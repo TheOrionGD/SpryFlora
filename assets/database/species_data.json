@@ -1,0 +1,66 @@
+[
+  {
+    "name": "Rose",
+    "lifespanDays": 150,
+    "wateringIntervalDays": 3,
+    "sunlight": "Full Sun",
+    "description": "Fragrant flowering perennial shrub with rich petals.",
+    "idealTemp": "18°C - 28°C"
+  },
+  {
+    "name": "Money Plant",
+    "lifespanDays": 300,
+    "wateringIntervalDays": 3,
+    "sunlight": "Indirect Light",
+    "description": "Lush cascading foliage believed to bring prosperity.",
+    "idealTemp": "15°C - 30°C"
+  },
+  {
+    "name": "Tulsi",
+    "lifespanDays": 120,
+    "wateringIntervalDays": 2,
+    "sunlight": "Direct Sun",
+    "description": "Holy basil with sacred medicinal and aromatic properties.",
+    "idealTemp": "20°C - 35°C"
+  },
+  {
+    "name": "Aloe Vera",
+    "lifespanDays": 365,
+    "wateringIntervalDays": 7,
+    "sunlight": "Bright Sunlight",
+    "description": "Hardy succulent loaded with soothing skin-nourishing gel.",
+    "idealTemp": "13°C - 27°C"
+  },
+  {
+    "name": "Snake Plant",
+    "lifespanDays": 400,
+    "wateringIntervalDays": 10,
+    "sunlight": "Low to Bright",
+    "description": "Air-purifying architectural plant that thrives on low maintenance.",
+    "idealTemp": "15°C - 29°C"
+  },
+  {
+    "name": "Peace Lily",
+    "lifespanDays": 250,
+    "wateringIntervalDays": 4,
+    "sunlight": "Medium Shade",
+    "description": "Elegant white spathes and deep emerald leaves.",
+    "idealTemp": "18°C - 26°C"
+  },
+  {
+    "name": "Spider Plant",
+    "lifespanDays": 200,
+    "wateringIntervalDays": 4,
+    "sunlight": "Bright Indirect",
+    "description": "Resilient arching leaves with baby plantlets.",
+    "idealTemp": "16°C - 24°C"
+  },
+  {
+    "name": "Jade Plant",
+    "lifespanDays": 350,
+    "wateringIntervalDays": 7,
+    "sunlight": "Direct Sun",
+    "description": "Fleshy miniature tree succulent symbolizing good luck.",
+    "idealTemp": "18°C - 24°C"
+  }
+]

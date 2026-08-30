@@ -1,0 +1,3 @@
+# Plant Animation Assets Placeholder
+# Directory structure ready for frame sequences:
+# assets/animations/rose/frame_001.png ...
