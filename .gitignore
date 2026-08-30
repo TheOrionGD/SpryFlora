@@ -173,3 +173,4 @@ migrate_working_dir/
 credentials.json
 google-services.json
 GoogleService-Info.plist
+lib/config/api_config.dart
