@@ -5,6 +5,7 @@ import '../models/plant_model.dart';
 import '../services/ai_service.dart';
 import '../services/plant_repository.dart';
 import '../theme/skeuo_theme.dart';
+import '../widgets/speech_visualizer.dart';
 
 /// Screen 15: AI Eco Buddy Chat (from 255.jpg)
 /// - Top Bar: Back button + "AI Eco Buddy"
@@ -280,6 +281,32 @@ class _AIEcoBuddyScreenState extends State<AIEcoBuddyScreen> {
             child: SafeArea(
               child: Row(
                 children: [
+                  // Voice Input Mic Button for Kids (Tamil & English Speech Extraction)
+                  GestureDetector(
+                    onTap: () {
+                      SpeechVisualizerWidget.show(
+                        context,
+                        onSpeechExtracted: (extractedText) {
+                          _sendMessage(extractedText);
+                        },
+                      );
+                    },
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFF81C784)),
+                      ),
+                      child: const Icon(
+                        Icons.mic_rounded,
+                        color: Color(0xFF2E7D32),
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -301,7 +328,7 @@ class _AIEcoBuddyScreenState extends State<AIEcoBuddyScreen> {
                           color: const Color(0xFF2E7D32),
                         ),
                         decoration: InputDecoration(
-                          hintText: 'Type a message...',
+                          hintText: 'Type or speak in தமிழ் / English...',
                           hintStyle: GoogleFonts.nunito(
                             fontSize: 14,
                             color: const Color(0xFFA5D6A7),

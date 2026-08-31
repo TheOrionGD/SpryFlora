@@ -7,6 +7,7 @@ import '../services/user_service.dart';
 import '../theme/skeuo_theme.dart';
 import '../widgets/fun_bouncy_button.dart';
 import '../widgets/fun_confetti_overlay.dart';
+import 'ai_eco_buddy_screen.dart';
 import 'garden_screen.dart';
 
 /// Screen 14: Virtual Companion (from 255.jpg)
@@ -256,21 +257,41 @@ class _VirtualCompanionScreenState extends State<VirtualCompanionScreen>
 
                 const SizedBox(height: 28),
 
-                // ── "View Growth Journey" Button ──────────────────────────
-                SizedBox(
-                  width: double.infinity,
-                  child: FunBouncyButton(
-                    text: 'View Growth Journey',
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const GardenScreen()),
-                      );
-                    },
-                    color: const Color(0xFF4CAF50),
-                    textColor: Colors.white,
-                    height: 54,
-                    fontSize: 17,
-                  ),
+                // ── "Talk to Eco Buddy 🎙️" & "View Growth Journey" Buttons ──────────────────────────
+                Row(
+                  children: [
+                    Expanded(
+                      child: FunBouncyButton(
+                        text: 'Voice Chat 🎙️',
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const AIEcoBuddyScreen(),
+                            ),
+                          );
+                        },
+                        color: const Color(0xFF2E7D32),
+                        textColor: Colors.white,
+                        height: 54,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FunBouncyButton(
+                        text: 'Growth Journey 🌿',
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const GardenScreen()),
+                          );
+                        },
+                        color: const Color(0xFF4CAF50),
+                        textColor: Colors.white,
+                        height: 54,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 20),
               ],

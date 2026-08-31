@@ -10,6 +10,7 @@ import 'excel_service.dart';
 import 'plant_health_engine.dart';
 
 /// Structured AI Plant Diagnostic Analysis Result
+/// Structured AI Plant Diagnostic Analysis Result
 class PlantAIAnalysisResult {
   final int healthPercent;
   final String diseaseStatus;
@@ -21,6 +22,9 @@ class PlantAIAnalysisResult {
   final String? discoveryBadgeName;
   final String? discoveryRewardMessage;
   final PlantSpecies? matchedSpecies;
+  final bool isPlantDetected;
+  final String? rejectionReason;
+  final String detectedObjectType;
 
   const PlantAIAnalysisResult({
     required this.healthPercent,
@@ -33,6 +37,9 @@ class PlantAIAnalysisResult {
     this.discoveryBadgeName,
     this.discoveryRewardMessage,
     this.matchedSpecies,
+    this.isPlantDetected = true,
+    this.rejectionReason,
+    this.detectedObjectType = 'Plant / Leaf',
   });
 }
 
@@ -64,45 +71,55 @@ class AIService {
     List<String> recommendations = healthReport.recommendations;
     String advice = 'Plant is growing in optimal condition!';
 
+    bool isPlantDetected = true;
+    String? rejectionReason;
+    String detectedObjectType = 'Plant / Leaf';
+
     // Multimodal AI Vision Diagnosis with Gemini
     if (apiKey.isNotEmpty && photoPath != null && photoPath.isNotEmpty) {
       try {
         String? base64Image;
+        List<int>? rawBytes;
         if (!kIsWeb && File(photoPath).existsSync()) {
-          final bytes = await File(photoPath).readAsBytes();
-          base64Image = base64Encode(bytes);
+          rawBytes = await File(photoPath).readAsBytes();
+          base64Image = base64Encode(rawBytes);
         } else if (photoPath.startsWith('data:image')) {
           final parts = photoPath.split(',');
           if (parts.length > 1) {
             base64Image = parts[1];
+            try {
+              rawBytes = base64Decode(base64Image);
+            } catch (_) {}
           }
         }
 
         if (base64Image != null && base64Image.isNotEmpty) {
           final prompt = '''
-You are an expert AI botanist and plant pathologist.
-Analyze this photo of a plant leaf and structure.
-Plant reported name: "${plant.plantName}", Species: "${plant.speciesName}".
-Current stats:
-- Age: ${plant.ageInDays} days (${plant.growthStageName})
-- Hydration: ${plant.hydrationScore}%, Sunlight: ${plant.sunlightScore}%
+You are an expert AI computer vision botanist and plant pathologist.
+Analyze this photo carefully.
 
-Identify the precise botanical species from the leaf structure and visual features.
+CRITICAL PLANT VERIFICATION REQUIREMENT:
+You MUST verify if this image contains a real plant, leaf, seedling, sprout, tree, flower, or botanical foliage.
+If the photo shows non-botanical items such as a wall, pen, notebook, desk, room background, vehicle, human face/body, electronic device, clothing, or plain surface with NO clear plant/leaf/seedling present, you MUST set "isPlantDetected" to false and describe the non-plant object in "detectedObjectType" (e.g. "Wall", "Pen", "Furniture", "Person", "Room Interior").
+
+Plant reported name: "${plant.plantName}", Species: "${plant.speciesName}".
+
 Return a JSON object in this exact format:
 {
-  "identifiedSpecies": "<Common English botanical name, e.g. 'Tulsi', 'Money Plant', 'Calathea', 'Fiddle Leaf Fig'>",
+  "isPlantDetected": true or false,
+  "detectedObjectType": "<'Plant / Leaf' if plant/seedling/leaf detected, or specific non-plant object name like 'Wall', 'Pen', 'Furniture', 'Person', 'Desk'>",
+  "rejectionReason": "<If isPlantDetected is false, provide concise user message e.g. 'No plant or leaf detected in photo. Scanner detected a wall/pen/object instead.' Otherwise null>",
+  "identifiedSpecies": "<Common English botanical name if plant, e.g. 'Tulsi', 'Money Plant', 'Calathea', 'Fiddle Leaf Fig'>",
   "healthPercent": <integer 0-100>,
   "diseaseStatus": "<'Healthy', 'None', or specific condition name like 'Leaf Spot' or 'Chlorosis'>",
   "confidencePercent": <integer 85-99>,
-  "estimatedLifespanDays": <integer, default 180>,
-  "estimatedWateringDays": <integer, default 3>,
   "recommendations": [
     "<recommendation 1>",
     "<recommendation 2>",
     "<recommendation 3>",
     "<recommendation 4>"
   ],
-  "detailedAdvice": "<concise friendly botanical guidance for the child/gardener>"
+  "detailedAdvice": "<concise friendly botanical guidance for the gardener>"
 }
 Do not wrap in markdown quotes. Return pure JSON only.
 ''';
@@ -110,6 +127,7 @@ Do not wrap in markdown quotes. Return pure JSON only.
           final visionResponse = await _callGeminiVisionApi(
             prompt: prompt,
             base64Image: base64Image,
+            preferredApiKey: ApiConfig.geminiApiKey1,
           );
 
           if (visionResponse != null && visionResponse.isNotEmpty) {
@@ -119,6 +137,17 @@ Do not wrap in markdown quotes. Return pure JSON only.
                   .replaceAll('```', '')
                   .trim();
               final map = jsonDecode(cleaned);
+
+              if (map['isPlantDetected'] != null) {
+                isPlantDetected = map['isPlantDetected'] == true;
+              }
+              if (map['detectedObjectType'] != null) {
+                detectedObjectType = map['detectedObjectType'].toString().trim();
+              }
+              if (map['rejectionReason'] != null) {
+                rejectionReason = map['rejectionReason'].toString().trim();
+              }
+
               if (map['identifiedSpecies'] != null &&
                   map['identifiedSpecies'].toString().trim().isNotEmpty) {
                 detectedSpeciesName =
@@ -134,12 +163,56 @@ Do not wrap in markdown quotes. Return pure JSON only.
                     .toList();
               }
               advice = (map['detailedAdvice'] as String?) ?? advice;
-            } catch (_) {}
+            } catch (e) {
+              debugPrint('Error parsing Gemini Vision response JSON: $e');
+            }
+          } else if (rawBytes != null) {
+            final offlineValid = _isBotanicalImageBytes(rawBytes);
+            if (!offlineValid) {
+              isPlantDetected = false;
+              detectedObjectType = 'Wall / Non-Botanical Object';
+              rejectionReason =
+                  'No plant, leaf, or seedling detected in photo. Please scan a clear image of a plant.';
+            }
           }
         }
       } catch (e) {
         debugPrint('Multimodal Gemini vision analysis failed: $e');
       }
+    } else if (photoPath != null && photoPath.isNotEmpty && !kIsWeb && File(photoPath).existsSync()) {
+      try {
+        final rawBytes = await File(photoPath).readAsBytes();
+        final offlineValid = _isBotanicalImageBytes(rawBytes);
+        if (!offlineValid) {
+          isPlantDetected = false;
+          detectedObjectType = 'Wall / Non-Botanical Object';
+          rejectionReason =
+              'No plant, leaf, or seedling detected in photo. Scanner detected a wall, pen, or plain surface.';
+        }
+      } catch (_) {}
+    }
+
+    if (!isPlantDetected) {
+      return PlantAIAnalysisResult(
+        healthPercent: 0,
+        diseaseStatus: 'Invalid Capture',
+        confidencePercent: 0,
+        recommendations: [
+          'Please capture a photo showing actual plant leaves, seedlings, or stem',
+          'Avoid taking pictures of walls, pens, desks, or background objects',
+          'Ensure adequate lighting focused directly on plant foliage',
+        ],
+        detailedAdvice: rejectionReason ??
+            'No plant, seedling, or leaf detected in photo. Scanner detected $detectedObjectType.',
+        identifiedSpecies: 'Not a Plant ($detectedObjectType)',
+        isNewDiscovery: false,
+        discoveryBadgeName: null,
+        discoveryRewardMessage: null,
+        isPlantDetected: false,
+        rejectionReason: rejectionReason ??
+            'No plant, seedling, or leaf detected in photo. Detected: $detectedObjectType',
+        detectedObjectType: detectedObjectType,
+      );
     }
 
     if (recommendations.isEmpty) {
@@ -191,10 +264,13 @@ Do not wrap in markdown quotes. Return pure JSON only.
       discoveryBadgeName: discoveryBadge,
       discoveryRewardMessage: discoveryReward,
       matchedSpecies: dbMatch,
+      isPlantDetected: true,
+      rejectionReason: null,
+      detectedObjectType: 'Plant / Leaf',
     );
   }
 
-  /// Generates personalized daily growth stage care guidance
+  /// Generates personalized daily growth stage care guidance (Segment 1 AI Feature -> Key 1)
   Future<String> getStageCareGuidance(PlantModel plant) async {
     final healthReport = PlantHealthEngine.evaluate(plant: plant);
 
@@ -214,7 +290,10 @@ The user is caring for a plant:
 Write a short, engaging, 2-3 sentence personalized botanical guidance tip for today. Focus on what this plant needs in its current "${plant.growthStageName}" stage. Include an emoji. Do not use markdown headers.
 ''';
 
-        final response = await _callGeminiApi(prompt: prompt);
+        final response = await _callGeminiApi(
+          prompt: prompt,
+          preferredApiKey: ApiConfig.geminiApiKey1,
+        );
         if (response != null && response.isNotEmpty) {
           return response.trim();
         }
@@ -227,7 +306,7 @@ Write a short, engaging, 2-3 sentence personalized botanical guidance tip for to
     return _generateOfflineStageGuidance(plant, healthReport);
   }
 
-  /// Analyzes Daily Check-in photo & environmental inputs
+  /// Analyzes Daily Check-in photo & environmental inputs (Segment 2 AI Feature -> Key 2)
   Future<String> analyzeCheckinAndPhoto({
     required PlantModel plant,
     required bool watered,
@@ -250,7 +329,10 @@ The user just completed a daily check-in for "${plant.plantName}" (${plant.speci
 Provide a concise 2-sentence diagnostic assessment of today's care. Praise good care, or gently advise on sunlight/watering balance. Include emojis.
 ''';
 
-        final response = await _callGeminiApi(prompt: prompt);
+        final response = await _callGeminiApi(
+          prompt: prompt,
+          preferredApiKey: ApiConfig.geminiApiKey2,
+        );
         if (response != null && response.isNotEmpty) {
           return response.trim();
         }
@@ -268,7 +350,7 @@ Provide a concise 2-sentence diagnostic assessment of today's care. Praise good 
     );
   }
 
-  /// Interactive Q&A with Flora AI Plant Doctor
+  /// Interactive Q&A with Flora AI Plant Doctor (Segment 2 AI Feature -> Key 2)
   Future<String> askFloraAI({
     PlantModel? plant,
     required String userQuestion,
@@ -289,6 +371,8 @@ Provide a concise 2-sentence diagnostic assessment of today's care. Praise good 
       try {
         final prompt = '''
 You are Flora AI, a warm, knowledgeable, and encouraging virtual plant doctor inside the SPR Flora app.
+Target Audience: Children / Kids caring for virtual & real plants.
+
 Plant context:
 - Name: "${activePlant.plantName}" (${activePlant.speciesName})
 - Age: ${activePlant.ageInDays} days, Stage: ${activePlant.growthStageName}
@@ -298,10 +382,14 @@ Plant context:
 
 User Question: "$userQuestion"
 
-Answer the user directly in 2-4 friendly, educational sentences with clear, actionable botanical tips. Keep it upbeat, child-friendly, and practical.
+Answer the child directly in 2-4 friendly, educational sentences with clear, actionable botanical tips.
+If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly Tamil with English keywords (or bilingual English/Tamil) so it is very easy for children to understand. Include emojis! Keep it upbeat and encouraging.
 ''';
 
-        final response = await _callGeminiApi(prompt: prompt);
+        final response = await _callGeminiApi(
+          prompt: prompt,
+          preferredApiKey: ApiConfig.geminiApiKey2,
+        );
         if (response != null && response.isNotEmpty) {
           return response.trim();
         }
@@ -314,112 +402,141 @@ Answer the user directly in 2-4 friendly, educational sentences with clear, acti
     return _generateOfflineQnAResponse(activePlant, userQuestion, healthReport);
   }
 
-  /// REST call to Gemini Generative Language API with automatic multi-model fallback
+  /// REST call to Gemini Generative Language API with segmented key routing & automatic failover
   Future<String?> _callGeminiApi({
     required String prompt,
+    String? preferredApiKey,
   }) async {
+    final primaryKey = preferredApiKey ?? ApiConfig.geminiApiKey1;
+    final fallbackKey = primaryKey == ApiConfig.geminiApiKey1
+        ? ApiConfig.geminiApiKey2
+        : ApiConfig.geminiApiKey1;
+
+    final keysToTry = [
+      primaryKey,
+      if (fallbackKey.isNotEmpty && fallbackKey != primaryKey) fallbackKey,
+    ];
+
     final modelsToTry = [
       ApiConfig.primaryModel,
       ApiConfig.secondaryModel,
+      'gemini-1.5-flash',
     ];
 
-    for (final model in modelsToTry) {
-      try {
-        final uri = Uri.parse('${ApiConfig.geminiBaseUrl}/$model:generateContent');
-        final headers = {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        };
-        final body = jsonEncode({
-          'contents': [
-            {
-              'parts': [
-                {'text': prompt}
-              ]
+    for (final currentKey in keysToTry) {
+      if (currentKey.isEmpty) continue;
+      for (final model in modelsToTry) {
+        try {
+          final uri = Uri.parse('${ApiConfig.geminiBaseUrl}/$model:generateContent');
+          final headers = {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': currentKey,
+          };
+          final body = jsonEncode({
+            'contents': [
+              {
+                'parts': [
+                  {'text': prompt}
+                ]
+              }
+            ],
+            'generationConfig': {
+              'temperature': 0.7,
+              'maxOutputTokens': 250,
             }
-          ],
-          'generationConfig': {
-            'temperature': 0.7,
-            'maxOutputTokens': 250,
-          }
-        });
+          });
 
-        final response = await http
-            .post(uri, headers: headers, body: body)
-            .timeout(const Duration(seconds: 7));
+          final response = await http
+              .post(uri, headers: headers, body: body)
+              .timeout(const Duration(seconds: 7));
 
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
-          if (text != null && text.isNotEmpty) {
-            return text;
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
+            if (text != null && text.isNotEmpty) {
+              return text;
+            }
+          } else {
+            debugPrint('Model $model with key returned status ${response.statusCode}, trying fallback...');
           }
-        } else {
-          debugPrint('Model $model returned status ${response.statusCode}, trying fallback...');
+        } catch (e) {
+          debugPrint('Model $model invocation error: $e');
         }
-      } catch (e) {
-        debugPrint('Model $model invocation error: $e');
       }
     }
 
     return null;
   }
 
-  /// Multimodal Vision REST call to Gemini with base64 image inlineData
+  /// Multimodal Vision REST call to Gemini with base64 image inlineData, key segmentation & failover
   Future<String?> _callGeminiVisionApi({
     required String prompt,
     required String base64Image,
+    String? preferredApiKey,
   }) async {
+    final primaryKey = preferredApiKey ?? ApiConfig.geminiApiKey1;
+    final fallbackKey = primaryKey == ApiConfig.geminiApiKey1
+        ? ApiConfig.geminiApiKey2
+        : ApiConfig.geminiApiKey1;
+
+    final keysToTry = [
+      primaryKey,
+      if (fallbackKey.isNotEmpty && fallbackKey != primaryKey) fallbackKey,
+    ];
+
     final modelsToTry = [
+      'gemini-flash-latest',
       'gemini-1.5-flash',
       'gemini-2.0-flash',
       'gemini-1.5-pro',
       ApiConfig.primaryModel,
-      ApiConfig.secondaryModel,
     ];
 
-    for (final model in modelsToTry) {
-      try {
-        final uri = Uri.parse('${ApiConfig.geminiBaseUrl}/$model:generateContent');
-        final headers = {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        };
-        final body = jsonEncode({
-          'contents': [
-            {
-              'parts': [
-                {'text': prompt},
-                {
-                  'inlineData': {
-                    'mimeType': 'image/jpeg',
-                    'data': base64Image,
+    for (final currentKey in keysToTry) {
+      if (currentKey.isEmpty) continue;
+      for (final model in modelsToTry) {
+        try {
+          final uri = Uri.parse('${ApiConfig.geminiBaseUrl}/$model:generateContent');
+          final headers = {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': currentKey,
+          };
+          final body = jsonEncode({
+            'contents': [
+              {
+                'parts': [
+                  {'text': prompt},
+                  {
+                    'inlineData': {
+                      'mimeType': 'image/jpeg',
+                      'data': base64Image,
+                    }
                   }
-                }
-              ]
+                ]
+              }
+            ],
+            'generationConfig': {
+              'temperature': 0.4,
+              'maxOutputTokens': 500,
             }
-          ],
-          'generationConfig': {
-            'temperature': 0.4,
-            'maxOutputTokens': 500,
-          }
-        });
+          });
 
-        final response = await http
-            .post(uri, headers: headers, body: body)
-            .timeout(const Duration(seconds: 10));
+          final response = await http
+              .post(uri, headers: headers, body: body)
+              .timeout(const Duration(seconds: 10));
 
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
-          if (text != null && text.isNotEmpty) {
-            return text;
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
+            if (text != null && text.isNotEmpty) {
+              return text;
+            }
+          } else {
+            debugPrint('Vision Model $model returned status ${response.statusCode}, trying fallback...');
           }
-        } else {
-          debugPrint('Vision Model $model returned status ${response.statusCode}, trying fallback...');
+        } catch (e) {
+          debugPrint('Vision Model $model invocation error: $e');
         }
-      } catch (e) {
-        debugPrint('Vision Model $model invocation error: $e');
       }
     }
 
@@ -476,7 +593,7 @@ Answer the user directly in 2-4 friendly, educational sentences with clear, acti
     }
   }
 
-  /// Offline Q&A Reasoning Engine
+  /// Offline Q&A Reasoning Engine supporting English, Tamil, and Tanglish queries
   String _generateOfflineQnAResponse(
     PlantModel plant,
     String question,
@@ -485,18 +602,98 @@ Answer the user directly in 2-4 friendly, educational sentences with clear, acti
     final q = question.toLowerCase();
     final species = plant.speciesName;
 
-    if (q.contains('water') || q.contains('drink') || q.contains('dry')) {
-      return '💧 For your $species, water every ${plant.wateringIntervalDays} days. Currently, watering is scheduled for ${plant.wateringStatusText}. Always ensure soil has good drainage!';
-    } else if (q.contains('sun') || q.contains('light') || q.contains('dark') || q.contains('window')) {
-      return '☀️ $species prefers ${plant.targetSunlightHours} hours of daily sunlight. Place ${plant.plantName} near an east or south-facing window for optimal growth.';
-    } else if (q.contains('yellow') || q.contains('brown') || q.contains('leaf') || q.contains('leaves')) {
-      return '🍃 Yellowing or brown leaf tips usually indicate either over-watering or direct sun scorching. Ensure the pot has drainage and move it to bright indirect light.';
-    } else if (q.contains('grow') || q.contains('stage') || q.contains('fast') || q.contains('tall')) {
-      return '📈 ${plant.plantName} is currently at ${(plant.growthProgress * 100).toInt()}% progress in the ${plant.growthStageName} stage! Consistent daily check-ins accelerate healthy natural development.';
-    } else if (q.contains('health') || q.contains('how is') || q.contains('status')) {
+    // Check for Tamil / Tanglish / English watering queries
+    if (q.contains('water') ||
+        q.contains('drink') ||
+        q.contains('dry') ||
+        q.contains('தண்ணீர்') ||
+        q.contains('thanneer') ||
+        q.contains('ஊற்ற')) {
+      return '💧 உங்கள் $species செடிக்கு ${plant.wateringIntervalDays} நாட்களுக்கு ஒருமுறை தண்ணீர் ஊற்ற வேண்டும். ($species needs watering every ${plant.wateringIntervalDays} days). Always make sure soil has good drainage!';
+    }
+    // Check for sunlight queries
+    else if (q.contains('sun') ||
+        q.contains('light') ||
+        q.contains('dark') ||
+        q.contains('window') ||
+        q.contains('சூரிய') ||
+        q.contains('வெளிச்சம்')) {
+      return '☀️ $species செடிக்கு தினமும் ${plant.targetSunlightHours} மணிநேரம் மிதமான சூரிய வெளிச்சம் தேவை. ($species prefers ${plant.targetSunlightHours}h of daily bright light near window).';
+    }
+    // Check for yellow leaf queries
+    else if (q.contains('yellow') ||
+        q.contains('brown') ||
+        q.contains('leaf') ||
+        q.contains('leaves') ||
+        q.contains('மஞ்சள்') ||
+        q.contains('இலை')) {
+      return '🍃 இலை மஞ்சள் நிறமாக மாறினால் அதிக தண்ணீர் அல்லது நேரடி வெயில் காரணமாக இருக்கலாம். (Yellow leaves are caused by over-watering or scorching sun). Move pot to bright indirect light!';
+    }
+    // Growth stage queries
+    else if (q.contains('grow') ||
+        q.contains('stage') ||
+        q.contains('fast') ||
+        q.contains('tall') ||
+        q.contains('வளர') ||
+        q.contains('செடி')) {
+      return '📈 உங்கள் ${plant.plantName} தற்போது ${(plant.growthProgress * 100).toInt()}% வளர்ந்துள்ளது! (${plant.growthStageName} stage). Daily check-in செய்து தொடர்ந்து பராமரியுங்கள்! 🌱';
+    }
+    // Health report queries
+    else if (q.contains('health') ||
+        q.contains('how is') ||
+        q.contains('status') ||
+        q.contains('சுகாதாரம்')) {
       return '🩺 Health Report: Overall ${health.overallHealth}% (${health.status}). Hydration is at ${health.hydrationScore}% and Sunlight is at ${health.sunlightScore}%. Keep up the fantastic care!';
     } else {
-      return '🌿 As a botanical mentor for ${plant.plantName} ($species), my top advice is consistency! Provide ${plant.targetSunlightHours}h light, water every ${plant.wateringIntervalDays} days, and check in daily to earn your certificate!';
+      return '🌿 Eco Buddy Advice for ${plant.plantName} ($species): ${plant.targetSunlightHours} மணிநேரம் சூரிய ஒளி, ${plant.wateringIntervalDays} நாட்களுக்கு ஒருமுறை தண்ணீர் வழங்கி நன்றாக வளருங்கள்! 🎉';
     }
   }
+
+  /// Heuristic offline analyzer to verify if photo bytes contain botanical/foliage color characteristics
+  /// Rejects plain walls, pens, monochrome backgrounds, or plain office items.
+  bool _isBotanicalImageBytes(List<int> bytes) {
+    if (bytes.length < 500) return true; // Can't sample very small byte streams
+
+    int totalSamples = 0;
+    int botanicalGreenSamples = 0;
+    int plainSurfaceSamples = 0;
+
+    // Sample across the image byte stream
+    final int step = (bytes.length / 400).floor().clamp(1, 1000);
+    for (int i = 0; i < bytes.length - 2; i += step) {
+      totalSamples++;
+      final b1 = bytes[i];
+      final b2 = bytes[i + 1];
+      final b3 = bytes[i + 2];
+
+      // Check for plain white / grey / cream wall (high RGB similarity, high brightness)
+      final diff1 = (b1 - b2).abs();
+      final diff2 = (b2 - b3).abs();
+      if (b1 > 140 && b2 > 140 && b3 > 140 && diff1 < 18 && diff2 < 18) {
+        plainSurfaceSamples++;
+      }
+
+      // Check for green foliage spectrum (Green channel elevated over Red & Blue)
+      if (b2 > 40 && b2 > (b1 * 0.85) && b2 > (b3 * 0.85)) {
+        botanicalGreenSamples++;
+      }
+    }
+
+    if (totalSamples == 0) return true;
+
+    final double wallRatio = plainSurfaceSamples / totalSamples;
+    final double greenRatio = botanicalGreenSamples / totalSamples;
+
+    // If over 65% of samples are plain wall surface and green foliage ratio is low (< 10%), reject
+    if (wallRatio > 0.65 && greenRatio < 0.10) {
+      return false;
+    }
+    // If green/foliage ratio is virtually zero (< 3%) and plain samples > 40%, reject non-plant
+    if (greenRatio < 0.03 && plainSurfaceSamples > 0.40 * totalSamples) {
+      return false;
+    }
+
+    return true;
+  }
 }
+

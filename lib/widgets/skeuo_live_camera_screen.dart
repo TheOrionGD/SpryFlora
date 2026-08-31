@@ -425,6 +425,40 @@ class _SkeuoLiveCameraScreenState extends State<SkeuoLiveCameraScreen>
                             );
                           },
                         ),
+
+                      // Plant Framing Guidance Overlay
+                      if (_capturedPhotoPath == null)
+                        Positioned(
+                          top: 16,
+                          left: 20,
+                          right: 20,
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.65),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: SkeuoTheme.primaryGreen.withValues(alpha: 0.6),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('🌱 ', style: TextStyle(fontSize: 13)),
+                                  Text(
+                                    'Align plant leaves, seedlings, or stem inside frame',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),

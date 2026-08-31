@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/plant_model.dart';
 import '../models/daily_checkin_model.dart';
 import '../services/ai_service.dart';
+import 'speech_visualizer.dart';
 
 /// Skeuomorphic Flora AI Plant Doctor Modal Sheet
 class FloraAISheet extends StatefulWidget {
@@ -308,6 +309,31 @@ class _FloraAISheetState extends State<FloraAISheet> {
               top: false,
               child: Row(
                 children: [
+                  // Kids Voice Recognition Mic Button
+                  GestureDetector(
+                    onTap: () {
+                      SpeechVisualizerWidget.show(
+                        context,
+                        onSpeechExtracted: (extractedText) {
+                          _askQuestion(extractedText);
+                        },
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.green.shade300),
+                      ),
+                      child: const Icon(
+                        Icons.mic_rounded,
+                        color: Color(0xFF2E7D32),
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
@@ -321,7 +347,7 @@ class _FloraAISheetState extends State<FloraAISheet> {
                         textInputAction: TextInputAction.send,
                         onSubmitted: _askQuestion,
                         decoration: const InputDecoration(
-                          hintText: 'Ask Flora AI anything about your plant...',
+                          hintText: 'Type or speak in தமிழ் / English...',
                           hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
                           border: InputBorder.none,
                           isDense: true,

@@ -45,6 +45,9 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen>
   String? _photoPath;
   String _identifiedSpecies = '';
   bool _isNewDiscovery = false;
+  bool _isPlantDetected = true;
+  String? _rejectionReason;
+  String _detectedObjectType = 'Plant / Leaf';
 
   final AIService _aiService = AIService();
 
@@ -80,6 +83,9 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen>
 
     if (mounted) {
       setState(() {
+        _isPlantDetected = result.isPlantDetected;
+        _rejectionReason = result.rejectionReason;
+        _detectedObjectType = result.detectedObjectType;
         _health = result.healthPercent;
         _disease = result.diseaseStatus;
         _confidence = result.confidencePercent;
@@ -89,7 +95,7 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen>
         _isAnalyzing = false;
       });
 
-      if (result.isNewDiscovery) {
+      if (result.isPlantDetected && result.isNewDiscovery) {
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) {
             LeafDiscoveryBadgeDialog.show(
@@ -172,18 +178,23 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen>
                     width: 280,
                     height: 240,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
+                      color: _isPlantDetected
+                          ? const Color(0xFFE8F5E9)
+                          : const Color(0xFFFFEBEE),
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color:
-                              const Color(0xFF2E7D32).withValues(alpha: 0.12),
+                          color: _isPlantDetected
+                              ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
+                              : Colors.red.withValues(alpha: 0.15),
                           blurRadius: 16,
                           offset: const Offset(0, 6),
                         ),
                       ],
                       border: Border.all(
-                        color: const Color(0xFF81C784),
+                        color: _isPlantDetected
+                            ? const Color(0xFF81C784)
+                            : const Color(0xFFE57373),
                         width: 2,
                       ),
                     ),
@@ -207,6 +218,7 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen>
                           return CustomPaint(
                             painter: _ScannerLinePainter(
                               progress: _scanLineCtrl.value,
+                              isPlant: _isPlantDetected,
                             ),
                           );
                         },
@@ -218,7 +230,9 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen>
                   Positioned.fill(
                     child: IgnorePointer(
                       child: CustomPaint(
-                        painter: _ReticleCornersPainter(),
+                        painter: _ReticleCornersPainter(
+                          isPlant: _isPlantDetected,
+                        ),
                       ),
                     ),
                   ),
@@ -228,94 +242,198 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen>
 
             const SizedBox(height: 18),
 
-            // ── Species Verification / Discovery Banner ──
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: _isNewDiscovery
-                    ? const Color(0xFFFFF8E1)
-                    : Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: _isNewDiscovery
-                      ? const Color(0xFFFFD54F)
-                      : const Color(0xFFE8F5E9),
-                  width: 1.5,
+            // ── Non-Plant Rejection Alert / Verification Banner ──
+            if (!_isPlantDetected)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFEBEE),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: const Color(0xFFEF5350),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.red.withValues(alpha: 0.06),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF2E7D32).withValues(alpha: 0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _isNewDiscovery
-                          ? const Color(0xFFFFECB3)
-                          : const Color(0xFFE8F5E9),
-                    ),
-                    child: Text(
-                      _isNewDiscovery ? '🎖️' : '🌿',
-                      style: const TextStyle(fontSize: 20),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                child: Column(
+                  children: [
+                    Row(
                       children: [
-                        Text(
-                          _isNewDiscovery
-                              ? 'New Discovery Identified!'
-                              : 'Botanical Database Match',
-                          style: GoogleFonts.nunito(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: _isNewDiscovery
-                                ? const Color(0xFFE65100)
-                                : SkeuoTheme.textSecondary,
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color(0xFFFFCDD2),
+                          ),
+                          child: const Icon(
+                            Icons.warning_amber_rounded,
+                            color: Color(0xFFC62828),
+                            size: 22,
                           ),
                         ),
-                        Text(
-                          _identifiedSpecies.isNotEmpty
-                              ? _identifiedSpecies
-                              : widget.plant.speciesName,
-                          style: GoogleFonts.nunito(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            color: SkeuoTheme.textPrimary,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Non-Plant Photo Captured',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFFC62828),
+                                ),
+                              ),
+                              Text(
+                                'Detected: $_detectedObjectType',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: const Color(0xFFB71C1C),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD32F2F),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'REJECTED',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _isNewDiscovery
-                          ? const Color(0xFFFF8F00)
-                          : SkeuoTheme.primaryGreen,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      _isNewDiscovery ? 'NEW DISCOVERY' : 'VERIFIED',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
+                    const SizedBox(height: 10),
+                    Text(
+                      _rejectionReason ??
+                          'The scanner detected a wall, pen, or non-plant object. Please capture a clear image of plant leaves, seedlings, or stem.',
+                      style: GoogleFonts.nunito(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF5D4037),
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: _scanNewPhoto,
+                      icon: const Icon(Icons.camera_alt_rounded, size: 18),
+                      label: const Text('Re-Scan Plant Photo'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD32F2F),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _isNewDiscovery
+                      ? const Color(0xFFFFF8E1)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: _isNewDiscovery
+                        ? const Color(0xFFFFD54F)
+                        : const Color(0xFFE8F5E9),
+                    width: 1.5,
                   ),
-                ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2E7D32).withValues(alpha: 0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _isNewDiscovery
+                            ? const Color(0xFFFFECB3)
+                            : const Color(0xFFE8F5E9),
+                      ),
+                      child: Text(
+                        _isNewDiscovery ? '🎖️' : '🌿',
+                        style: const TextStyle(fontSize: 20),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _isNewDiscovery
+                                ? 'New Discovery Identified!'
+                                : 'Botanical Database Match',
+                            style: GoogleFonts.nunito(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _isNewDiscovery
+                                  ? const Color(0xFFE65100)
+                                  : SkeuoTheme.textSecondary,
+                            ),
+                          ),
+                          Text(
+                            _identifiedSpecies.isNotEmpty
+                                ? _identifiedSpecies
+                                : widget.plant.speciesName,
+                            style: GoogleFonts.nunito(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: SkeuoTheme.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _isNewDiscovery
+                            ? const Color(0xFFFF8F00)
+                            : SkeuoTheme.primaryGreen,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        _isNewDiscovery ? 'NEW DISCOVERY' : 'VERIFIED',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
 
             const SizedBox(height: 16),
 
@@ -544,17 +662,19 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen>
 
 class _ScannerLinePainter extends CustomPainter {
   final double progress;
+  final bool isPlant;
 
-  _ScannerLinePainter({required this.progress});
+  _ScannerLinePainter({required this.progress, this.isPlant = true});
 
   @override
   void paint(Canvas canvas, Size size) {
     final y = progress * size.height;
+    final strokeColor = isPlant ? const Color(0xFF00E676) : const Color(0xFFFF5252);
     final paint = Paint()
       ..shader = LinearGradient(
         colors: [
           Colors.transparent,
-          const Color(0xFF00E676).withValues(alpha: 0.6),
+          strokeColor.withValues(alpha: 0.6),
           Colors.transparent,
         ],
       ).createShader(Rect.fromLTWH(0, y - 2, size.width, 4))
@@ -566,14 +686,18 @@ class _ScannerLinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ScannerLinePainter oldDelegate) =>
-      oldDelegate.progress != progress;
+      oldDelegate.progress != progress || oldDelegate.isPlant != isPlant;
 }
 
 class _ReticleCornersPainter extends CustomPainter {
+  final bool isPlant;
+
+  _ReticleCornersPainter({this.isPlant = true});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF00E676)
+      ..color = isPlant ? const Color(0xFF00E676) : const Color(0xFFFF5252)
       ..strokeWidth = 3
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
@@ -607,5 +731,7 @@ class _ReticleCornersPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _ReticleCornersPainter oldDelegate) =>
+      oldDelegate.isPlant != isPlant;
 }
+
