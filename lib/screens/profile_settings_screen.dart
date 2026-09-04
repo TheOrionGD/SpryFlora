@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../config/api_config.dart';
 import '../config/app_version.dart';
 import '../models/user_model.dart';
 import '../services/plant_repository.dart';
@@ -66,10 +68,14 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
   @override
   Widget build(BuildContext context) {
     final name = _user?.childName.trim();
-    final displayName = (name != null && name.isNotEmpty) ? name : 'Alex';
+    final displayName = (name != null && name.isNotEmpty) ? name : 'Little Gardener';
+    final levelName = _user?.experienceLevelName ?? 'Beginner';
+    final userXp = _user?.xp ?? 120;
     final plantCount = _plantRepository.plants.length;
-    final gardenScore = 500 + plantCount * 65;
-    const daysActive = 21;
+    final gardenScore = 500 + plantCount * 65 + userXp;
+    final daysActive = _user?.createdAt != null
+        ? DateTime.now().difference(_user!.createdAt).inDays + 1
+        : 1;
 
     return Scaffold(
       backgroundColor: SkeuoTheme.background,
@@ -91,7 +97,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       // Profile Hero (Screen 16)
-                      _buildProfileHero(displayName, gardenScore),
+                      _buildProfileHero(displayName, levelName, userXp, gardenScore),
                       const SizedBox(height: 20),
 
                       // 4 Stats Grid: Plants Grown | Need Water | Avg Health | Days Active
@@ -212,6 +218,13 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                           ),
                           const Divider(height: 1, color: Color(0xFFF1F8EE)),
                           _buildSettingsTile(
+                            icon: Icons.delete_forever_rounded,
+                            title: 'Delete Account & Data (Web)',
+                            titleColor: SkeuoTheme.alertRed,
+                            onTap: _showDeleteAccountDialog,
+                          ),
+                          const Divider(height: 1, color: Color(0xFFF1F8EE)),
+                          _buildSettingsTile(
                             icon: Icons.logout_rounded,
                             title: 'Sign Out',
                             titleColor: SkeuoTheme.alertRed,
@@ -322,7 +335,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
     );
   }
 
-  Widget _buildProfileHero(String displayName, int gardenScore) {
+  Widget _buildProfileHero(String displayName, String levelName, int userXp, int gardenScore) {
     return Column(
       children: [
         Container(
@@ -365,11 +378,28 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
             color: SkeuoTheme.textPrimary,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8F5E9),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFA5D6A7), width: 1),
+          ),
+          child: Text(
+            '🏆 $levelName Gardener  •  $userXp XP',
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF2E7D32),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
         Text(
-          'Young Gardener 🌱  •  Score: $gardenScore',
+          'Favorite Plant: ${_user?.favoritePlant ?? "Tulsi"} 🌱',
           style: GoogleFonts.nunito(
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
             color: SkeuoTheme.textSecondary,
           ),
@@ -660,6 +690,88 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                     size: 14,
                     color: SkeuoTheme.alertRed,
                     weight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openAccountDeletionWebPage() async {
+    final urlStr = ApiConfig.accountDeletionUrl;
+    final uri = Uri.parse(urlStr);
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not launch account deletion URL: $urlStr'),
+            backgroundColor: SkeuoTheme.alertRed,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error launching deletion page: $e'),
+            backgroundColor: SkeuoTheme.alertRed,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showDeleteAccountDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SkeuoTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            const Text('🗑️', style: TextStyle(fontSize: 22)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Delete Account & Data',
+                style: SkeuoTheme.funHeading(
+                    size: 17, color: SkeuoTheme.alertRed),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'In accordance with Google Play Store policies, account deletion is processed via our secure web portal.\n\n'
+          'You will be redirected to the SpryFlora server deletion page to verify your credentials and request permanent removal of your account, plant logs, and stored data.',
+          style: SkeuoTheme.funBody(size: 13.5, color: SkeuoTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel',
+                style: SkeuoTheme.funBody(
+                    size: 14,
+                    color: SkeuoTheme.textMuted,
+                    weight: FontWeight.w700)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SkeuoTheme.alertRed,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _openAccountDeletionWebPage();
+            },
+            icon: const Icon(Icons.open_in_browser_rounded, size: 18),
+            label: const Text('Open Web Page',
+                style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),

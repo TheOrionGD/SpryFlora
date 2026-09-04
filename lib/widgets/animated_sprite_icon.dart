@@ -237,6 +237,8 @@ class _AnimatedSpriteIconState extends State<AnimatedSpriteIcon>
       width: widget.width,
       height: widget.height,
       fit: widget.fit,
+      filterQuality: FilterQuality.high,
+      isAntiAlias: true,
       errorBuilder: (_, __, ___) => Icon(
         Icons.eco_rounded,
         size: widget.width ?? 48,

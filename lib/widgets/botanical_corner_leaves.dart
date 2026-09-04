@@ -28,6 +28,7 @@ class BotanicalCornerLeaves extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
         errorBuilder: (_, __, ___) => const SizedBox.shrink(),
       ),
     );

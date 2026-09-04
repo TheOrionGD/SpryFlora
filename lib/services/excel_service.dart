@@ -86,7 +86,7 @@ class ExcelService {
             }
 
             parsedList.add(PlantSpecies(
-              name: nameVal,
+              commonName: nameVal,
               lifespanDays: lifespan > 0 ? lifespan : 150,
               wateringIntervalDays: interval > 0 ? interval : 3,
             ));
@@ -98,50 +98,11 @@ class ExcelService {
       } catch (_) {}
     }
 
-    // 3. Fallback standard list
+    // 3. Throw exception or record error if base species database could not be loaded
     if (baseSpecies.isEmpty) {
-      baseSpecies = const [
-        PlantSpecies(
-            name: 'Rose',
-            lifespanDays: 150,
-            wateringIntervalDays: 3,
-            sunlight: 'Full Sun'),
-        PlantSpecies(
-            name: 'Money Plant',
-            lifespanDays: 300,
-            wateringIntervalDays: 3,
-            sunlight: 'Indirect Light'),
-        PlantSpecies(
-            name: 'Tulsi',
-            lifespanDays: 120,
-            wateringIntervalDays: 2,
-            sunlight: 'Direct Sun'),
-        PlantSpecies(
-            name: 'Aloe Vera',
-            lifespanDays: 365,
-            wateringIntervalDays: 7,
-            sunlight: 'Bright Sunlight'),
-        PlantSpecies(
-            name: 'Snake Plant',
-            lifespanDays: 400,
-            wateringIntervalDays: 10,
-            sunlight: 'Low to Bright'),
-        PlantSpecies(
-            name: 'Peace Lily',
-            lifespanDays: 250,
-            wateringIntervalDays: 4,
-            sunlight: 'Medium Shade'),
-        PlantSpecies(
-            name: 'Spider Plant',
-            lifespanDays: 200,
-            wateringIntervalDays: 4,
-            sunlight: 'Bright Indirect'),
-        PlantSpecies(
-            name: 'Jade Plant',
-            lifespanDays: 350,
-            wateringIntervalDays: 7,
-            sunlight: 'Direct Sun'),
-      ];
+      _isLoaded = false;
+      _cachedSpecies = [];
+      throw Exception('Species database unavailable. Unable to load plant species catalog.');
     }
 
     // 4. Merge discovered custom species from SharedPreferences

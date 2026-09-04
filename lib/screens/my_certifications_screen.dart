@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/plant_model.dart';
 import '../services/plant_repository.dart';
 import '../services/user_service.dart';
+import '../widgets/app_background.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/professional_landscape_certificate.dart';
 import 'certificate_screen.dart';
@@ -37,9 +38,9 @@ class _MyCertificationsScreenState extends State<MyCertificationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F5),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
@@ -83,8 +84,9 @@ class _MyCertificationsScreenState extends State<MyCertificationsScreen> {
           }
         },
       ),
-      body: AnimatedBuilder(
-        animation: _plantRepo,
+      body: AppBackground(
+        child: AnimatedBuilder(
+          animation: _plantRepo,
         builder: (context, _) {
           final plants = _plantRepo.plants;
           final user = _userService.currentUser;
@@ -256,8 +258,9 @@ class _MyCertificationsScreenState extends State<MyCertificationsScreen> {
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 
   /// Interactive Modal explaining locked certificate status & remaining lifespan
   void _showLockedCertificateSheet(BuildContext context, PlantModel plant) {

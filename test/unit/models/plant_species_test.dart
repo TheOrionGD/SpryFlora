@@ -30,8 +30,8 @@ void main() {
     });
 
     test('PlantSpecies toJson converts correctly and preserves metadata', () {
-      const species = PlantSpecies(
-        name: 'Tulsi',
+      final species = PlantSpecies(
+        commonName: 'Tulsi',
         lifespanDays: 120,
         wateringIntervalDays: 2,
         sunlight: 'Direct Sun',

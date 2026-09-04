@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/plant_model.dart';
+import '../services/ai_service.dart';
 import '../services/image_service.dart';
 import '../services/watering_service.dart';
 import '../theme/skeuo_theme.dart';
@@ -178,6 +179,42 @@ class _DailyCheckinScreenState extends State<DailyCheckinScreen> {
     setState(() => _isSubmitting = true);
 
     try {
+      if (_wateredToday && _capturedPhotoPath != null) {
+        final verification = await AIService().verifyWateringPhoto(
+          plant: widget.plant,
+          photoPath: _capturedPhotoPath!,
+        );
+
+        if (verification['isVerified'] != true) {
+          setState(() => _isSubmitting = false);
+          if (!mounted) return;
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              backgroundColor: Colors.white,
+              title: Row(
+                children: [
+                  const Text('💧 Verification Failed', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: SkeuoTheme.alertRed)),
+                ],
+              ),
+              content: Text(
+                verification['rejectionReason'] ??
+                    'Buddy couldn\'t verify your watering photo. Please capture a clear photo showing your plant and water! 🌱',
+                style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w600, color: SkeuoTheme.textPrimary),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Try Again 📷', style: TextStyle(fontWeight: FontWeight.bold, color: SkeuoTheme.primaryGreen)),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+      }
+
       final updatedPlant = await _wateringService.processCheckin(
         plant: widget.plant,
         watered: _wateredToday,

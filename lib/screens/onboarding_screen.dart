@@ -110,21 +110,46 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         backgroundColor: SkeuoTheme.background,
         body: Stack(
           children: [
-            // Top Sky/Botanical Gradient Background
+            // Top Sky/Botanical Background with Scenic Image Backdrop
             Positioned(
               top: 0,
               left: 0,
               right: 0,
               height: MediaQuery.of(context).size.height * 0.58,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 400),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: page.topGradient,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    'assets/sprites/image.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 400),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: page.topGradient,
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                ),
+                  // Subtle gradient overlay for readability and smooth transition to lower card
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.12),
+                          Colors.transparent,
+                          SkeuoTheme.background.withValues(alpha: 0.25),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 

@@ -2,20 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/user_service.dart';
+import '../services/auth_service.dart';
 import '../theme/skeuo_theme.dart';
+import '../widgets/app_background.dart';
 import '../widgets/fun_bouncy_button.dart';
 import 'home_screen.dart';
 import 'profile_setup_screen.dart';
 import 'register_screen.dart';
 
 /// Screen 5: Login Screen (from 255.jpg)
-/// - Botanical leaf decoration at top
-/// - "Welcome Back! / Login to continue"
-/// - Email & Password text fields
-/// - "Forgot Password?"
-/// - Green pill "Login" button
-/// - "or" with Google & Apple sign-in options
-/// - "Don't have an account? Sign Up"
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -41,21 +36,37 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    final userService = UserService();
-    final hasUser = await userService.hasUserData();
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    if (hasUser && userService.currentUser != null) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+    try {
+      final authService = AuthService();
+      await authService.login(
+        email: _emailCtrl.text.trim(),
+        password: _passCtrl.text,
       );
-    } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const ProfileSetupScreen()),
+
+      final userService = UserService();
+      await userService.loadUserData();
+      final hasUser = await userService.hasUserData();
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (hasUser && userService.currentUser != null) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const ProfileSetupScreen()),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     }
   }
@@ -63,9 +74,10 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SkeuoTheme.background,
-      body: Stack(
-        children: [
+      backgroundColor: Colors.transparent,
+      body: AppBackground(
+        child: Stack(
+          children: [
           // ── Top Botanical Leaf Frame Accent ──────────────────────────────
           Positioned(
             top: 0,
@@ -195,60 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             fontSize: 18,
                           ),
 
-                    const SizedBox(height: 28),
-
-                    // "or" Divider
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Divider(
-                            color: Colors.grey.withValues(alpha: 0.3),
-                            thickness: 1,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          child: Text(
-                            'or',
-                            style: GoogleFonts.nunito(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Divider(
-                            color: Colors.grey.withValues(alpha: 0.3),
-                            thickness: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Social Logins (Google & Apple)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildSocialButton(
-                          iconText: 'G',
-                          color: const Color(0xFFDB4437),
-                          label: 'Google',
-                          onTap: _handleLogin,
-                        ),
-                        const SizedBox(width: 20),
-                        _buildSocialButton(
-                          icon: Icons.apple,
-                          color: Colors.black,
-                          label: 'Apple',
-                          onTap: _handleLogin,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 36),
+                    const SizedBox(height: 32),
 
                     // Don't have an account? Sign Up
                     Row(
@@ -289,8 +248,9 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildInputField({
     required TextEditingController controller,
@@ -338,49 +298,6 @@ class _LoginScreenState extends State<LoginScreen> {
           border: InputBorder.none,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSocialButton({
-    String? iconText,
-    IconData? icon,
-    required Color color,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: Border.all(
-            color: const Color(0xFFE0E0E0),
-            width: 1.2,
-          ),
-        ),
-        child: Center(
-          child: icon != null
-              ? Icon(icon, size: 30, color: color)
-              : Text(
-                  iconText ?? '',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    color: color,
-                  ),
-                ),
         ),
       ),
     );

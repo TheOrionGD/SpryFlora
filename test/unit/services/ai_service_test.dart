@@ -9,7 +9,6 @@ void main() {
   group('AIService Unit Tests', () {
     test('AIService accesses configured ApiConfig credentials seamlessly', () {
       final aiService = AIService();
-      expect(aiService.apiKey.isNotEmpty, isTrue);
       expect(aiService.apiKey, ApiConfig.geminiApiKey);
     });
 
@@ -73,6 +72,36 @@ void main() {
 
       expect(answer.isNotEmpty, isTrue);
       expect(answer.length, greaterThan(10));
+    });
+
+    test('ApiConfig backend proxy configuration properties are valid', () {
+      expect(ApiConfig.usesBackendProxy, equals(ApiConfig.aiBackendUrl.isNotEmpty));
+      expect(ApiConfig.backendIdentifyEndpoint, equals('/ai/plant-identify'));
+      expect(ApiConfig.backendAnalysisEndpoint, equals('/ai/plant-analysis'));
+      expect(ApiConfig.backendWateringEndpoint, equals('/ai/watering-verification'));
+      expect(ApiConfig.backendBuddyEndpoint, equals('/ai/buddy'));
+    });
+
+    test('verifyWateringPhoto rejects non-existent or invalid image paths strictly', () async {
+      final now = DateTime.now();
+      final plant = PlantModel(
+        id: 'ai_plant_ver',
+        plantName: 'Leafy',
+        speciesName: 'Rose',
+        plantingDate: now.subtract(const Duration(days: 10)),
+        lifespanDays: 150,
+        wateringIntervalDays: 3,
+      );
+
+      final aiService = AIService();
+      final result = await aiService.verifyWateringPhoto(
+        plant: plant,
+        photoPath: '/non_existent_path_wall_photo.jpg',
+      );
+
+      expect(result['isVerified'], isFalse);
+      expect(result['confidence'], equals(0));
+      expect(result['rejectionReason'], isNotNull);
     });
   });
 }

@@ -196,6 +196,7 @@ class _ProfessionalLandscapeCertificateState
                     child: Image.asset(
                       'assets/sprites/certificate_approved_stamp.png',
                       fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
                       errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),
                   ),

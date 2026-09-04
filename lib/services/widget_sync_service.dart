@@ -72,6 +72,10 @@ class WidgetSyncService {
         androidName: _androidWidgetName,
       );
     } catch (e) {
+      if (e.toString().contains('MissingPluginException')) {
+        // Silently skip on test environments or platforms missing home_widget plugin
+        return;
+      }
       debugPrint('Error updating home screen widget: $e');
     }
   }

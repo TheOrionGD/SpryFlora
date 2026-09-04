@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
+import 'plant_repository.dart';
+import 'sync_service.dart';
 
 class UserService {
   static final UserService _instance = UserService._internal();
@@ -20,7 +22,24 @@ class UserService {
 
   // In-memory cache getters
   UserProfile? get currentUser => _currentUser;
-  VirtualPlant? get virtualPlant => _virtualPlant;
+  // Virtual plant derived dynamically from authoritative PlantRepository
+  VirtualPlant? get virtualPlant {
+    final repositoryPlants = PlantRepository().plants;
+    if (repositoryPlants.isNotEmpty) {
+      final p = repositoryPlants.first;
+      return VirtualPlant(
+        name: p.plantName,
+        health: p.health,
+        level: (p.growthProgress * 5).toInt() + 1,
+        wateringsCount: repositoryPlants.length,
+        lastWatered: p.lastWateredDate,
+      );
+    }
+    if (_currentUser != null) {
+      return VirtualPlant(name: _currentUser!.favoritePlant);
+    }
+    return _virtualPlant;
+  }
   bool get isInitialized => _isInitialized;
 
   /// Check if user has completed onboarding
@@ -81,13 +100,6 @@ class UserService {
           debugPrint('✓ Loaded user: ${_currentUser?.childName}');
         }
 
-        if (json['virtualPlant'] != null) {
-          _virtualPlant = VirtualPlant.fromJson(
-              json['virtualPlant'] as Map<String, dynamic>);
-        } else if (_currentUser != null) {
-          _virtualPlant = VirtualPlant(name: _currentUser!.favoritePlant);
-        }
-
         _isInitialized = true;
         debugPrint('✓ User data successfully loaded and initialized');
       } else {
@@ -104,7 +116,6 @@ class UserService {
   Future<void> saveUserProfile(UserProfile profile) async {
     try {
       _currentUser = profile;
-      _virtualPlant ??= VirtualPlant(name: profile.favoritePlant);
       await _saveToFile();
       _isInitialized = true;
       debugPrint('✓ User profile saved: ${profile.childName}');
@@ -114,35 +125,71 @@ class UserService {
     }
   }
 
-  // Update virtual plant health
-  Future<void> updateVirtualPlantHealth(int health) async {
-    if (_virtualPlant != null) {
-      _virtualPlant = _virtualPlant!.copyWith(health: health.clamp(0, 100));
+  /// Adds XP points to the current user's profile and updates progression level
+  Future<void> addXp(int points) async {
+    if (_currentUser != null) {
+      _currentUser = _currentUser!.copyWith(xp: _currentUser!.xp + points);
       await _saveToFile();
-      debugPrint('Plant health updated: ${_virtualPlant!.health}%');
+    }
+  }
+
+  /// Increments completed plants count
+  Future<void> incrementCompletedPlants() async {
+    if (_currentUser != null) {
+      _currentUser = _currentUser!.copyWith(
+        completedPlantsCount: _currentUser!.completedPlantsCount + 1,
+        xp: _currentUser!.xp + 200,
+      );
+      await _saveToFile();
+    }
+  }
+
+  /// Updates favorite plant in user profile
+  Future<void> updateFavoritePlant(String plantName) async {
+    if (_currentUser != null) {
+      _currentUser = _currentUser!.copyWith(favoritePlant: plantName);
+      await _saveToFile();
+    }
+  }
+
+  // Update virtual plant health by updating authoritative plant in repository
+  Future<void> updateVirtualPlantHealth(int health) async {
+    final plants = PlantRepository().plants;
+    if (plants.isNotEmpty) {
+      final updated = plants.first.copyWith(health: health.clamp(0, 100));
+      await PlantRepository().updatePlant(updated);
     }
   }
 
   // Update virtual plant level
   Future<void> updateVirtualPlantLevel(int level) async {
-    if (_virtualPlant != null) {
-      _virtualPlant = _virtualPlant!.copyWith(level: level);
-      await _saveToFile();
-      debugPrint('Plant level updated: ${_virtualPlant!.level}');
-    }
+    // Level is derived dynamically from growth progress in PlantModel
   }
 
-  // Water the virtual plant
+  // Water the virtual plant with daily idempotency protection
   Future<void> waterVirtualPlant() async {
-    if (_virtualPlant != null) {
-      int newHealth = (_virtualPlant!.health + 10).clamp(0, 100);
-      _virtualPlant = _virtualPlant!.copyWith(
-        health: newHealth,
-        wateringsCount: _virtualPlant!.wateringsCount + 1,
-        lastWatered: DateTime.now(),
+    final plants = PlantRepository().plants;
+    if (plants.isNotEmpty) {
+      final p = plants.first;
+      final now = DateTime.now();
+      final last = p.lastWateredDate;
+      final isSameDay = last.year == now.year && last.month == now.month && last.day == now.day;
+
+      final updated = p.copyWith(
+        health: (p.health + 10).clamp(0, 100),
+        lastWateredDate: now,
+        nextWateringDate: now.add(Duration(days: p.wateringIntervalDays)),
       );
-      await _saveToFile();
-      debugPrint('Plant watered! New health: ${_virtualPlant!.health}%');
+      await PlantRepository().updatePlant(updated);
+
+      if (_currentUser != null && !isSameDay) {
+        final newStreak = _currentUser!.careStreakDays + 1;
+        _currentUser = _currentUser!.copyWith(
+          xp: _currentUser!.xp + 25,
+          careStreakDays: newStreak,
+        );
+        await _saveToFile();
+      }
     }
   }
 
@@ -181,10 +228,10 @@ class UserService {
     try {
       final data = {
         'user': _currentUser?.toJson(),
-        'virtualPlant': _virtualPlant?.toJson(),
         'savedAt': DateTime.now().toIso8601String(),
       };
       await _saveToStorage(jsonEncode(data));
+      SyncService().syncUserProfile(_currentUser);
     } catch (e) {
       debugPrint('✗ Error saving data: $e');
     }

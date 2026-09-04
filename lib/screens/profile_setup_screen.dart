@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/user_model.dart';
+import '../services/excel_service.dart';
 import '../services/image_service.dart';
 import '../services/user_service.dart';
 import '../theme/skeuo_theme.dart';
 import '../widgets/app_photo_view.dart';
+import '../widgets/app_background.dart';
 import '../widgets/fun_bouncy_button.dart';
 import '../widgets/fun_confetti_overlay.dart';
 import '../widgets/skeuo_live_camera_screen.dart';
@@ -30,28 +32,32 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _ageController = TextEditingController();
   final _schoolController = TextEditingController();
   final ImageService _imageService = ImageService();
+  String _selectedPlant = 'Tulsi';
+  String? _profilePhotoPath;
+  bool _isLoading = false;
+  bool _showConfetti = false;
+  List<String> _plantOptions = ['Tulsi', 'Rose', 'Aloe Vera', 'Money Plant'];
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initialName ?? '');
+    _loadSpeciesOptions();
   }
 
-  String _selectedPlant = 'Tulsi';
-  String? _profilePhotoPath;
-  bool _isLoading = false;
-  bool _showConfetti = false;
-
-  final List<String> _plantOptions = [
-    'Tulsi',
-    'Rose',
-    'Aloe Vera',
-    'Money Plant',
-    'Sunflower',
-    'Snake Plant',
-    'Peace Lily',
-    'Lavender',
-  ];
+  Future<void> _loadSpeciesOptions() async {
+    try {
+      final speciesList = await ExcelService().loadSpeciesDatabase();
+      if (speciesList.isNotEmpty && mounted) {
+        setState(() {
+          _plantOptions = speciesList.map((s) => s.name).toList();
+          if (!_plantOptions.contains(_selectedPlant)) {
+            _selectedPlant = _plantOptions.first;
+          }
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -219,9 +225,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     return FunConfettiOverlay(
       isActive: _showConfetti,
       child: Scaffold(
-        backgroundColor: SkeuoTheme.background,
-        body: Stack(
-          children: [
+        backgroundColor: Colors.transparent,
+        body: AppBackground(
+          child: Stack(
+            children: [
             // Top foliage accent
             Positioned(
               top: 0,
@@ -445,8 +452,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildTextField({
     required TextEditingController controller,

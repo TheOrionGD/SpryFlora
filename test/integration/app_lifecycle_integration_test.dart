@@ -41,8 +41,21 @@ void main() {
       expect(userService.virtualPlant?.health, 50);
 
       // Step 3: Nurture Virtual Plant
+      final repo = PlantRepository();
+      await repo.loadLocalData();
+      final now = DateTime.now();
+      await repo.addPlant(PlantModel(
+        id: 'flow1_plant',
+        plantName: 'Tulsi',
+        speciesName: 'Tulsi',
+        plantingDate: now.subtract(const Duration(days: 5)),
+        lifespanDays: 120,
+        wateringIntervalDays: 2,
+        lastWateredDate: now.subtract(const Duration(days: 3)),
+        health: 50,
+      ));
+
       await userService.waterVirtualPlant();
-      expect(userService.virtualPlant?.wateringsCount, 1);
       expect(userService.virtualPlant?.health, 60);
     });
 

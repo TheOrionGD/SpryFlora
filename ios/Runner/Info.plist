@@ -51,6 +51,10 @@
 	<string>SpryFlora needs camera access to capture daily plant check-in photos for AI growth and health monitoring.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>SpryFlora needs photo library access to upload plant photos and save milestone certificates.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>SpryFlora uses speech recognition to allow children and gardeners to ask Flora AI questions using voice commands.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SpryFlora requires microphone access to record voice input for interactive Flora AI Q&A.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

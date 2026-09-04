@@ -5,6 +5,7 @@ import '../models/plant_model.dart';
 import '../services/notification_service.dart';
 import '../services/plant_repository.dart';
 import '../theme/skeuo_theme.dart';
+import '../widgets/app_background.dart';
 import '../widgets/app_photo_view.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/fun_bouncy_button.dart';
@@ -54,15 +55,13 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
     return FunConfettiOverlay(
       isActive: _showConfetti,
       child: Scaffold(
-        backgroundColor: SkeuoTheme.background,
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Top Bar: < My Plants
-              _buildAppBar(),
-
-              // Plant List
-              Expanded(
+        backgroundColor: Colors.transparent,
+        body: AppBackground(
+          child: SafeArea(
+            child: Column(
+              children: [
+                _buildAppBar(),
+                Expanded(
                 child: _isLoading
                     ? const Center(
                         child: CircularProgressIndicator(
@@ -116,7 +115,8 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
             ],
           ),
         ),
-        bottomNavigationBar: BottomNavBar(
+      ),
+      bottomNavigationBar: BottomNavBar(
           currentIndex: 1,
           onTap: (index) {
             if (index == 1) return;

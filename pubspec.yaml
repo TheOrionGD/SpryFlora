@@ -39,11 +39,15 @@ dependencies:
   path_provider: ^2.1.5
   excel: ^4.0.6
   intl: ^0.20.2
-  flutter_local_notifications: ^18.0.1
-  google_fonts: ^6.2.1
+  flutter_local_notifications: ^22.3.0
+  google_fonts: ^8.2.1
   share_plus: ^13.3.0
   http: ^1.2.0
-  home_widget: ^0.7.0
+  home_widget: ^0.9.3
+  speech_to_text: ^7.0.0
+  crypto: ^3.0.6
+  video_player: ^2.9.2
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:
@@ -56,6 +60,21 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/logo/logo.png"
+  min_sdk_android: 21
+  web:
+    generate: true
+    image_path: "assets/logo/logo.png"
+    background_color: "#1E8449"
+    theme_color: "#2ECC71"
+  windows:
+    generate: true
+    image_path: "assets/logo/logo.png"
+    icon_size: 48
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -71,16 +90,11 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/logo/
-    - assets/logo/mascot_transparent.png
-    - assets/logo/image2.png
-    - assets/logo/image.png
-    - assets/logo/logo.png
     - assets/database/
     - assets/animations/
     - assets/illustrations/
     - assets/images/
     - assets/sprites/
-    - assets/screens/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

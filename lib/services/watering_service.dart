@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../models/plant_model.dart';
 import '../models/daily_checkin_model.dart';
 import 'plant_repository.dart';
@@ -24,6 +25,20 @@ class WateringService {
     String? notes,
   }) async {
     final now = DateTime.now();
+    final existingCheckins = _repository.getCheckinsForPlant(plant.id);
+
+    // Prevent duplicate care events / XP farming within the same day for the same plant
+    final isAlreadyCheckedInToday = existingCheckins.any((c) {
+      return c.checkinDate.year == now.year &&
+          c.checkinDate.month == now.month &&
+          c.checkinDate.day == now.day &&
+          c.watered == watered;
+    });
+
+    if (isAlreadyCheckedInToday) {
+      debugPrint('ℹ Duplicate care event ignored for plant ${plant.id} today.');
+      return plant;
+    }
 
     // 1. Generate AI Diagnosis for this check-in
     final aiDiagnosis = await _aiService.analyzeCheckinAndPhoto(
@@ -36,7 +51,7 @@ class WateringService {
 
     // 2. Record daily check-in model
     final checkin = DailyCheckinModel(
-      id: 'checkin_${now.millisecondsSinceEpoch}',
+      id: 'checkin_${plant.id}_${now.year}${now.month}${now.day}_${now.millisecondsSinceEpoch}',
       plantId: plant.id,
       checkinDate: now,
       watered: watered,
@@ -50,10 +65,10 @@ class WateringService {
     await _repository.addCheckin(checkin);
 
     // 3. Compute Multi-Factor Health using PlantHealthEngine
-    final existingCheckins = _repository.getCheckinsForPlant(plant.id);
+    final updatedCheckins = _repository.getCheckinsForPlant(plant.id);
     final healthReport = PlantHealthEngine.evaluate(
       plant: plant,
-      checkins: existingCheckins,
+      checkins: updatedCheckins,
       currentCheckinSunlight: sunlightHours,
       currentCheckinWatered: watered,
     );

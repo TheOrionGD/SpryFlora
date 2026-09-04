@@ -4,9 +4,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/plant_model.dart';
 import '../models/daily_checkin_model.dart';
 import 'widget_sync_service.dart';
+import 'notification_service.dart';
+import 'sync_service.dart';
 
-/// Local Plant Repository
-/// Manages persistent offline storage for all User Plants & Daily Check-ins
+/// Local & Remote Plant Repository
+/// Manages persistent offline caching and remote synchronization for User Plants & Daily Check-ins
 class PlantRepository extends ChangeNotifier {
   static final PlantRepository _instance = PlantRepository._internal();
   factory PlantRepository() => _instance;
@@ -23,7 +25,7 @@ class PlantRepository extends ChangeNotifier {
   List<DailyCheckinModel> get checkins => List.unmodifiable(_checkins);
   bool get isLoaded => _isLoaded;
 
-  /// Loads all plants and checkins from persistent local storage
+  /// Loads all plants and checkins from persistent local storage, then syncs with backend if online
   Future<void> loadLocalData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -52,6 +54,15 @@ class PlantRepository extends ChangeNotifier {
 
       _isLoaded = true;
       notifyListeners();
+
+      // Trigger background sync if remote backend is configured
+      final remotePlants = await SyncService().syncPlants(_plants);
+      if (remotePlants != null && remotePlants.isNotEmpty) {
+        _plants = remotePlants;
+        await _savePlantsToStorage();
+        notifyListeners();
+      }
+      await SyncService().syncCheckins(_checkins);
     } catch (_) {
       _plants = [];
       _checkins = [];
@@ -66,6 +77,8 @@ class PlantRepository extends ChangeNotifier {
     await _savePlantsToStorage();
     notifyListeners();
     WidgetSyncService().updateWidgetData(plantsList: _plants);
+    NotificationService().reconcileNotifications(_plants);
+    SyncService().syncPlants(_plants);
     return plant;
   }
 
@@ -77,6 +90,24 @@ class PlantRepository extends ChangeNotifier {
       await _savePlantsToStorage();
       notifyListeners();
       WidgetSyncService().updateWidgetData(plantsList: _plants);
+      NotificationService().reconcileNotifications(_plants);
+      SyncService().syncPlants(_plants);
+    }
+  }
+
+  /// Marks a plant as fully completed
+  Future<void> markPlantCompleted(String id) async {
+    final index = _plants.indexWhere((p) => p.id == id);
+    if (index != -1) {
+      _plants[index] = _plants[index].copyWith(
+        isCompletedManually: true,
+        updatedAt: DateTime.now(),
+      );
+      await _savePlantsToStorage();
+      notifyListeners();
+      WidgetSyncService().updateWidgetData(plantsList: _plants);
+      NotificationService().reconcileNotifications(_plants);
+      SyncService().syncPlants(_plants);
     }
   }
 
@@ -88,6 +119,8 @@ class PlantRepository extends ChangeNotifier {
     await _saveCheckinsToStorage();
     notifyListeners();
     WidgetSyncService().updateWidgetData(plantsList: _plants);
+    NotificationService().reconcileNotifications(_plants);
+    SyncService().syncPlants(_plants);
   }
 
   /// Finds plant by ID
@@ -104,6 +137,7 @@ class PlantRepository extends ChangeNotifier {
     _checkins.insert(0, checkin);
     await _saveCheckinsToStorage();
     notifyListeners();
+    SyncService().syncCheckins(_checkins);
   }
 
   /// Gets all check-in records for a given plant

@@ -8,6 +8,7 @@ import '../models/daily_checkin_model.dart';
 import '../models/plant_species.dart';
 import 'excel_service.dart';
 import 'plant_health_engine.dart';
+import 'auth_service.dart';
 
 /// Structured AI Plant Diagnostic Analysis Result
 /// Structured AI Plant Diagnostic Analysis Result
@@ -76,7 +77,7 @@ class AIService {
     String detectedObjectType = 'Plant / Leaf';
 
     // Multimodal AI Vision Diagnosis with Gemini
-    if (apiKey.isNotEmpty && photoPath != null && photoPath.isNotEmpty) {
+    if ((apiKey.isNotEmpty || ApiConfig.usesBackendProxy) && photoPath != null && photoPath.isNotEmpty) {
       try {
         String? base64Image;
         List<int>? rawBytes;
@@ -94,6 +95,15 @@ class AIService {
         }
 
         if (base64Image != null && base64Image.isNotEmpty) {
+          // Tier 1: Specialized Hugging Face Computer Vision Classification if configured
+          if (rawBytes != null && ApiConfig.huggingFaceApiKey.isNotEmpty) {
+            final hfResult = await _callHuggingFaceVisionApi(rawBytes);
+            if (hfResult != null && hfResult['label'] != null) {
+              detectedSpeciesName = hfResult['label'].toString();
+              confidence = (hfResult['confidence'] as int?) ?? confidence;
+            }
+          }
+
           final prompt = '''
 You are an expert AI computer vision botanist and plant pathologist.
 Analyze this photo carefully.
@@ -124,11 +134,16 @@ Return a JSON object in this exact format:
 Do not wrap in markdown quotes. Return pure JSON only.
 ''';
 
-          final visionResponse = await _callGeminiVisionApi(
+          String? visionResponse = await _callGeminiVisionApi(
             prompt: prompt,
             base64Image: base64Image,
             preferredApiKey: ApiConfig.geminiApiKey1,
           );
+
+          // Tier 3: Grok Failover AI Reasoning Provider if Gemini is unavailable
+          if ((visionResponse == null || visionResponse.isEmpty) && ApiConfig.grokApiKey.isNotEmpty) {
+            visionResponse = await _callGrokApi(prompt);
+          }
 
           if (visionResponse != null && visionResponse.isNotEmpty) {
             try {
@@ -164,7 +179,7 @@ Do not wrap in markdown quotes. Return pure JSON only.
               }
               advice = (map['detailedAdvice'] as String?) ?? advice;
             } catch (e) {
-              debugPrint('Error parsing Gemini Vision response JSON: $e');
+              debugPrint('Error parsing Vision response JSON: $e');
             }
           } else if (rawBytes != null) {
             final offlineValid = _isBotanicalImageBytes(rawBytes);
@@ -177,9 +192,10 @@ Do not wrap in markdown quotes. Return pure JSON only.
           }
         }
       } catch (e) {
-        debugPrint('Multimodal Gemini vision analysis failed: $e');
+        debugPrint('Multimodal vision analysis failed: $e');
       }
-    } else if (photoPath != null && photoPath.isNotEmpty && !kIsWeb && File(photoPath).existsSync()) {
+    }
+ else if (photoPath != null && photoPath.isNotEmpty && !kIsWeb && File(photoPath).existsSync()) {
       try {
         final rawBytes = await File(photoPath).readAsBytes();
         final offlineValid = _isBotanicalImageBytes(rawBytes);
@@ -238,7 +254,7 @@ Do not wrap in markdown quotes. Return pure JSON only.
       // New plant species discovered not previously in database!
       isNewDiscovery = true;
       final newSpecies = PlantSpecies(
-        name: detectedSpeciesName,
+        commonName: detectedSpeciesName,
         lifespanDays: 180,
         wateringIntervalDays: 3,
         sunlight: 'Bright Indirect Light',
@@ -274,7 +290,7 @@ Do not wrap in markdown quotes. Return pure JSON only.
   Future<String> getStageCareGuidance(PlantModel plant) async {
     final healthReport = PlantHealthEngine.evaluate(plant: plant);
 
-    if (apiKey.isNotEmpty) {
+    if (apiKey.isNotEmpty || ApiConfig.usesBackendProxy) {
       try {
         final prompt = '''
 You are Flora AI, a friendly botanical expert mentor for children and plant lovers in the SPR Flora virtual plant care app.
@@ -314,7 +330,7 @@ Write a short, engaging, 2-3 sentence personalized botanical guidance tip for to
     required String environmentCondition,
     String? photoPath,
   }) async {
-    if (apiKey.isNotEmpty) {
+    if (apiKey.isNotEmpty || ApiConfig.usesBackendProxy) {
       try {
         final prompt = '''
 You are Flora AI, a virtual plant doctor in SPR Flora app.
@@ -367,7 +383,7 @@ Provide a concise 2-sentence diagnostic assessment of today's care. Praise good 
         );
     final healthReport = PlantHealthEngine.evaluate(plant: activePlant, checkins: history);
 
-    if (apiKey.isNotEmpty) {
+    if (apiKey.isNotEmpty || ApiConfig.usesBackendProxy) {
       try {
         final prompt = '''
 You are Flora AI, a warm, knowledgeable, and encouraging virtual plant doctor inside the SPR Flora app.
@@ -407,6 +423,24 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
     required String prompt,
     String? preferredApiKey,
   }) async {
+    if (ApiConfig.usesBackendProxy) {
+      try {
+        final uri = Uri.parse('${ApiConfig.aiBackendUrl}${ApiConfig.backendBuddyEndpoint}');
+        final response = await http.post(
+          uri,
+          headers: AuthService().getAuthorizationHeaders(),
+          body: jsonEncode({'prompt': prompt}),
+        ).timeout(const Duration(seconds: 10));
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['result'] != null) return data['result'].toString();
+          if (data['text'] != null) return data['text'].toString();
+        }
+      } catch (e) {
+        debugPrint('Backend proxy AI call failed: $e');
+      }
+    }
+
     final primaryKey = preferredApiKey ?? ApiConfig.geminiApiKey1;
     final fallbackKey = primaryKey == ApiConfig.geminiApiKey1
         ? ApiConfig.geminiApiKey2
@@ -474,6 +508,24 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
     required String base64Image,
     String? preferredApiKey,
   }) async {
+    if (ApiConfig.usesBackendProxy) {
+      try {
+        final uri = Uri.parse('${ApiConfig.aiBackendUrl}${ApiConfig.backendAnalysisEndpoint}');
+        final response = await http.post(
+          uri,
+          headers: AuthService().getAuthorizationHeaders(),
+          body: jsonEncode({'prompt': prompt, 'image': base64Image}),
+        ).timeout(const Duration(seconds: 12));
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['result'] != null) return data['result'].toString();
+          if (data['text'] != null) return data['text'].toString();
+        }
+      } catch (e) {
+        debugPrint('Backend proxy vision AI call failed: $e');
+      }
+    }
+
     final primaryKey = preferredApiKey ?? ApiConfig.geminiApiKey1;
     final fallbackKey = primaryKey == ApiConfig.geminiApiKey1
         ? ApiConfig.geminiApiKey2
@@ -485,11 +537,10 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
     ];
 
     final modelsToTry = [
-      'gemini-flash-latest',
+      ApiConfig.primaryModel,
+      ApiConfig.secondaryModel,
       'gemini-1.5-flash',
       'gemini-2.0-flash',
-      'gemini-1.5-pro',
-      ApiConfig.primaryModel,
     ];
 
     for (final currentKey in keysToTry) {
@@ -647,6 +698,162 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
     } else {
       return '🌿 Eco Buddy Advice for ${plant.plantName} ($species): ${plant.targetSunlightHours} மணிநேரம் சூரிய ஒளி, ${plant.wateringIntervalDays} நாட்களுக்கு ஒருமுறை தண்ணீர் வழங்கி நன்றாக வளருங்கள்! 🎉';
     }
+  }
+
+  /// Verifies user-uploaded photo evidence of watering activity
+  Future<Map<String, dynamic>> verifyWateringPhoto({
+    required PlantModel plant,
+    required String photoPath,
+  }) async {
+    bool isVerified = false;
+    int confidence = 0;
+    String message = 'Watering photo verified!';
+    String? rejectionReason;
+
+    try {
+      String? base64Image;
+      List<int>? rawBytes;
+      if (!kIsWeb && File(photoPath).existsSync()) {
+        rawBytes = await File(photoPath).readAsBytes();
+        base64Image = base64Encode(rawBytes);
+      } else if (photoPath.startsWith('data:image')) {
+        final parts = photoPath.split(',');
+        if (parts.length > 1) {
+          base64Image = parts[1];
+          try {
+            rawBytes = base64Decode(base64Image);
+          } catch (_) {}
+        }
+      }
+
+      if (rawBytes != null && !_isBotanicalImageBytes(rawBytes)) {
+        return {
+          'isVerified': false,
+          'confidence': 0,
+          'message': 'Buddy couldn\'t detect your plant 💧',
+          'rejectionReason': 'No plant or watering action detected in photo. Scanner detected a non-botanical object. Please take a photo of your plant and water.',
+        };
+      }
+
+      if ((apiKey.isNotEmpty || ApiConfig.usesBackendProxy) && base64Image != null && base64Image.isNotEmpty) {
+        final prompt = '''
+Analyze this image submitted as proof of watering a plant named "${plant.plantName}" (${plant.speciesName}).
+Determine if the photo shows a plant/leaf and signs of watering activity (water droplets, watering container, soil hydration).
+
+Return JSON only:
+{
+  "isWateringVerified": true,
+  "confidencePercent": 92,
+  "userFeedback": "Great job watering your ${plant.plantName}! 💧"
+}
+''';
+
+        final response = await _callGeminiVisionApi(
+          prompt: prompt,
+          base64Image: base64Image,
+          preferredApiKey: ApiConfig.geminiApiKey1,
+        );
+
+        if (response != null && response.isNotEmpty) {
+          try {
+            final cleaned = response.replaceAll('```json', '').replaceAll('```', '').trim();
+            final map = jsonDecode(cleaned);
+            isVerified = map['isWateringVerified'] == true;
+            confidence = (map['confidencePercent'] as num?)?.toInt() ?? 90;
+            message = map['userFeedback']?.toString() ?? message;
+            if (!isVerified) {
+              rejectionReason = message;
+            }
+          } catch (e) {
+            isVerified = false;
+            confidence = 0;
+            rejectionReason = 'AI verification service encountered a parsing error. Please try again.';
+          }
+        } else {
+          isVerified = false;
+          confidence = 0;
+          rejectionReason = 'AI verification service unavailable or timed out. Please check network connection.';
+        }
+      } else {
+        isVerified = false;
+        confidence = 0;
+        rejectionReason = 'AI verification requires an active connection to AI Service.';
+      }
+    } catch (e) {
+      debugPrint('Watering verification error: $e');
+      isVerified = false;
+      confidence = 0;
+      rejectionReason = 'An error occurred while analyzing your watering photo. Please try again.';
+    }
+
+    return {
+      'isVerified': isVerified,
+      'confidence': confidence,
+      'message': message,
+      'rejectionReason': rejectionReason,
+    };
+  }
+
+  /// Hugging Face Inference API for specialized vision classification
+  Future<Map<String, dynamic>?> _callHuggingFaceVisionApi(List<int> imageBytes) async {
+    if (ApiConfig.huggingFaceApiKey.isEmpty) return null;
+    try {
+      final uri = Uri.parse(ApiConfig.huggingFaceVisionModel);
+      final response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer ${ApiConfig.huggingFaceApiKey}',
+          'Content-Type': 'application/octet-stream',
+        },
+        body: imageBytes,
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> results = jsonDecode(response.body);
+        if (results.isNotEmpty && results[0] is Map) {
+          final top = results[0] as Map<String, dynamic>;
+          final label = top['label'] as String? ?? 'Plant';
+          final score = (top['score'] as num?)?.toDouble() ?? 0.8;
+          return {
+            'label': label,
+            'confidence': (score * 100).toInt(),
+          };
+        }
+      }
+    } catch (e) {
+      debugPrint('Hugging Face Vision API error: $e');
+    }
+    return null;
+  }
+
+  /// Grok API (xAI) for fallback reasoning
+  Future<String?> _callGrokApi(String prompt) async {
+    if (ApiConfig.grokApiKey.isEmpty) return null;
+    try {
+      final uri = Uri.parse(ApiConfig.grokApiUrl);
+      final response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer ${ApiConfig.grokApiKey}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'model': ApiConfig.grokModel,
+          'messages': [
+            {'role': 'user', 'content': prompt}
+          ],
+          'temperature': 0.7,
+        }),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final map = jsonDecode(response.body);
+        return map['choices']?[0]?['message']?['content'] as String?;
+      }
+    } catch (e) {
+      debugPrint('Grok API error: $e');
+    }
+    return null;
   }
 
   /// Heuristic offline analyzer to verify if photo bytes contain botanical/foliage color characteristics

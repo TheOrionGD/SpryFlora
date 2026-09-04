@@ -7,6 +7,7 @@ import '../services/notification_service.dart';
 import '../services/plant_repository.dart';
 import '../services/user_service.dart';
 import '../theme/skeuo_theme.dart';
+import '../widgets/app_background.dart';
 import '../widgets/app_photo_view.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/fun_animated_plant.dart';
@@ -18,6 +19,7 @@ import 'my_plants_screen.dart';
 import 'plant_details_screen.dart';
 import 'profile_settings_screen.dart';
 import 'virtual_companion_screen.dart';
+import 'mascot_journey_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -147,17 +149,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: SkeuoTheme.background,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(color: SkeuoTheme.primaryGreen),
-              const SizedBox(height: 16),
-              Text('Loading your garden...',
-                  style: SkeuoTheme.funBody(
-                      size: 16, color: SkeuoTheme.primaryGreen)),
-            ],
+        backgroundColor: Colors.transparent,
+        body: AppBackground(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: SkeuoTheme.primaryGreen),
+                const SizedBox(height: 16),
+                Text('Loading your garden...',
+                    style: SkeuoTheme.funBody(
+                        size: 16, color: SkeuoTheme.primaryGreen)),
+              ],
+            ),
           ),
         ),
       );
@@ -166,9 +170,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return FunConfettiOverlay(
       isActive: _showWaterConfetti,
       child: Scaffold(
-        backgroundColor: SkeuoTheme.background,
-        body: Container(
-          decoration: const BoxDecoration(gradient: SkeuoTheme.mintGradient),
+        backgroundColor: Colors.transparent,
+        body: AppBackground(
           child: SafeArea(
             child: FadeTransition(
               opacity: _headerFade,
@@ -196,6 +199,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
             // ── Today's Mission Card (Screen 08) ─────────────────────────
             _buildTodaysMissionCard(),
+            const SizedBox(height: 18),
+
+            // ── Gamified Mascot Journey Banner ───────────────────────────
+            _buildMascotJourneyBanner(),
             const SizedBox(height: 18),
 
             // ── Quick Garden Stats Overview ─────────────────────────────
@@ -372,6 +379,139 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             size: 24,
           ),
         ],
+      ),
+    );
+  }
+
+  // ── Gamified Mascot Journey Banner Widget ─────────────────────────────
+  Widget _buildMascotJourneyBanner() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const MascotJourneyScreen()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF1E8449),
+              Color(0xFF2ECC71),
+              Color(0xFF27AE60),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2ECC71).withValues(alpha: 0.35),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Mascot Thumbnail / Icon
+            Container(
+              width: 56,
+              height: 56,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.25),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white70, width: 2),
+              ),
+              child: Image.asset(
+                'assets/sprites/mascot_pot_happy.png',
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.map_rounded,
+                  color: Colors.white,
+                  size: 30,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1C40F),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'GAMIFIED MAP',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 10,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        '16 Milestones',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Mascot Growth Journey',
+                    style: GoogleFonts.nunito(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Explore your level path from seed to grand tree!',
+                    style: TextStyle(
+                      color: Color(0xE6FFFFFF),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 6,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: Color(0xFF1E8449),
+                size: 16,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -29,7 +29,7 @@ class NotificationService {
       );
 
       await _notificationsPlugin.initialize(
-        initializationSettings,
+        settings: initializationSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           // Handle notification click
         },
@@ -76,21 +76,30 @@ class NotificationService {
           'Your ${plant.speciesName} needs water today! Regular interval is ${plant.wateringIntervalDays} days.';
 
       await _notificationsPlugin.show(
-        notificationId,
-        title,
-        body,
-        platformDetails,
+        id: notificationId,
+        title: title,
+        body: body,
+        notificationDetails: platformDetails,
         payload: plant.id,
       );
     } catch (_) {}
   }
 
+  /// Reconciles notification schedules for all plants in repository
+  Future<void> reconcileNotifications(List<PlantModel> plants) async {
+    await initialize();
+    try {
+      await _notificationsPlugin.cancelAll();
+      for (final plant in plants) {
+        if (plant.isWateringDue) {
+          await sendWateringDueNotification(plant);
+        }
+      }
+    } catch (_) {}
+  }
+
   /// Checks all plants and dispatches system notifications for any plant due today or overdue
   Future<void> checkAndNotifyDuePlants(List<PlantModel> plants) async {
-    for (final plant in plants) {
-      if (plant.isWateringDue) {
-        await sendWateringDueNotification(plant);
-      }
-    }
+    await reconcileNotifications(plants);
   }
 }

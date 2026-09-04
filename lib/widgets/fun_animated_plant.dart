@@ -160,6 +160,7 @@ class _FunAnimatedPlantState extends State<FunAnimatedPlant>
                           width: widget.size,
                           height: widget.size,
                           fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
                           errorBuilder: (context, error, stackTrace) {
                             return CustomPaint(
                               size: Size(widget.size, widget.size),

@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:math';
+import 'package:flutter/foundation.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 /// Supported Speech Languages
 enum SpeechLanguage {
@@ -9,19 +10,20 @@ enum SpeechLanguage {
 }
 
 /// Kids Voice & Speech Recognition Service
-/// Performs live voice text extraction in Tamil and English,
-/// generates speech visualizer waveform data, and stores extracted text.
+/// Performs real live speech recognition in Tamil, English, and Tanglish,
+/// streams real microphone sound level data to the 7-band visualizer, and returns transcribed text.
 class KidsVoiceService {
   static final KidsVoiceService _instance = KidsVoiceService._internal();
   factory KidsVoiceService() => _instance;
   KidsVoiceService._internal();
 
+  final SpeechToText _speechToText = SpeechToText();
+  bool _isInitialized = false;
   bool _isListening = false;
   SpeechLanguage _currentLanguage = SpeechLanguage.tamil;
 
   final StreamController<List<double>> _visualizerStreamController =
       StreamController<List<double>>.broadcast();
-  Timer? _waveformTimer;
 
   bool get isListening => _isListening;
   SpeechLanguage get currentLanguage => _currentLanguage;
@@ -31,97 +33,143 @@ class KidsVoiceService {
     _currentLanguage = lang;
   }
 
-  /// Sample kid voice queries in Tamil & English for realistic interactive speech extraction
-  final List<String> _tamilKidQueries = [
-    'என் செடிக்கு எப்போது தண்ணீர் ஊற்ற வேண்டும்?',
-    'செடியின் இலை மஞ்சள் நிறமாக மாறினால் என்ன செய்ய வேண்டும்?',
-    'செடி வளர எவ்வளவு சூரிய வெளிச்சம் வேண்டும்?',
-    'ரோஜா செடி சீக்கிரம் வளர சிறந்த வழி என்ன?',
-    'எனது புதிய துளசி செடியை எப்படி பராமரிப்பது?',
-  ];
+  /// Initializes underlying SpeechToText engine if supported
+  Future<bool> initialize() async {
+    if (_isInitialized) return true;
+    try {
+      if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS)) {
+        _isInitialized = await _speechToText.initialize(
+          onError: (val) => debugPrint('SpeechToText error: $val'),
+          onStatus: (status) {
+            if (status == 'done' || status == 'notListening') {
+              _isListening = false;
+              _updateVisualizerWithAmplitude(0.0);
+            }
+          },
+        );
+      } else {
+        _isInitialized = false;
+      }
+    } catch (e) {
+      debugPrint('SpeechToText initialization failed: $e');
+      _isInitialized = false;
+    }
+    return _isInitialized;
+  }
 
-  final List<String> _englishKidQueries = [
-    'How often should I water my plant?',
-    'Why are my plant leaves turning yellow?',
-    'How much sunlight does my sprout need daily?',
-    'Tips to grow a healthy green Tulsi plant',
-    'How to make my flowers bloom faster?',
-  ];
-
-  final List<String> _tanglishKidQueries = [
-    'Plant ku daily thanneer oothanuma?',
-    'Leaves yellow aachuna enna panranum?',
-    'Intha plant ku sun light evvalavu venum?',
-    'My plant sproting pathi tips thanga',
-  ];
-
-  /// Starts listening to kid's speech input, streams live audio visualizer waveforms,
-  /// and extracts live text in Tamil or English. (Stores only text data, no raw audio recorded).
+  /// Starts listening to speech input and streams live audio visualizer waveforms based on real microphone sound levels.
+  /// If [inputText] is supplied, streams partial text updates to [onPartialText].
   Future<String?> startListening({
     SpeechLanguage? language,
+    String? inputText,
     Function(String partialText)? onPartialText,
   }) async {
     _isListening = true;
     if (language != null) _currentLanguage = language;
 
-    // Start live speech audio visualizer wave stream
-    _waveformTimer?.cancel();
-    final random = Random();
-    _waveformTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      if (!_isListening) {
-        timer.cancel();
-        return;
+    if (inputText != null && inputText.isNotEmpty) {
+      final words = inputText.split(' ');
+      String currentText = '';
+      for (int i = 0; i < words.length; i++) {
+        if (!_isListening) break;
+        await Future.delayed(const Duration(milliseconds: 120));
+        currentText += (i == 0 ? '' : ' ') + words[i];
+        _updateVisualizerWithAmplitude(0.4 + (i % 3) * 0.2);
+        if (onPartialText != null) {
+          onPartialText(currentText);
+        }
       }
-      // Generate 7-band live equalizer waveform levels (0.1 to 1.0)
-      final levels = List.generate(
-        7,
-        (index) => 0.15 + random.nextDouble() * 0.85,
+      stopListening();
+      return currentText;
+    }
+
+    final available = await initialize();
+    if (!available) {
+      _isListening = false;
+      _updateVisualizerWithAmplitude(0.0);
+      return null;
+    }
+
+    String localeId = 'ta_IN';
+    if (_currentLanguage == SpeechLanguage.english) {
+      localeId = 'en_US';
+    } else if (_currentLanguage == SpeechLanguage.tanglish) {
+      localeId = 'ta_IN';
+    }
+
+    final Completer<String?> completer = Completer<String?>();
+    String recognizedText = '';
+
+    try {
+      await _speechToText.listen(
+        onResult: (result) {
+          recognizedText = result.recognizedWords;
+          if (onPartialText != null && recognizedText.isNotEmpty) {
+            onPartialText(recognizedText);
+          }
+          if (result.finalResult && !completer.isCompleted) {
+            completer.complete(recognizedText);
+          }
+        },
+        onSoundLevelChange: (level) {
+          // Normalize decibel level (-10dB to +10dB) into 0.1 to 1.0 amplitude
+          final normalized = ((level + 10) / 20).clamp(0.1, 1.0);
+          _updateVisualizerWithAmplitude(normalized);
+        },
+        listenOptions: SpeechListenOptions(
+          localeId: localeId,
+          cancelOnError: true,
+          listenMode: ListenMode.confirmation,
+          listenFor: const Duration(seconds: 10),
+          pauseFor: const Duration(seconds: 3),
+        ),
       );
-      _visualizerStreamController.add(levels);
-    });
 
-    // Select query list based on selected language
-    List<String> candidates;
-    switch (_currentLanguage) {
-      case SpeechLanguage.tamil:
-        candidates = _tamilKidQueries;
-        break;
-      case SpeechLanguage.tanglish:
-        candidates = _tanglishKidQueries;
-        break;
-      case SpeechLanguage.english:
-        candidates = _englishKidQueries;
-        break;
+      // Auto resolve after timeout if no final result fired
+      Timer(const Duration(seconds: 10), () {
+        if (!completer.isCompleted) {
+          completer.complete(recognizedText.isNotEmpty ? recognizedText : null);
+        }
+      });
+
+      final result = await completer.future;
+      stopListening();
+      return result;
+    } catch (e) {
+      debugPrint('Error during speech recognition: $e');
+      stopListening();
+      return null;
     }
-
-    final selectedQuery = candidates[random.nextInt(candidates.length)];
-
-    // Simulate live partial speech text extraction stream
-    final words = selectedQuery.split(' ');
-    String currentText = '';
-    for (int i = 0; i < words.length; i++) {
-      if (!_isListening) break;
-      await Future.delayed(Duration(milliseconds: 350 + random.nextInt(200)));
-      currentText += (i == 0 ? '' : ' ') + words[i];
-      if (onPartialText != null) {
-        onPartialText(currentText);
-      }
-    }
-
-    await Future.delayed(const Duration(milliseconds: 400));
-    stopListening();
-    return currentText.isNotEmpty ? currentText : selectedQuery;
   }
 
-  /// Stops speech recognition listening and halts speech visualizer waveform stream
+  /// Maps microphone sound amplitude into 7-band visualizer heights
+  void _updateVisualizerWithAmplitude(double amplitude) {
+    if (!_visualizerStreamController.isClosed) {
+      final amp = amplitude.clamp(0.1, 1.0);
+      final levels = [
+        (amp * 0.6).clamp(0.1, 1.0),
+        (amp * 0.85).clamp(0.1, 1.0),
+        (amp * 1.0).clamp(0.1, 1.0),
+        (amp * 0.95).clamp(0.1, 1.0),
+        (amp * 0.75).clamp(0.1, 1.0),
+        (amp * 0.55).clamp(0.1, 1.0),
+        (amp * 0.35).clamp(0.1, 1.0),
+      ];
+      _visualizerStreamController.add(levels);
+    }
+  }
+
+  /// Stops speech recognition listening and resets visualizer waveform to quiet state
   void stopListening() {
     _isListening = false;
-    _waveformTimer?.cancel();
-    _visualizerStreamController.add(List.filled(7, 0.1));
+    if (_speechToText.isListening) {
+      _speechToText.stop();
+    }
+    _updateVisualizerWithAmplitude(0.0);
   }
 
   void dispose() {
-    _waveformTimer?.cancel();
+    stopListening();
     _visualizerStreamController.close();
   }
 }

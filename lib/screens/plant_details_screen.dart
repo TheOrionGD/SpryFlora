@@ -12,6 +12,7 @@ import '../widgets/flora_ai_sheet.dart';
 import '../widgets/fun_bouncy_button.dart';
 import '../widgets/plant_growth_animation.dart';
 import '../widgets/skeuo_card.dart';
+import '../widgets/petal_completion_dialog.dart';
 import '../widgets/skeuo_status_badge.dart';
 import 'ai_analysis_screen.dart';
 import 'daily_checkin_screen.dart';
@@ -307,23 +308,42 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                     _buildAIGuidanceCard(),
                     const SizedBox(height: 14),
 
-                    // Claim certificate if completed
-                    if (_plant.isCompleted) ...[
-                      FunBouncyButton(
-                        text: 'Claim Certificate 📜',
-                        onPressed: () {
+                    // Final Petal Harvest Challenge & Claim Certificate
+                    FunBouncyButton(
+                      text: _plant.isCompleted
+                          ? 'View Official Certificate 📜'
+                          : '🌸 Final Petal Challenge!',
+                      onPressed: () {
+                        if (_plant.isCompleted) {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  CertificateScreen(plant: _plant),
+                              builder: (_) => CertificateScreen(plant: _plant),
                             ),
                           );
-                        },
-                        color: const Color(0xFFFF8F00),
-                        height: 52,
-                      ),
-                      const SizedBox(height: 14),
-                    ],
+                        } else {
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => PetalCompletionDialog(
+                              plant: _plant,
+                              onComplete: () {
+                                _fetchPlant();
+                                if (mounted) setState(() {});
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => CertificateScreen(plant: _plant),
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        }
+                      },
+                      color: _plant.isCompleted
+                          ? const Color(0xFFFF8F00)
+                          : const Color(0xFFE91E63),
+                      height: 52,
+                    ),
+                    const SizedBox(height: 14),
                   ],
                 ),
               ),

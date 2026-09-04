@@ -4,6 +4,9 @@ class UserProfile {
   final String school;
   final String favoritePlant;
   final String? profilePhotoPath;
+  final int xp;
+  final int careStreakDays;
+  final int completedPlantsCount;
   final DateTime createdAt;
 
   UserProfile({
@@ -12,8 +15,22 @@ class UserProfile {
     required this.school,
     required this.favoritePlant,
     this.profilePhotoPath,
+    this.xp = 120,
+    this.careStreakDays = 1,
+    this.completedPlantsCount = 0,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
+
+  /// Dynamic Experience Level derived from actual earned XP
+  String get experienceLevelName {
+    if (xp < 250) {
+      return 'Beginner';
+    } else if (xp < 750) {
+      return 'Intermediate';
+    } else {
+      return 'Advanced';
+    }
+  }
 
   // Convert to JSON
   Map<String, dynamic> toJson() {
@@ -23,6 +40,9 @@ class UserProfile {
       'school': school,
       'favoritePlant': favoritePlant,
       'profilePhotoPath': profilePhotoPath,
+      'xp': xp,
+      'careStreakDays': careStreakDays,
+      'completedPlantsCount': completedPlantsCount,
       'createdAt': createdAt.toIso8601String(),
     };
   }
@@ -31,11 +51,16 @@ class UserProfile {
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
       childName: json['childName'] as String,
-      age: json['age'] as int,
+      age: (json['age'] as num).toInt(),
       school: json['school'] as String,
       favoritePlant: json['favoritePlant'] as String,
       profilePhotoPath: json['profilePhotoPath'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      xp: (json['xp'] as num?)?.toInt() ?? 120,
+      careStreakDays: (json['careStreakDays'] as num?)?.toInt() ?? 1,
+      completedPlantsCount: (json['completedPlantsCount'] as num?)?.toInt() ?? 0,
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : DateTime.now(),
     );
   }
 
@@ -46,6 +71,9 @@ class UserProfile {
     String? school,
     String? favoritePlant,
     String? profilePhotoPath,
+    int? xp,
+    int? careStreakDays,
+    int? completedPlantsCount,
   }) {
     return UserProfile(
       childName: childName ?? this.childName,
@@ -53,6 +81,9 @@ class UserProfile {
       school: school ?? this.school,
       favoritePlant: favoritePlant ?? this.favoritePlant,
       profilePhotoPath: profilePhotoPath ?? this.profilePhotoPath,
+      xp: xp ?? this.xp,
+      careStreakDays: careStreakDays ?? this.careStreakDays,
+      completedPlantsCount: completedPlantsCount ?? this.completedPlantsCount,
       createdAt: createdAt,
     );
   }

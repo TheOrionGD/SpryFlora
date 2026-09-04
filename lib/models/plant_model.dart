@@ -17,6 +17,9 @@ class PlantModel {
   final int sunlightScore; // 0 to 100
   final int consistencyScore; // 0 to 100
   final String healthStatus; // 'Thriving', 'Optimal', 'Needs Sunlight', 'Under-watered', 'Stressed'
+  final double initialHeightCm;
+  final double matureHeightCm;
+  final bool isCompletedManually;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -39,6 +42,9 @@ class PlantModel {
     this.sunlightScore = 95,
     this.consistencyScore = 95,
     this.healthStatus = 'Optimal',
+    this.initialHeightCm = 2.0,
+    this.matureHeightCm = 50.0,
+    this.isCompletedManually = false,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : lastWateredDate = lastWateredDate ?? plantingDate,
@@ -62,6 +68,21 @@ class PlantModel {
     return (ageInDays / lifespanDays).clamp(0.0, 1.0);
   }
 
+  /// Calculates dynamic height in cm based on elapsed time and care health
+  double get currentHeightCm {
+    final careMultiplier = (health / 100.0).clamp(0.5, 1.0);
+    final height = initialHeightCm + (matureHeightCm - initialHeightCm) * growthProgress * careMultiplier;
+    return double.parse(height.toStringAsFixed(1));
+  }
+
+  /// Calculates today's estimated growth in cm
+  double get todaysGrowthCm {
+    if (lifespanDays <= 0) return 0.0;
+    final dailyRate = (matureHeightCm - initialHeightCm) / lifespanDays;
+    final growth = dailyRate * (health / 100.0);
+    return double.parse(growth.toStringAsFixed(1));
+  }
+
   /// Human-friendly Growth Stage Name based on progress
   String get growthStageName {
     final progress = growthProgress;
@@ -80,7 +101,7 @@ class PlantModel {
   String get stageBadge => growthStageName.toUpperCase();
 
   /// Whether the plant has completed its full lifecycle lifespan
-  bool get isCompleted => lifespanDays > 0 && ageInDays >= lifespanDays;
+  bool get isCompleted => isCompletedManually || (lifespanDays > 0 && ageInDays >= lifespanDays) || growthProgress >= 1.0;
 
   /// Calculates dynamic animation frame index given total frame count (e.g. 150)
   /// Frame Index = floor(Growth Progress * (totalFrames - 1))
@@ -158,6 +179,9 @@ class PlantModel {
       'sunlightScore': sunlightScore,
       'consistencyScore': consistencyScore,
       'healthStatus': healthStatus,
+      'initialHeightCm': initialHeightCm,
+      'matureHeightCm': matureHeightCm,
+      'isCompletedManually': isCompletedManually,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -189,6 +213,9 @@ class PlantModel {
       sunlightScore: (json['sunlightScore'] as num?)?.toInt() ?? 95,
       consistencyScore: (json['consistencyScore'] as num?)?.toInt() ?? 95,
       healthStatus: json['healthStatus'] as String? ?? 'Optimal',
+      initialHeightCm: (json['initialHeightCm'] as num?)?.toDouble() ?? 2.0,
+      matureHeightCm: (json['matureHeightCm'] as num?)?.toDouble() ?? 50.0,
+      isCompletedManually: json['isCompletedManually'] as bool? ?? false,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : null,
@@ -216,6 +243,9 @@ class PlantModel {
     int? sunlightScore,
     int? consistencyScore,
     String? healthStatus,
+    double? initialHeightCm,
+    double? matureHeightCm,
+    bool? isCompletedManually,
     DateTime? updatedAt,
   }) {
     return PlantModel(
@@ -237,6 +267,9 @@ class PlantModel {
       sunlightScore: sunlightScore ?? this.sunlightScore,
       consistencyScore: consistencyScore ?? this.consistencyScore,
       healthStatus: healthStatus ?? this.healthStatus,
+      initialHeightCm: initialHeightCm ?? this.initialHeightCm,
+      matureHeightCm: matureHeightCm ?? this.matureHeightCm,
+      isCompletedManually: isCompletedManually ?? this.isCompletedManually,
       createdAt: createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
     );

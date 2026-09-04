@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/user_service.dart';
-import '../theme/skeuo_theme.dart';
+import '../services/auth_service.dart';
+import '../widgets/app_background.dart';
 import '../widgets/fun_bouncy_button.dart';
 import 'login_screen.dart';
 import 'profile_setup_screen.dart';
@@ -22,10 +23,10 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _childNameCtrl = TextEditingController();
-  final _parentEmailCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
-  final _confirmPassCtrl = TextEditingController();
+  final _childNameCtrl = TextEditingController(text: 'Leo');
+  final _parentEmailCtrl = TextEditingController(text: 'hero@spryflora.com');
+  final _passCtrl = TextEditingController(text: 'spryflora123');
+  final _confirmPassCtrl = TextEditingController(text: 'spryflora123');
 
   bool _obscurePass = true;
   bool _obscureConfirm = true;
@@ -44,39 +45,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
+    try {
+      final authService = AuthService();
+      await authService.register(
+        email: _parentEmailCtrl.text.trim(),
+        password: _passCtrl.text,
+        name: _childNameCtrl.text.trim(),
+      );
 
-    final userService = UserService();
-    await userService.setOnboardingCompleted(true);
+      final userService = UserService();
+      await userService.loadUserData();
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => ProfileSetupScreen(
-          initialName: _childNameCtrl.text.trim(),
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const ProfileSetupScreen(),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SkeuoTheme.background,
-      body: Stack(
-        children: [
-          // ── Top Botanical Leaf Frame Accent ──────────────────────────────
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 180,
-            child: CustomPaint(
-              painter: _TopBotanicalLeavesPainter(),
+      backgroundColor: Colors.transparent,
+      body: AppBackground(
+        child: Stack(
+          children: [
+            // ── Top Botanical Leaf Frame Accent ──────────────────────────────
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 180,
+              child: CustomPaint(
+                painter: _TopBotanicalLeavesPainter(),
+              ),
             ),
-          ),
 
           // ── Main Content ──────────────────────────────────────────────────
           SafeArea(
@@ -259,8 +275,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildInputField({
     required TextEditingController controller,
