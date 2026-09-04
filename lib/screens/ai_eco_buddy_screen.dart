@@ -7,6 +7,7 @@ import '../services/plant_repository.dart';
 import '../theme/skeuo_theme.dart';
 import '../widgets/speech_visualizer.dart';
 import '../widgets/app_background.dart';
+import '../widgets/leaves_particle_overlay.dart';
 
 /// Screen 15: AI Eco Buddy Chat (from 255.jpg)
 /// - Top Bar: Back button + "AI Eco Buddy"
@@ -167,50 +168,52 @@ class _AIEcoBuddyScreenState extends State<AIEcoBuddyScreen> {
         ),
         centerTitle: true,
       ),
-      body: AppBackground(
-        child: Column(
-          children: [
-          // ── Quick Suggestions Bar ─────────────────────────────────────────
-          Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _quickQuestions.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final q = _quickQuestions[index];
-                return GestureDetector(
-                  onTap: () => _sendMessage(q),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: const Color(0xFFC8E6C9),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        q,
-                        style: GoogleFonts.nunito(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF2E7D32),
+      body: LeavesParticleOverlay(
+        maxThroughput: true,
+        child: AppBackground(
+          child: Column(
+            children: [
+              // ── Quick Suggestions Bar ─────────────────────────────────────────
+              Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _quickQuestions.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final q = _quickQuestions[index];
+                    return GestureDetector(
+                      onTap: () => _sendMessage(q),
+                      child: Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFFC8E6C9),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            q,
+                            style: GoogleFonts.nunito(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF2E7D32),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+                    );
+                  },
+                ),
+              ),
 
-          const Divider(height: 1, color: Color(0xFFE8F5E9)),
+              const Divider(height: 1, color: Color(0xFFE8F5E9)),
 
           // ── Chat Messages ─────────────────────────────────────────────────
           Expanded(
@@ -369,11 +372,12 @@ class _AIEcoBuddyScreenState extends State<AIEcoBuddyScreen> {
               ),
             ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildMessageBubble({
     required String text,

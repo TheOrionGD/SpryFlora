@@ -9,6 +9,8 @@ import '../models/plant_species.dart';
 import 'excel_service.dart';
 import 'plant_health_engine.dart';
 import 'auth_service.dart';
+import 'user_service.dart';
+import 'plant_repository.dart';
 
 /// Structured AI Plant Diagnostic Analysis Result
 /// Structured AI Plant Diagnostic Analysis Result
@@ -367,29 +369,56 @@ Provide a concise 2-sentence diagnostic assessment of today's care. Praise good 
   }
 
   /// Interactive Q&A with Flora AI Plant Doctor (Segment 2 AI Feature -> Key 2)
+  /// Interactive Q&A with Flora AI Plant Doctor (Segment 2 AI Feature -> Key 2)
+  /// Strictly references user specific profile data and logged database records.
   Future<String> askFloraAI({
     PlantModel? plant,
     required String userQuestion,
     List<DailyCheckinModel> history = const [],
   }) async {
     final activePlant = plant ??
-        PlantModel(
-          id: 'default_companion',
-          plantName: 'My Plant Buddy',
-          speciesName: 'Tulsi',
-          plantingDate: DateTime.now().subtract(const Duration(days: 7)),
-          lifespanDays: 120,
-          wateringIntervalDays: 3,
-        );
+        (PlantRepository().plants.isNotEmpty
+            ? PlantRepository().plants.first
+            : PlantModel(
+                id: 'default_companion',
+                plantName: 'My Plant Buddy',
+                speciesName: 'Tulsi',
+                plantingDate: DateTime.now().subtract(const Duration(days: 7)),
+                lifespanDays: 120,
+                wateringIntervalDays: 3,
+              ));
     final healthReport = PlantHealthEngine.evaluate(plant: activePlant, checkins: history);
+
+    // User-specific database records & profile context
+    final userProfile = UserService().currentUser;
+    final allUserPlants = PlantRepository().plants;
+    final userPlantListContext = allUserPlants.isNotEmpty
+        ? allUserPlants
+            .map((p) =>
+                '- "${p.plantName}" (${p.speciesName}): Health ${p.health}%, Hydration ${p.hydrationScore}%, Sunlight ${p.sunlightScore}%, Growth Stage "${p.growthStageName}", Days Until Water: ${p.daysUntilWatering}, Last Watered: ${p.lastWateredDate.toIso8601String().split('T')[0]}')
+            .join('\n')
+        : '- "${activePlant.plantName}" (${activePlant.speciesName}): Health ${activePlant.health}%';
 
     if (apiKey.isNotEmpty || ApiConfig.usesBackendProxy) {
       try {
         final prompt = '''
-You are Flora AI, a warm, knowledgeable, and encouraging virtual plant doctor inside the SPR Flora app.
-Target Audience: Children / Kids caring for virtual & real plants.
+You are Flora AI, a warm, knowledgeable, and encouraging virtual plant doctor inside the SpryFlora app.
 
-Plant context:
+CRITICAL MANDATE:
+You MUST answer strictly using the data of THIS PARTICULAR USER and their specific database records.
+Do NOT provide generic or global answers unrelated to this user when asked about their plants, status, or progress.
+
+User Specific Profile Data:
+- User Name: "${userProfile?.childName ?? 'Young Gardener'}"
+- Care Streak: ${userProfile?.careStreakDays ?? 0} days
+- Eco XP / Level: ${userProfile?.xp ?? 0} XP
+- Favorite Plant: "${userProfile?.favoritePlant ?? activePlant.plantName}"
+- Total Completed Plants: ${userProfile?.completedPlantsCount ?? 0}
+
+User's Logged Database Plants (${allUserPlants.length} total):
+$userPlantListContext
+
+Active Selected Plant Context:
 - Name: "${activePlant.plantName}" (${activePlant.speciesName})
 - Age: ${activePlant.ageInDays} days, Stage: ${activePlant.growthStageName}
 - Health: ${healthReport.overallHealth}% (${healthReport.status})
@@ -398,8 +427,8 @@ Plant context:
 
 User Question: "$userQuestion"
 
-Answer the child directly in 2-4 friendly, educational sentences with clear, actionable botanical tips.
-If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly Tamil with English keywords (or bilingual English/Tamil) so it is very easy for children to understand. Include emojis! Keep it upbeat and encouraging.
+Answer the user directly in 2-4 friendly, educational sentences using their specific name, specific plant names, and database statistics.
+If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly Tamil/Tanglish with English keywords. Include emojis! Keep it upbeat, user-specific, and highly encouraging.
 ''';
 
         final response = await _callGeminiApi(

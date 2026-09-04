@@ -47,9 +47,7 @@ class CloudTransitionOverlayState extends State<CloudTransitionOverlay>
 
   /// Triggers a cloud transition sweep. Invokes [onCovered] at peak cloud cover (400ms mark).
   void triggerTransition({VoidCallback? onCovered}) {
-    _internalAnimCtrl.forward(from: 0.0).then((_) {
-      _internalAnimCtrl.reverse();
-    });
+    _internalAnimCtrl.forward(from: 0.0);
 
     Timer(const Duration(milliseconds: 400), () {
       if (mounted && onCovered != null) {

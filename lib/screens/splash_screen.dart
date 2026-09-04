@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'onboarding_screen.dart';
 import '../services/backend_warmup_service.dart';
+import '../widgets/leaves_particle_overlay.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -120,11 +121,9 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
 
-                // Floating ambient leaves overlay
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _LeavesPainter(t: _leavesCtrl.value),
-                  ),
+                // Floating ambient leaves overlay (High Throughput)
+                const Positioned.fill(
+                  child: LeavesParticleOverlay(maxThroughput: true),
                 ),
 
                 // 2. Center Main Hero Content (Mascot + Tagline)
@@ -270,69 +269,4 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-// ── Floating Leaves Painter ────────────────────────────────────────────────────
-class _LeavesPainter extends CustomPainter {
-  final double t;
 
-  const _LeavesPainter({required this.t});
-
-  static final _leaves = List.generate(14, (i) {
-    final rand = math.Random(i * 31 + 7);
-    return _LeafData(
-      x: rand.nextDouble(),
-      yStart: rand.nextDouble(),
-      speed: 0.035 + rand.nextDouble() * 0.055,
-      size: 7.0 + rand.nextDouble() * 13.0,
-      phase: rand.nextDouble() * math.pi * 2,
-      opacity: 0.18 + rand.nextDouble() * 0.22,
-      colorIdx: i % 3,
-    );
-  });
-
-  static const _colors = [
-    Color(0xFFA5D6A7), // light green
-    Color(0xFFFFD54F), // yellow
-    Color(0xFFFFFFFF), // white
-  ];
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (final leaf in _leaves) {
-      final y = ((leaf.yStart - leaf.speed * t) % 1.0) * size.height;
-      final x = (leaf.x + math.sin(t * math.pi * 2 + leaf.phase) * 0.045) *
-          size.width;
-      final paint = Paint()
-        ..color = _colors[leaf.colorIdx].withValues(alpha: leaf.opacity)
-        ..style = PaintingStyle.fill;
-
-      canvas.save();
-      canvas.translate(x, y);
-      canvas.rotate(t * math.pi * 1.5 + leaf.phase);
-
-      final path = Path()
-        ..moveTo(0, leaf.size / 2)
-        ..quadraticBezierTo(leaf.size / 2, 0, 0, -leaf.size / 2)
-        ..quadraticBezierTo(-leaf.size / 2, 0, 0, leaf.size / 2);
-      canvas.drawPath(path, paint);
-      canvas.restore();
-    }
-  }
-
-  @override
-  bool shouldRepaint(_LeavesPainter old) => old.t != t;
-}
-
-class _LeafData {
-  final double x, yStart, speed, size, phase, opacity;
-  final int colorIdx;
-
-  const _LeafData({
-    required this.x,
-    required this.yStart,
-    required this.speed,
-    required this.size,
-    required this.phase,
-    required this.opacity,
-    required this.colorIdx,
-  });
-}

@@ -4,6 +4,7 @@ import '../models/plant_model.dart';
 import '../models/daily_checkin_model.dart';
 import '../services/ai_service.dart';
 import 'speech_visualizer.dart';
+import 'leaves_particle_overlay.dart';
 
 /// Skeuomorphic Flora AI Plant Doctor Modal Sheet
 class FloraAISheet extends StatefulWidget {
@@ -135,10 +136,14 @@ class _FloraAISheetState extends State<FloraAISheet> {
           ),
         ],
       ),
-      child: Column(
-        children: [
-          // Drag handle
-          Center(
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        child: LeavesParticleOverlay(
+          particleCount: 40,
+          child: Column(
+            children: [
+              // Drag handle
+              Center(
             child: Container(
               margin: const EdgeInsets.only(top: 12, bottom: 8),
               width: 44,
@@ -381,10 +386,12 @@ class _FloraAISheetState extends State<FloraAISheet> {
               ),
             ),
           ),
-        ],
+          ],
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildMetricPill(String label, String value, Color color) {
     return Column(

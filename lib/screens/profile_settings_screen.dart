@@ -14,6 +14,7 @@ import '../widgets/fun_bouncy_button.dart';
 import 'ai_eco_buddy_screen.dart';
 import 'my_plants_screen.dart';
 import '../widgets/app_background.dart';
+import '../widgets/leaves_particle_overlay.dart';
 import 'my_certifications_screen.dart';
 import 'profile_setup_screen.dart';
 import 'virtual_companion_screen.dart';
@@ -80,9 +81,11 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: AppBackground(
-        child: SafeArea(
-          child: FadeTransition(
+      body: LeavesParticleOverlay(
+        maxThroughput: true,
+        child: AppBackground(
+          child: SafeArea(
+            child: FadeTransition(
           opacity: _headerFade,
           child: Column(
             children: [
@@ -281,35 +284,36 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
       ),
     ),
   ),
+),
   bottomNavigationBar: BottomNavBar(
-        currentIndex: 4,
-        onTap: (index) {
-          if (index == 4) return;
-          switch (index) {
-            case 0:
-              Navigator.of(context).pop();
-              break;
-            case 1:
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const MyPlantsScreen()),
-              );
-              break;
-            case 2:
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const AIEcoBuddyScreen()),
-              );
-              break;
-            case 3:
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                    builder: (_) => const VirtualCompanionScreen()),
-              );
-              break;
-          }
-        },
-      ),
-    );
-  }
+    currentIndex: 4,
+    onTap: (index) {
+      if (index == 4) return;
+      switch (index) {
+        case 0:
+          Navigator.of(context).pop();
+          break;
+        case 1:
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const MyPlantsScreen()),
+          );
+          break;
+        case 2:
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const AIEcoBuddyScreen()),
+          );
+          break;
+        case 3:
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+                builder: (_) => const VirtualCompanionScreen()),
+          );
+          break;
+      }
+    },
+  ),
+);
+}
 
   Widget _buildAppBar() {
     return Padding(

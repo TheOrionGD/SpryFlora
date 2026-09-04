@@ -143,9 +143,9 @@ class _VirtualCompanionScreenState extends State<VirtualCompanionScreen>
               ),
             ),
 
-            // 2. Leaf Particle Effect Overlay
+            // 2. Leaf Particle Effect Overlay (High Throughput)
             const Positioned.fill(
-              child: LeavesParticleOverlay(),
+              child: LeavesParticleOverlay(maxThroughput: true),
             ),
 
             // 3. Foreground Interactive UI

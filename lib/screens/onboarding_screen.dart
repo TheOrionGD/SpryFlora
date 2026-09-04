@@ -163,9 +163,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   void _triggerCloudTransitionToNextPage() {
     if (_currentPage < _pages.length - 1) {
       final nextIdx = _currentPage + 1;
-      _cloudAnimCtrl.forward(from: 0.0).then((_) {
-        _cloudAnimCtrl.reverse();
-      });
+      _cloudAnimCtrl.forward(from: 0.0);
 
       // Jump page right at peak cloud cover (400ms mark)
       Timer(const Duration(milliseconds: 400), () {
@@ -249,7 +247,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 ),
               ),
 
-              // 2. Top Cloud Engine Status Header Badge
+              // 2. Top Header Branding Badge
               Positioned(
                 top: MediaQuery.of(context).padding.top + 8,
                 left: 16,
@@ -278,18 +276,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             shape: BoxShape.circle,
-                            color: _warmupService.isWarm
-                                ? const Color(0xFF2ECC71)
-                                : const Color(0xFFFFD54F),
+                            color: Color(0xFF2ECC71),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          _warmupService.isWarm
-                              ? 'Render Cloud: Ready 🟢'
-                              : 'Render Cloud: Booting (50s Flow)... ⚡',
+                          'SpryFlora • Botanical Journey 🌿',
                           style: GoogleFonts.nunito(
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
@@ -311,6 +305,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 itemBuilder: (context, index) {
                   final p = _pages[index];
                   return Column(
+                    key: ValueKey('onboard_page_$index'),
                     children: [
                       // Top Illustration
                       Expanded(
@@ -420,7 +415,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                 ],
                               ),
 
-                              // Bottom Automated 5-Second Timer Bar & 9-Cloud Step Indicators
+                              // Bottom Automated 5-Second Timer Bar & 9-Step Indicators
                               Column(
                                 children: [
                                   // Smooth 5-Second Linear Timer Progress Bar
@@ -457,14 +452,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
                                   const SizedBox(height: 14),
 
-                                  // 9 Cloud Progress Dots / Step Indicators (No Skip / Next Buttons)
+                                  // 9 Step Progress Dots (No Skip / Next Buttons)
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: List.generate(
                                       _pages.length,
                                       (dotIdx) {
-                                        final isAct = dotIdx == _currentPage;
-                                        final isPast = dotIdx < _currentPage;
+                                        final isAct = dotIdx == index;
+                                        final isPast = dotIdx < index;
                                         return AnimatedContainer(
                                           duration: const Duration(
                                               milliseconds: 350),
@@ -491,7 +486,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
                                   // Caption indicator
                                   Text(
-                                    'Auto-flow: 5s per screen • 50s Cloud Boot Sync (${_currentPage + 1}/9)',
+                                    'Auto-flow: 5s per screen (${index + 1}/9)',
                                     style: GoogleFonts.nunito(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,

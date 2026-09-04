@@ -42,9 +42,12 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen>
   late int _currentStageIndex;
   MascotJourneyViewMode _viewMode = MascotJourneyViewMode.singleStage;
 
-  // Floating mascot bounce animation
   late final AnimationController _bounceCtrl;
   late final ScrollController _scrollController;
+
+  Timer? _autoStageTimer;
+  bool _isAutoPlayActive = true;
+  CloudTransitionOverlayState? _currentCloudOverlay;
 
   static const double _cardWidth = 130.0;
   static const double _verticalSpacing = 210.0;
@@ -64,6 +67,17 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen>
     )..repeat(reverse: true);
 
     _initVideoBackground();
+    _start3SecAutoStageTimer();
+  }
+
+  void _start3SecAutoStageTimer() {
+    _autoStageTimer?.cancel();
+    _autoStageTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      if (_isAutoPlayActive && _viewMode == MascotJourneyViewMode.singleStage) {
+        _onNextStagePressed(_currentCloudOverlay);
+      }
+    });
   }
 
   /// Initializes Video Background Loop for assets/sprites/bg.mp4
@@ -86,6 +100,7 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen>
 
   @override
   void dispose() {
+    _autoStageTimer?.cancel();
     _videoController?.dispose();
     _bounceCtrl.dispose();
     _scrollController.dispose();
@@ -126,6 +141,7 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen>
         child: Builder(
           builder: (innerContext) {
             final cloudOverlay = CloudTransitionOverlay.of(innerContext);
+            _currentCloudOverlay = cloudOverlay;
 
             return Stack(
               fit: StackFit.expand,
@@ -223,6 +239,30 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen>
       ),
       centerTitle: true,
       actions: [
+        // 3s Auto-Play Toggle Button
+        IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: _isAutoPlayActive
+                  ? const Color(0xFF2ECC71).withValues(alpha: 0.6)
+                  : Colors.black.withValues(alpha: 0.45),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              _isAutoPlayActive ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          onPressed: () {
+            setState(() {
+              _isAutoPlayActive = !_isAutoPlayActive;
+            });
+          },
+          tooltip: _isAutoPlayActive ? 'Pause 3s Auto-Flow' : 'Play 3s Auto-Flow',
+        ),
+
         // Grid Overview / Map Toggle Button
         IconButton(
           icon: Container(
