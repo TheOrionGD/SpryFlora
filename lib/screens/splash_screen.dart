@@ -4,7 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../widgets/botanical_corner_leaves.dart';
 import 'landing_selection_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -89,210 +88,181 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: AnimatedBuilder(
-        animation: Listenable.merge([_introCtrl, _bounceCtrl, _leavesCtrl]),
-        builder: (context, _) {
-          final floatY = math.sin(_bounceCtrl.value * math.pi) * 8;
+      body: SizedBox.expand(
+        child: AnimatedBuilder(
+          animation: Listenable.merge([_introCtrl, _bounceCtrl, _leavesCtrl]),
+          builder: (context, _) {
+            final floatY = math.sin(_bounceCtrl.value * math.pi) * 8;
 
-          return Stack(
-            children: [
-              // 1. Scenic Nature Field & Sky Background
-              Positioned.fill(
-                child: Image.asset(
-                  'assets/sprites/image.png',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color(0xFF81D4FA),
-                          Color(0xFFA5D6A7),
-                          Color(0xFF388E3C),
-                        ],
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                // 1. Scenic Nature Field & Sky Background
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/sprites/image.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0xFF81D4FA),
+                            Color(0xFFA5D6A7),
+                            Color(0xFF388E3C),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
 
-              // Floating ambient leaves overlay
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _LeavesPainter(t: _leavesCtrl.value),
+                // Floating ambient leaves overlay
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _LeavesPainter(t: _leavesCtrl.value),
+                  ),
                 ),
-              ),
 
-              // 2. Corner Decorative Leaves Frame
-              const BotanicalLeavesFrame(
-                leafSize: 140,
-                opacity: 0.95,
-              ),
+                // 2. Center Main Hero Content (Mascot + Tagline)
+                Positioned.fill(
+                  child: SafeArea(
+                    child: FadeTransition(
+                      opacity: _fadeAnim,
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: double.infinity,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const Spacer(flex: 3),
 
-              // 3. Center Main Hero Content (Mascot + SpryFlora Title Logo + Tagline)
-              SafeArea(
-                child: FadeTransition(
-                  opacity: _fadeAnim,
-                  child: Column(
-                    children: [
-                      const Spacer(flex: 3),
-
-                      // Floating Animated Mascot & Logo Stack
-                      Transform.translate(
-                        offset: Offset(0, -floatY),
-                        child: Transform.scale(
-                          scale: _scaleAnim.value,
-                          child: SizedBox(
-                            width: 320,
-                            child: Stack(
-                              alignment: Alignment.topCenter,
-                              children: [
-                                // Glowing background aura behind mascot
-                                Positioned(
-                                  top: 10,
-                                  child: Container(
-                                    width: 220,
-                                    height: 220,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: RadialGradient(
-                                        colors: [
-                                          Colors.white.withValues(
-                                            alpha: 0.30 +
-                                                0.15 *
-                                                    math.sin(
-                                                        _bounceCtrl.value *
-                                                            math.pi),
+                            // Floating Animated Center Mascot
+                            Transform.translate(
+                              offset: Offset(0, -floatY),
+                              child: Transform.scale(
+                                scale: _scaleAnim.value,
+                                child: SizedBox(
+                                  width: 260,
+                                  height: 260,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      // Glowing background aura behind mascot
+                                      Container(
+                                        width: 220,
+                                        height: 220,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          gradient: RadialGradient(
+                                            colors: [
+                                              Colors.white.withValues(
+                                                alpha: 0.35 +
+                                                    0.15 *
+                                                        math.sin(
+                                                            _bounceCtrl.value *
+                                                                math.pi),
+                                              ),
+                                              Colors.transparent,
+                                            ],
                                           ),
-                                          Colors.transparent,
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-
-                                // Mascot Pot Illustration
-                                Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SizedBox(
-                                      width: 240,
-                                      height: 240,
-                                      child: Image.asset(
-                                        'assets/sprites/mascot_pot_happy.png',
-                                        fit: BoxFit.contain,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 50),
-                                  ],
-                                ),
-
-                                // Colorful SpryFlora Logo overlapping bottom of pot
-                                Positioned(
-                                  bottom: 10,
-                                  child: SizedBox(
-                                    width: 280,
-                                    height: 85,
-                                    child: Image.asset(
-                                      'assets/sprites/logo_spryflora.png',
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (_, __, ___) => Text(
-                                        'SpryFlora',
-                                        style: GoogleFonts.nunito(
-                                          fontSize: 42,
-                                          fontWeight: FontWeight.w900,
-                                          color: Colors.white,
                                         ),
                                       ),
-                                    ),
+
+                                      // Center Mascot (mascot_transparent.png)
+                                      Image.asset(
+                                        'assets/logo/mascot_transparent.png',
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
-                      ),
 
-                      const SizedBox(height: 24),
+                            const SizedBox(height: 24),
 
-                      // 4. Taglines ("Grow Plants", "Grow Future" + Sprout Icon)
-                      Column(
-                        children: [
-                          Text(
-                            'Grow Plants',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.nunito(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                              shadows: const [
-                                Shadow(
-                                  color: Color(0x99000000),
-                                  offset: Offset(0, 2),
-                                  blurRadius: 6,
+                            // 4. Taglines ("Grow Plants", "Grow Future" + Sprout Icon)
+                            Column(
+                              children: [
+                                Text(
+                                  'Grow Plants',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: 0.5,
+                                    shadows: const [
+                                      Shadow(
+                                        color: Color(0x99000000),
+                                        offset: Offset(0, 2),
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Grow Future',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: 0.5,
+                                    shadows: const [
+                                      Shadow(
+                                        color: Color(0x99000000),
+                                        offset: Offset(0, 2),
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+
+                                // Tiny white sprout icon below "Grow Future"
+                                const Icon(
+                                  Icons.eco_rounded,
+                                  color: Colors.white,
+                                  size: 20,
                                 ),
                               ],
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Grow Future',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.nunito(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                              shadows: const [
-                                Shadow(
-                                  color: Color(0x99000000),
-                                  offset: Offset(0, 2),
-                                  blurRadius: 6,
-                                ),
-                              ],
+
+                            const Spacer(flex: 2),
+
+                            // 5. Loading indicator dots at bottom
+                            Text(
+                              'Loading${'.' * _dotCount}',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.nunito(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white.withValues(alpha: 0.85),
+                                shadows: const [
+                                  Shadow(
+                                    color: Color(0x80000000),
+                                    offset: Offset(0, 1),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
 
-                          // Tiny white sprout icon below "Grow Future"
-                          const Icon(
-                            Icons.eco_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ],
-                      ),
-
-                      const Spacer(flex: 2),
-
-                      // 5. Loading indicator dots at bottom
-                      Text(
-                        'Loading${'.' * _dotCount}',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.nunito(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white.withValues(alpha: 0.85),
-                          shadows: const [
-                            Shadow(
-                              color: Color(0x80000000),
-                              offset: Offset(0, 1),
-                              blurRadius: 4,
-                            ),
+                            const SizedBox(height: 32),
                           ],
                         ),
                       ),
-
-                      const SizedBox(height: 32),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }

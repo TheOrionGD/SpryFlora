@@ -9,6 +9,8 @@ import '../widgets/fun_bouncy_button.dart';
 import '../widgets/leaf_discovery_badge_dialog.dart';
 import '../widgets/skeuo_live_camera_screen.dart';
 
+import '../widgets/app_background.dart';
+
 /// Screen 13: AI Plant Analysis (from 255.jpg)
 /// - Top Bar: Back button + "AI Plant Analysis" + Real-time Camera Scanner action
 /// - Scanned plant image with glowing reticle / AI bounding box
@@ -136,9 +138,9 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SkeuoTheme.background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: SkeuoTheme.background,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
@@ -164,9 +166,10 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen>
           const SizedBox(width: 8),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        physics: const BouncingScrollPhysics(),
+      body: AppBackground(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          physics: const BouncingScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -586,8 +589,9 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen>
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildFallbackIllustration() {
     return Center(

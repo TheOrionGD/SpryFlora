@@ -4,11 +4,13 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../services/plant_repository.dart';
 import '../services/user_service.dart';
-import '../theme/skeuo_theme.dart';
 import '../widgets/fun_bouncy_button.dart';
 import '../widgets/fun_confetti_overlay.dart';
 import 'ai_eco_buddy_screen.dart';
 import 'garden_screen.dart';
+
+import '../widgets/leaves_particle_overlay.dart';
+import '../widgets/video_background_backdrop.dart';
 
 /// Screen 14: Virtual Companion (from 255.jpg)
 /// - Top Bar: "Virtual Companion"
@@ -72,43 +74,89 @@ class _VirtualCompanionScreenState extends State<VirtualCompanionScreen>
     return FunConfettiOverlay(
       isActive: _showConfetti,
       child: Scaffold(
-        backgroundColor: SkeuoTheme.background,
+        backgroundColor: Colors.black,
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
-          backgroundColor: SkeuoTheme.background,
+          backgroundColor: Colors.transparent,
           elevation: 0,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new_rounded,
-                color: SkeuoTheme.textPrimary, size: 20),
-            onPressed: () => Navigator.of(context).pop(),
+          leading: Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.35),
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white, size: 18),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
           ),
           title: Text(
             'Virtual Companion',
             style: GoogleFonts.nunito(
               fontSize: 20,
               fontWeight: FontWeight.w900,
-              color: SkeuoTheme.textPrimary,
+              color: Colors.white,
             ),
           ),
           centerTitle: true,
           actions: [
-            IconButton(
-              icon: Icon(Icons.park_rounded, color: SkeuoTheme.primaryGreen),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const GardenScreen()),
-                );
-              },
+            Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.35),
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.park_rounded, color: Color(0xFF2ECC71)),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const GardenScreen()),
+                  );
+                },
+              ),
             ),
           ],
         ),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 10),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 1. Continuous Video Background (assets/sprites/bg.mp4)
+            const Positioned.fill(
+              child: VideoBackgroundBackdrop(),
+            ),
+
+            // Soft Translucent Dark Overlay for legibility
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.30),
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.45),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // 2. Leaf Particle Effect Overlay
+            const Positioned.fill(
+              child: LeavesParticleOverlay(),
+            ),
+
+            // 3. Foreground Interactive UI
+            SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 10),
 
                 // ── Animated Companion Mascot in Pot ────────────────────────
                 GestureDetector(
@@ -298,9 +346,11 @@ class _VirtualCompanionScreenState extends State<VirtualCompanionScreen>
             ),
           ),
         ),
-      ),
-    );
-  }
+      ],
+    ),
+  ),
+);
+}
 
   Widget _buildChecklistItem(String title, {required bool isDone}) {
     return Row(

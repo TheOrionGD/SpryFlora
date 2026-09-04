@@ -1,45 +1,46 @@
 import 'package:flutter/material.dart';
 
-/// Centralized SpryFlora App Background Wrapper
-/// Features assets/sprites/pg.png backdrop image layered over
-/// linear-gradient(180deg, #D8EEF8 0%, #F6F7EB 45%, #FCFBF4 100%)
+/// Centralized SpryFlora App Background Wrapper.
+/// Renders assets/sprites/image.png as the scenic background image for post-authentication screens.
 class AppBackground extends StatelessWidget {
   final Widget child;
+  final double overlayOpacity;
 
   const AppBackground({
     super.key,
     required this.child,
+    this.overlayOpacity = 0.08,
   });
-
-  static const LinearGradient defaultGradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    stops: [0.0, 0.45, 1.0],
-    colors: [
-      Color(0xFFD8EEF8),
-      Color(0xFFF6F7EB),
-      Color(0xFFFCFBF4),
-    ],
-  );
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // 1. Fallback Gradient (180deg: #d8eef8 0%, #f6f7eb 45%, #fcfbf4 100%)
-        Container(
-          decoration: const BoxDecoration(
-            gradient: defaultGradient,
+        // 1. Primary Post-Authentication Background Image (assets/sprites/image.png)
+        Image.asset(
+          'assets/sprites/image.png',
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF81D4FA),
+                  Color(0xFFA5D6A7),
+                  Color(0xFF388E3C),
+                ],
+              ),
+            ),
           ),
         ),
 
-        // 2. Primary Page Background Asset (assets/sprites/pg.png)
-        Image.asset(
-          'assets/sprites/pg.png',
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-        ),
+        // 2. Translucent soft overlay for UI contrast and readability
+        if (overlayOpacity > 0)
+          Container(
+            color: Colors.black.withValues(alpha: overlayOpacity),
+          ),
 
         // 3. Screen Body Content
         child,

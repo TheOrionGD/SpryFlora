@@ -12,6 +12,7 @@ import '../theme/skeuo_theme.dart';
 import '../widgets/app_photo_view.dart';
 import '../widgets/fun_bouncy_button.dart';
 import '../widgets/skeuo_live_camera_screen.dart';
+import '../widgets/app_background.dart';
 
 /// Screen 09: Add New Plant (from 255.jpg)
 class AddPlantScreen extends StatefulWidget {
@@ -152,16 +153,17 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SkeuoTheme.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top App Bar: < Add New Plant
-            _buildAppBar(),
+      backgroundColor: Colors.transparent,
+      body: AppBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Top App Bar: < Add New Plant
+              _buildAppBar(),
 
-            // Form Body
-            Expanded(
-              child: SingleChildScrollView(
+              // Form Body
+              Expanded(
+                child: SingleChildScrollView(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 physics: const BouncingScrollPhysics(),
@@ -231,8 +233,9 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildAppBar() {
     return Padding(

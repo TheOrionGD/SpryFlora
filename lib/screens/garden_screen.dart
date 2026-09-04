@@ -979,23 +979,31 @@ class _GardenScenicBackdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF90CAF9), // Sky blue
-            Color(0xFFC8E6C9), // Soft horizon green
-            Color(0xFFA5D6A7), // Meadow rolling hill
-            Color(0xFF81C784), // Foreground lush garden field
-          ],
-          stops: [0.0, 0.32, 0.65, 1.0],
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          'assets/sprites/image.png',
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF90CAF9),
+                  Color(0xFFC8E6C9),
+                  Color(0xFFA5D6A7),
+                  Color(0xFF81C784),
+                ],
+              ),
+            ),
+          ),
         ),
-      ),
-      child: CustomPaint(
-        painter: _DistantHillsPainter(),
-      ),
+        CustomPaint(
+          painter: _DistantHillsPainter(),
+        ),
+      ],
     );
   }
 }

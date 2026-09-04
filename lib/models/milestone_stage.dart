@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Data model representing a milestone stage in the SpryFlora Mascot Journey.
+/// Data model representing a single stage in the 16-stage SpryFlora Mascot Journey.
 class MilestoneStage {
   final int id;
   final int stageNumber;
@@ -9,6 +9,8 @@ class MilestoneStage {
   final bool isUnlocked;
   final bool isCompleted;
   final bool isCurrent;
+  final String badgeSymbol;
+  final String landName;
   final String assetPath;
   final IconData fallbackIcon;
   final int xpReward;
@@ -22,6 +24,8 @@ class MilestoneStage {
     required this.isUnlocked,
     required this.isCompleted,
     required this.isCurrent,
+    required this.badgeSymbol,
+    required this.landName,
     required this.assetPath,
     required this.fallbackIcon,
     required this.xpReward,
@@ -36,6 +40,8 @@ class MilestoneStage {
     bool? isUnlocked,
     bool? isCompleted,
     bool? isCurrent,
+    String? badgeSymbol,
+    String? landName,
     String? assetPath,
     IconData? fallbackIcon,
     int? xpReward,
@@ -49,6 +55,8 @@ class MilestoneStage {
       isUnlocked: isUnlocked ?? this.isUnlocked,
       isCompleted: isCompleted ?? this.isCompleted,
       isCurrent: isCurrent ?? this.isCurrent,
+      badgeSymbol: badgeSymbol ?? this.badgeSymbol,
+      landName: landName ?? this.landName,
       assetPath: assetPath ?? this.assetPath,
       fallbackIcon: fallbackIcon ?? this.fallbackIcon,
       xpReward: xpReward ?? this.xpReward,
@@ -56,14 +64,15 @@ class MilestoneStage {
     );
   }
 
-  /// Generates a default list of 16 sequential botanical growth journey milestones.
-  /// Sets stages 1 to 4 as completed, stage 5 as current/active, and remaining as locked.
-  static List<MilestoneStage> getDummyStages({int activeIndex = 4}) {
+  /// Generates the list of 16 predefined botanical growth journey milestones.
+  static List<MilestoneStage> getDummyStages({int activeIndex = 0}) {
     final rawData = [
       {
         'id': 1,
         'title': 'Seed Awakening',
-        'description': 'Plant your first sprout seed in nutrient-rich soil.',
+        'badgeSymbol': 'SEED',
+        'landName': 'Sprout Hollow',
+        'description': 'Plant your first seed in nutrient-rich soil and begin your SpryFlora journey.',
         'assetPath': 'assets/sprites/boy_planting.png',
         'fallbackIcon': Icons.grass,
         'xp': 50,
@@ -72,7 +81,9 @@ class MilestoneStage {
       {
         'id': 2,
         'title': 'First Sprout',
-        'description': 'Witness the tiny green shoot break through the earth.',
+        'badgeSymbol': 'SPROUT',
+        'landName': 'Sprout Hollow',
+        'description': 'Witness the tiny green shoot break through the earth with joy.',
         'assetPath': 'assets/sprites/mascot_pot_happy.png',
         'fallbackIcon': Icons.eco,
         'xp': 75,
@@ -80,8 +91,10 @@ class MilestoneStage {
       },
       {
         'id': 3,
-        'title': 'Sunlight Booster',
-        'description': 'Give your baby plant optimal indirect sunlight hours.',
+        'title': 'Sunlight',
+        'badgeSymbol': 'SUNLIGHT',
+        'landName': 'Sunlit Meadow',
+        'description': 'Provide optimal indirect sunlight hours for natural leaf development.',
         'assetPath': 'assets/sprites/boy_phone_scanning.png',
         'fallbackIcon': Icons.wb_sunny,
         'xp': 100,
@@ -89,8 +102,10 @@ class MilestoneStage {
       },
       {
         'id': 4,
-        'title': 'Hydration Haven',
-        'description': 'Master moisture balance and root hydration routine.',
+        'title': 'Oasis',
+        'badgeSymbol': 'OASIS',
+        'landName': 'Dewdrop Springs',
+        'description': 'Master moisture balance and root hydration routine for steady growth.',
         'assetPath': 'assets/sprites/mascot_pot_winking.png',
         'fallbackIcon': Icons.water_drop,
         'xp': 125,
@@ -99,7 +114,9 @@ class MilestoneStage {
       {
         'id': 5,
         'title': 'Potted Potency',
-        'description': 'Repot your thriving plant into a spacious ceramic home.',
+        'badgeSymbol': 'CURRENT',
+        'landName': 'Dewdrop Springs',
+        'description': 'Explore your sprout as it matures in a spacious ceramic pot.',
         'assetPath': 'assets/sprites/plant_potted.png',
         'fallbackIcon': Icons.local_florist,
         'xp': 150,
@@ -108,7 +125,9 @@ class MilestoneStage {
       {
         'id': 6,
         'title': 'Nutrient Shield',
-        'description': 'Feed natural bio-organic fertilizer for steady stem growth.',
+        'badgeSymbol': 'CANOPY',
+        'landName': 'Terra Haven',
+        'description': 'Feed bio-organic fertilizer for strong stems and vibrant green leaves.',
         'assetPath': 'assets/sprites/mascot_pot_happy.png',
         'fallbackIcon': Icons.science,
         'xp': 175,
@@ -117,7 +136,9 @@ class MilestoneStage {
       {
         'id': 7,
         'title': 'Leaf Pruning',
-        'description': 'Trim yellowing fronds to redirect energy into fresh foliage.',
+        'badgeSymbol': 'CANOPY',
+        'landName': 'Verdant Vale',
+        'description': 'Trim aging fronds to redirect nutrients into fresh young foliage.',
         'assetPath': 'assets/sprites/boy_planting.png',
         'fallbackIcon': Icons.content_cut,
         'xp': 200,
@@ -126,7 +147,9 @@ class MilestoneStage {
       {
         'id': 8,
         'title': 'Root Explorer',
-        'description': 'Check root health and avoid root-bound stagnation.',
+        'badgeSymbol': 'CANOPY',
+        'landName': 'Whisper Grove',
+        'description': 'Inspect root health and prevent root-bound stagnation in soil.',
         'assetPath': 'assets/sprites/certificate_spryflora_icon.png',
         'fallbackIcon': Icons.nature_people,
         'xp': 225,
@@ -135,7 +158,9 @@ class MilestoneStage {
       {
         'id': 9,
         'title': 'Humidity Oasis',
-        'description': 'Create a tropical misting microclimate for lush leaves.',
+        'badgeSymbol': 'CANOPY',
+        'landName': 'Terora Haven',
+        'description': 'Create a soothing tropical misting microclimate for lush fronds.',
         'assetPath': 'assets/sprites/mascot_pot_winking.png',
         'fallbackIcon': Icons.opacity,
         'xp': 250,
@@ -143,26 +168,32 @@ class MilestoneStage {
       },
       {
         'id': 10,
-        'title': 'Floral Buds',
-        'description': 'Nurture delicate flower buds as they prepare to open.',
+        'title': 'Branch',
+        'badgeSymbol': 'BRANCH',
+        'landName': 'Terra Haven',
+        'description': 'Excellent progress! Your SpryFlora is reaching out with new growth.',
         'assetPath': 'assets/sprites/plant_potted.png',
-        'fallbackIcon': Icons.filter_vintage,
+        'fallbackIcon': Icons.nature,
         'xp': 275,
-        'topic': 'Budding Phase',
+        'topic': 'Branching Phase',
       },
       {
         'id': 11,
         'title': 'Sweet Bloom',
-        'description': 'Celebrate your first full vibrant blossom opening.',
+        'badgeSymbol': 'BLOOM',
+        'landName': 'Rarama Convey',
+        'description': 'Celebrate your first full vibrant blossom opening in the garden.',
         'assetPath': 'assets/sprites/mascot_celebrating_confetti.png',
-        'fallbackIcon': Icons.nature,
+        'fallbackIcon': Icons.filter_vintage,
         'xp': 300,
         'topic': 'Blooming',
       },
       {
         'id': 12,
         'title': 'Pollinator Haven',
-        'description': 'Attract friendly bees and butterflies to garden haven.',
+        'badgeSymbol': 'HAVEN',
+        'landName': 'Terra Sovings',
+        'description': 'Attract friendly bees and butterflies to your thriving garden sanctuary.',
         'assetPath': 'assets/sprites/avatar_boy_hero.png',
         'fallbackIcon': Icons.emoji_nature,
         'xp': 350,
@@ -171,7 +202,9 @@ class MilestoneStage {
       {
         'id': 13,
         'title': 'Fruit Seedling',
-        'description': 'Observe successful pollination forming small fruits.',
+        'badgeSymbol': 'HARVEST',
+        'landName': 'Dewdrop Springs',
+        'description': 'Observe successful pollination forming healthy small fruits.',
         'assetPath': 'assets/sprites/scroll_diploma.png',
         'fallbackIcon': Icons.yard,
         'xp': 400,
@@ -180,7 +213,9 @@ class MilestoneStage {
       {
         'id': 14,
         'title': 'Canopy Growth',
-        'description': 'Develop a thick lush canopy protecting small flora.',
+        'badgeSymbol': 'CANOPY',
+        'landName': 'Emerald Arbor',
+        'description': 'Develop a thick canopy protecting delicate lower botanical life.',
         'assetPath': 'assets/sprites/mascot_graduate_logo.png',
         'fallbackIcon': Icons.park,
         'xp': 450,
@@ -189,7 +224,9 @@ class MilestoneStage {
       {
         'id': 15,
         'title': 'Guardian Tree',
-        'description': 'Become a sanctuary tree providing shade and clean air.',
+        'badgeSymbol': 'GUARDIAN',
+        'landName': 'Elderwood Sanctuary',
+        'description': 'Become an environmental guardian providing shade and clean oxygen.',
         'assetPath': 'assets/sprites/certificate_approved_stamp.png',
         'fallbackIcon': Icons.forest,
         'xp': 500,
@@ -197,8 +234,10 @@ class MilestoneStage {
       },
       {
         'id': 16,
-        'title': 'Spry Master Blossom',
-        'description': 'Achieve ultimate master botanical status in SpryFlora!',
+        'title': 'Spry Master',
+        'badgeSymbol': 'MASTER',
+        'landName': 'Celestia Flora',
+        'description': 'Achieve ultimate master botanical status in the world of SpryFlora!',
         'assetPath': 'assets/sprites/trophy_champion.png',
         'fallbackIcon': Icons.emoji_events,
         'xp': 1000,
@@ -220,6 +259,8 @@ class MilestoneStage {
         isUnlocked: isUnlocked,
         isCompleted: isCompleted,
         isCurrent: isCurrent,
+        badgeSymbol: item['badgeSymbol'] as String,
+        landName: item['landName'] as String,
         assetPath: item['assetPath'] as String,
         fallbackIcon: item['fallbackIcon'] as IconData,
         xpReward: item['xp'] as int,

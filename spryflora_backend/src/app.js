@@ -13,6 +13,7 @@ import speciesRoutes from './routes/species.routes.js';
 import syncRoutes from './routes/sync.routes.js';
 import aiRoutes from './routes/ai.routes.js';
 import deletionRoutes from './routes/deletion.routes.js';
+import forgotPasswordRoutes from './routes/forgot_password.routes.js';
 
 const app = express();
 
@@ -50,8 +51,9 @@ app.get('/ready', (req, res) => {
   return res.status(503).json({ ready: false, reason: 'Database connection not ready' });
 });
 
-// Server-rendered Account Deletion Link (Google Play Console Policy Compliant)
+// Server-rendered Account Deletion Link & Password Recovery Portal
 app.use('/delete-account', deletionRoutes);
+app.use('/forgot-password', forgotPasswordRoutes);
 
 // Primary API Routes
 app.use('/api/auth', authRoutes);

@@ -10,10 +10,9 @@ export class GeminiService {
     }
 
     const modelsToTry = [
-      'gemini-flash-lite-latest',
-      'gemini-3.6-flash',
       'gemini-flash-latest',
-      'gemini-3.5-flash',
+      'gemma-4-26b-a4b-it',
+      'gemma-4-31b-it',
     ];
 
     for (const key of keysToTry) {
@@ -37,6 +36,7 @@ export class GeminiService {
 
           const response = await fetch(url, {
             method: 'POST',
+            signal: AbortSignal.timeout(5000),
             headers: {
               'Content-Type': 'application/json',
               'x-goog-api-key': key,

@@ -13,6 +13,7 @@ import '../widgets/bottom_nav_bar.dart';
 import '../widgets/fun_bouncy_button.dart';
 import 'ai_eco_buddy_screen.dart';
 import 'my_plants_screen.dart';
+import '../widgets/app_background.dart';
 import 'my_certifications_screen.dart';
 import 'profile_setup_screen.dart';
 import 'virtual_companion_screen.dart';
@@ -78,9 +79,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
         : 1;
 
     return Scaffold(
-      backgroundColor: SkeuoTheme.background,
-      body: SafeArea(
-        child: FadeTransition(
+      backgroundColor: Colors.transparent,
+      body: AppBackground(
+        child: SafeArea(
+          child: FadeTransition(
           opacity: _headerFade,
           child: Column(
             children: [
@@ -278,7 +280,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
         ),
       ),
     ),
-      bottomNavigationBar: BottomNavBar(
+  ),
+  bottomNavigationBar: BottomNavBar(
         currentIndex: 4,
         onTap: (index) {
           if (index == 4) return;

@@ -1,11 +1,11 @@
 @echo off
-title SpryFlora Launcher - Backend & Web (Edge)
+title SpryFlora Launcher - Backend ^& Web (Edge)
 color 0A
 
 echo ====================================================
-echo 🌿 SPRYFLORA FULL-STACK LAUNCHER
+echo SPRYFLORA FULL-STACK LAUNCHER
 echo ====================================================
-echo Starting Node.js Backend Server & Flutter Web App on Edge...
+echo Starting Node.js Backend Server ^& Flutter Web App on Edge...
 echo.
 
 :: 1. Launch Node.js Backend Server in a new window
@@ -13,7 +13,7 @@ echo [1/2] Starting SpryFlora Backend Server on http://localhost:3000 ...
 start "SpryFlora Node.js Backend Server" cmd /k "cd /d %~dp0spryflora_backend && npm run dev"
 
 :: Wait 3 seconds for backend server initialization
-timeout /t 3 /nobreak >nul
+ping -n 4 127.0.0.1 >nul
 
 :: 2. Launch Flutter Web App on Microsoft Edge browser
 echo [2/2] Launching SpryFlora Flutter Web App on Microsoft Edge ...

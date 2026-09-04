@@ -6,6 +6,7 @@ import '../services/ai_service.dart';
 import '../services/plant_repository.dart';
 import '../theme/skeuo_theme.dart';
 import '../widgets/speech_visualizer.dart';
+import '../widgets/app_background.dart';
 
 /// Screen 15: AI Eco Buddy Chat (from 255.jpg)
 /// - Top Bar: Back button + "AI Eco Buddy"
@@ -120,9 +121,9 @@ class _AIEcoBuddyScreenState extends State<AIEcoBuddyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SkeuoTheme.background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: SkeuoTheme.background,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: Navigator.of(context).canPop()
             ? IconButton(
@@ -166,8 +167,9 @@ class _AIEcoBuddyScreenState extends State<AIEcoBuddyScreen> {
         ),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
+      body: AppBackground(
+        child: Column(
+          children: [
           // ── Quick Suggestions Bar ─────────────────────────────────────────
           Container(
             height: 48,
@@ -369,8 +371,9 @@ class _AIEcoBuddyScreenState extends State<AIEcoBuddyScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildMessageBubble({
     required String text,

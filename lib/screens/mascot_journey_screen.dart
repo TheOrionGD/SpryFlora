@@ -1,35 +1,52 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:video_player/video_player.dart';
+
 import '../models/milestone_stage.dart';
+import '../widgets/cloud_transition_overlay.dart';
+import '../widgets/stage_pedestal_card.dart';
+import '../widgets/journey_bottom_dock.dart';
+import '../widgets/land_discovery_map.dart';
 import '../widgets/journey_path_painter.dart';
 import '../widgets/milestone_card.dart';
-import '../widgets/current_mascot_marker.dart';
 
-/// Main screen displaying the Gamified Vertical Mascot Journey Map for SpryFlora.
-/// Features looping MP4 background video, S-curve path painter, 16 milestone cards,
-/// floating animated mascot marker, auto-scroll centering, and stage detail bottom sheet.
+enum MascotJourneyViewMode {
+  singleStage,  // Single Stage Pedestal & Island Map (Image 1)
+  gridOverview, // 16-Stage Grid Overview Matrix (Image 2)
+  verticalMap,  // S-Curve Full Vertical Map
+}
+
+/// Main Controller Screen for SpryFlora 16-Stage Mascot Journey Flow.
+/// Features Clash of Clans (CoC) Cloud Transitions, Video Player Background Loop,
+/// Central Stone Hexagonal Stage Pedestal, Land Discovery Map, and Bottom Carved Dock.
 class MascotJourneyScreen extends StatefulWidget {
   final int initialActiveIndex;
 
   const MascotJourneyScreen({
     super.key,
-    this.initialActiveIndex = 4, // Default active stage (5th milestone index 4)
+    this.initialActiveIndex = 0, // Default starts at Stage 1 (index 0)
   });
 
   @override
   State<MascotJourneyScreen> createState() => _MascotJourneyScreenState();
 }
 
-class _MascotJourneyScreenState extends State<MascotJourneyScreen> {
-  late final ScrollController _scrollController;
+class _MascotJourneyScreenState extends State<MascotJourneyScreen>
+    with SingleTickerProviderStateMixin {
   VideoPlayerController? _videoController;
   bool _isVideoInitialized = false;
 
   late List<MilestoneStage> _stages;
-  late int _activeMilestoneIndex;
+  late int _currentStageIndex;
+  MascotJourneyViewMode _viewMode = MascotJourneyViewMode.singleStage;
+
+  // Floating mascot bounce animation
+  late final AnimationController _bounceCtrl;
+  late final ScrollController _scrollController;
 
   static const double _cardWidth = 130.0;
-  static const double _cardHeight = 160.0;
   static const double _verticalSpacing = 210.0;
   static const double _topPadding = 120.0;
   static const double _bottomPadding = 160.0;
@@ -37,206 +54,498 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen> {
   @override
   void initState() {
     super.initState();
+    _currentStageIndex = widget.initialActiveIndex;
+    _stages = MilestoneStage.getDummyStages(activeIndex: _currentStageIndex);
     _scrollController = ScrollController();
-    _activeMilestoneIndex = widget.initialActiveIndex;
-    _stages = MilestoneStage.getDummyStages(activeIndex: _activeMilestoneIndex);
+
+    _bounceCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
 
     _initVideoBackground();
-
-    // Auto-scroll to center on activeMilestoneIndex after layout build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToActiveMilestone(animate: true);
-    });
   }
 
+  /// Initializes Video Background Loop for assets/sprites/bg.mp4
   Future<void> _initVideoBackground() async {
     try {
       _videoController = VideoPlayerController.asset('assets/sprites/bg.mp4');
       await _videoController!.initialize();
-      _videoController!.setLooping(true);
-      _videoController!.setVolume(0.0); // Muted background video playback
-      _videoController!.play();
+      _videoController!.setLooping(true); // Loop video continuously
+      _videoController!.setVolume(0.0);   // Muted background loop
+      await _videoController!.play();
       if (mounted) {
         setState(() {
           _isVideoInitialized = true;
         });
       }
     } catch (e) {
-      debugPrint(
-          'Video Player initialization notice: $e. Falling back to scenic image backdrop.');
+      debugPrint('Video Player loop notice: $e. Falling back to organic nature backdrop.');
     }
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
     _videoController?.dispose();
+    _bounceCtrl.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _scrollToActiveMilestone({bool animate = false}) {
-    if (!_scrollController.hasClients) return;
-
-    final targetY = _topPadding + (_activeMilestoneIndex * _verticalSpacing);
-    final screenHeight = MediaQuery.of(context).size.height;
-    final scrollOffset = (targetY - (screenHeight / 2) + (_cardHeight / 2))
-        .clamp(0.0, _scrollController.position.maxScrollExtent);
-
-    if (animate) {
-      _scrollController.animateTo(
-        scrollOffset,
-        duration: const Duration(milliseconds: 900),
-        curve: Curves.easeOutCubic,
-      );
-    } else {
-      _scrollController.jumpTo(scrollOffset);
+  /// Triggers Clash of Clans style Cloud Sweep and advances stage at 50% occlusion
+  void _onNextStagePressed(CloudTransitionOverlayState? cloudOverlay) {
+    if (cloudOverlay == null) {
+      _advanceStageIndex();
+      return;
     }
+
+    cloudOverlay.triggerTransition(
+      onCovered: () {
+        if (mounted) {
+          setState(() {
+            _advanceStageIndex();
+          });
+        }
+      },
+    );
+  }
+
+  void _advanceStageIndex() {
+    _currentStageIndex = (_currentStageIndex + 1) % _stages.length;
+    _stages = MilestoneStage.getDummyStages(activeIndex: _currentStageIndex);
   }
 
   @override
   Widget build(BuildContext context) {
+    final activeStage = _stages[_currentStageIndex];
+
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: _buildTopAppBar(activeStage),
+      body: CloudTransitionOverlay(
+        child: Builder(
+          builder: (innerContext) {
+            final cloudOverlay = CloudTransitionOverlay.of(innerContext);
+
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                // 1. Video Player Background or Organic Nature Fallback Backdrop
+                Positioned.fill(
+                  child: _buildBackgroundBackdrop(),
+                ),
+
+                // Translucent gradient overlay for high contrast readability
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.30),
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.40),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                // 2. Active Screen Content based on _viewMode
+                Positioned.fill(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 350),
+                    child: _buildMainContent(activeStage, cloudOverlay),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildTopAppBar(MilestoneStage activeStage) {
+    return AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      leading: Container(
+        margin: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.45),
+          shape: BoxShape.circle,
+        ),
+        child: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.maybePop(context),
+        ),
+      ),
+      title: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white24, width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.park, color: Color(0xFF2ECC71), size: 18),
+            const SizedBox(width: 6),
+            Text(
+              'Mascot Journey',
+              style: GoogleFonts.nunito(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1C40F),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Stage ${_currentStageIndex + 1}/${_stages.length}',
+                style: GoogleFonts.nunito(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      centerTitle: true,
+      actions: [
+        // Grid Overview / Map Toggle Button
+        IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.45),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              _viewMode == MascotJourneyViewMode.gridOverview
+                  ? Icons.view_day_rounded
+                  : Icons.map_rounded,
+              color: Colors.white,
+            ),
+          ),
+          onPressed: () {
+            setState(() {
+              if (_viewMode == MascotJourneyViewMode.singleStage) {
+                _viewMode = MascotJourneyViewMode.gridOverview;
+              } else if (_viewMode == MascotJourneyViewMode.gridOverview) {
+                _viewMode = MascotJourneyViewMode.verticalMap;
+              } else {
+                _viewMode = MascotJourneyViewMode.singleStage;
+              }
+            });
+          },
+          tooltip: 'Toggle View Mode',
+        ),
+
+        // Floating Seedling Boy Mascot Avatar Tag
+        Padding(
+          padding: const EdgeInsets.only(right: 12.0),
+          child: AnimatedBuilder(
+            animation: _bounceCtrl,
+            builder: (context, child) {
+              final floatY = math.sin(_bounceCtrl.value * math.pi) * 4;
+              return Transform.translate(
+                offset: Offset(0, floatY),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF2ECC71),
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black38, blurRadius: 6),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/sprites/avatar_boy_hero.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMainContent(
+    MilestoneStage activeStage,
+    CloudTransitionOverlayState? cloudOverlay,
+  ) {
+    switch (_viewMode) {
+      case MascotJourneyViewMode.singleStage:
+        return _buildSingleStageView(activeStage, cloudOverlay);
+      case MascotJourneyViewMode.gridOverview:
+        return _build16StageGridOverview(cloudOverlay);
+      case MascotJourneyViewMode.verticalMap:
+        return _buildVerticalPathMapView();
+    }
+  }
+
+  /// Single Stage Screen: Central Floating Mascot Display + Transparent Step Path Map + Bottom Console Dock
+  Widget _buildSingleStageView(
+    MilestoneStage activeStage,
+    CloudTransitionOverlayState? cloudOverlay,
+  ) {
+    return SafeArea(
+      child: Stack(
+        children: [
+          // 1. Background Step Path Map (Transparent over video background)
+          Positioned.fill(
+            child: LandDiscoveryMap(
+              stage: activeStage,
+              totalStages: _stages.length,
+              stages: _stages,
+              activeIndex: _currentStageIndex,
+              onStageSelected: (index) {
+                if (cloudOverlay != null) {
+                  cloudOverlay.triggerTransition(
+                    onCovered: () {
+                      if (mounted) {
+                        setState(() {
+                          _currentStageIndex = index;
+                          _stages = MilestoneStage.getDummyStages(
+                            activeIndex: _currentStageIndex,
+                          );
+                        });
+                      }
+                    },
+                  );
+                } else {
+                  setState(() {
+                    _currentStageIndex = index;
+                    _stages = MilestoneStage.getDummyStages(
+                      activeIndex: _currentStageIndex,
+                    );
+                  });
+                }
+              },
+            ),
+          ),
+
+          // 2. Containerless Floating Stage Mascot Display (No diamond stone box container)
+          Positioned(
+            top: 20,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: StagePedestalCard(
+                stage: activeStage,
+                size: 210,
+                isGlowing: true,
+              ),
+            ),
+          ),
+
+          // 3. Bottom Carved Stone Console Dock with EXPLORE button
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: JourneyBottomDock(
+              stage: activeStage,
+              totalStages: _stages.length,
+              onNextStage: () => _onNextStagePressed(cloudOverlay),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 16-Stage Grid Overview Matrix (Image 2)
+  Widget _build16StageGridOverview(CloudTransitionOverlayState? cloudOverlay) {
+    return SafeArea(
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Expanded(
+            child: GridView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                childAspectRatio: 0.58,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              itemCount: _stages.length,
+              itemBuilder: (context, index) {
+                final stage = _stages[index];
+                final isCurrent = (index == _currentStageIndex);
+
+                return GestureDetector(
+                  onTap: () {
+                    if (cloudOverlay != null) {
+                      cloudOverlay.triggerTransition(
+                        onCovered: () {
+                          setState(() {
+                            _currentStageIndex = index;
+                            _stages = MilestoneStage.getDummyStages(
+                              activeIndex: _currentStageIndex,
+                            );
+                            _viewMode = MascotJourneyViewMode.singleStage;
+                          });
+                        },
+                      );
+                    } else {
+                      setState(() {
+                        _currentStageIndex = index;
+                        _stages = MilestoneStage.getDummyStages(
+                          activeIndex: _currentStageIndex,
+                        );
+                        _viewMode = MascotJourneyViewMode.singleStage;
+                      });
+                    }
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isCurrent
+                          ? const Color(0xFFF1C40F).withValues(alpha: 0.25)
+                          : Colors.black.withValues(alpha: 0.40),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isCurrent
+                            ? const Color(0xFFF1C40F)
+                            : Colors.white24,
+                        width: isCurrent ? 2 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Small Stage Badge Card
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(4.0),
+                            child: StagePedestalCard(
+                              stage: stage,
+                              size: 90,
+                              isGlowing: isCurrent,
+                            ),
+                          ),
+                        ),
+
+                        // Mini Land Banner
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF8B7355),
+                            borderRadius: const BorderRadius.vertical(
+                              bottom: Radius.circular(10),
+                            ),
+                          ),
+                          child: Text(
+                            stage.landName,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.nunito(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Overall Progress Footer Bar
+          Container(
+            width: double.infinity,
+            color: Colors.black.withValues(alpha: 0.85),
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            child: Text(
+              'Overall Progress: ${_currentStageIndex + 1} Completed, Stage ${_currentStageIndex + 1} Current. '
+              'Total Stages: ${_stages.length} / Chapter Progress: ${((_currentStageIndex + 1) / _stages.length * 100).round()}% / GROWING STRONG!',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunito(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// S-Curve Full Vertical Map View
+  Widget _buildVerticalPathMapView() {
     final double screenWidth = MediaQuery.of(context).size.width;
     final double totalHeight =
         _topPadding + (_stages.length * _verticalSpacing) + _bottomPadding;
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: Container(
-          margin: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.35),
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.maybePop(context),
-          ),
+    return SingleChildScrollView(
+      controller: _scrollController,
+      physics: const BouncingScrollPhysics(),
+      child: SizedBox(
+        width: screenWidth,
+        height: totalHeight,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: CustomPaint(
+                painter: JourneyPathPainter(
+                  totalCount: _stages.length,
+                  activeIndex: _currentStageIndex,
+                  verticalSpacing: _verticalSpacing,
+                  topPadding: _topPadding,
+                ),
+              ),
+            ),
+
+            ...List.generate(_stages.length, (index) {
+              final stage = _stages[index];
+              final cardOffset = _getCardOffset(index, screenWidth);
+
+              return Positioned(
+                left: cardOffset.dx,
+                top: cardOffset.dy,
+                child: MilestoneCard(
+                  stage: stage,
+                  onTap: () {
+                    setState(() {
+                      _currentStageIndex = index;
+                      _stages = MilestoneStage.getDummyStages(
+                        activeIndex: _currentStageIndex,
+                      );
+                      _viewMode = MascotJourneyViewMode.singleStage;
+                    });
+                  },
+                ),
+              );
+            }),
+          ],
         ),
-        title: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white24, width: 1),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.park, color: Color(0xFF2ECC71), size: 20),
-              const SizedBox(width: 8),
-              const Text(
-                'Mascot Journey',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1C40F),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  'Stage ${_activeMilestoneIndex + 1}/16',
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 11,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.35),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.my_location, color: Colors.white),
-            ),
-            onPressed: () => _scrollToActiveMilestone(animate: true),
-            tooltip: 'Center on Active Level',
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          // 1. BACKGROUND VIDEO / IMAGE BACKDROP
-          Positioned.fill(
-            child: _buildBackgroundBackdrop(),
-          ),
-
-          // Dark translucent overlay gradient to ensure high contrast map readability
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.35),
-                    Colors.black.withValues(alpha: 0.15),
-                    Colors.black.withValues(alpha: 0.45),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // 2. SCROLLABLE JOURNEY MAP STACK
-          SingleChildScrollView(
-            controller: _scrollController,
-            physics: const BouncingScrollPhysics(),
-            child: SizedBox(
-              width: screenWidth,
-              height: totalHeight,
-              child: Stack(
-                children: [
-                  // A. CustomPainter winding S-curve track
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: JourneyPathPainter(
-                        totalCount: _stages.length,
-                        activeIndex: _activeMilestoneIndex,
-                        verticalSpacing: _verticalSpacing,
-                        topPadding: _topPadding,
-                      ),
-                    ),
-                  ),
-
-                  // B. Milestone Cards placed along the calculated S-curve anchors
-                  ...List.generate(_stages.length, (index) {
-                    final stage = _stages[index];
-                    final cardOffset = _getCardOffset(index, screenWidth);
-
-                    return Positioned(
-                      left: cardOffset.dx,
-                      top: cardOffset.dy,
-                      child: MilestoneCard(
-                        stage: stage,
-                        onTap: () => _onStageSelected(stage),
-                      ),
-                    );
-                  }),
-
-                  // C. Floating Animated Current Mascot Marker over active level card
-                  _buildPositionedMascotMarker(screenWidth),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -255,33 +564,27 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen> {
       );
     }
 
-    // Fallback: Scenic Image backdrop or lush gradient
-    return Image.asset(
-      'assets/sprites/image.png',
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        return Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF1A362B),
-                Color(0xFF0E231B),
-                Color(0xFF05100B),
-              ],
-            ),
-          ),
-        );
-      },
+    // Organic Nature Sky/Forest Backdrop Fallback (Gradient without opaque static image overlay)
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF1B4F72),
+            Color(0xFF2E86C1),
+            Color(0xFF1E8449),
+            Color(0xFF114B27),
+          ],
+        ),
+      ),
     );
   }
 
   Offset _getCardOffset(int index, double screenWidth) {
-    final double padding = 28.0;
+    const double padding = 28.0;
     final double usableW = screenWidth - (padding * 2) - _cardWidth;
 
-    // S-curve alternating pattern matching JourneyPathPainter
     final double factor = (index % 4 == 0)
         ? 0.5
         : (index % 4 == 1)
@@ -294,283 +597,5 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen> {
     final double y = _topPadding + (index * _verticalSpacing);
 
     return Offset(x, y);
-  }
-
-  Widget _buildPositionedMascotMarker(double screenWidth) {
-    if (_activeMilestoneIndex < 0 || _activeMilestoneIndex >= _stages.length) {
-      return const SizedBox.shrink();
-    }
-
-    final activeStage = _stages[_activeMilestoneIndex];
-    final cardOffset = _getCardOffset(_activeMilestoneIndex, screenWidth);
-    final markerLeft = cardOffset.dx + (_cardWidth / 2) - 60.0;
-    final markerTop = cardOffset.dy - 48.0;
-
-    return Positioned(
-      left: markerLeft,
-      top: markerTop,
-      child: CurrentMascotMarker(
-        stageTitle: activeStage.title,
-        onTap: () => _onStageSelected(activeStage),
-      ),
-    );
-  }
-
-  /// Triggers onStageSelected(int stageId) and shows stage detail Modal Bottom Sheet
-  void _onStageSelected(MilestoneStage stage) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1E272E),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black54,
-                blurRadius: 20,
-                offset: Offset(0, -6),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Top Drag indicator bar
-              Container(
-                width: 48,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Stage Header & Sprite display
-              Row(
-                children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2C3A47),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: stage.isCurrent
-                            ? const Color(0xFFF1C40F)
-                            : const Color(0xFF2ECC71),
-                        width: 2,
-                      ),
-                    ),
-                    child: Image.asset(
-                      stage.assetPath,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => Icon(
-                        stage.fallbackIcon,
-                        size: 36,
-                        color: const Color(0xFF2ECC71),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2ECC71),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'STAGE #${stage.stageNumber}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              stage.topic,
-                              style: const TextStyle(
-                                color: Color(0xFFBDC3C7),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          stage.title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-              const Divider(color: Colors.white12),
-              const SizedBox(height: 12),
-
-              // Description
-              Text(
-                stage.description,
-                style: const TextStyle(
-                  color: Color(0xFFDCDDE1),
-                  fontSize: 14,
-                  height: 1.4,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // XP Reward Card
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2C3A47),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.star_rounded,
-                        color: Color(0xFFF1C40F), size: 28),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Completion Reward',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                        Text(
-                          '+${stage.xpReward} XP',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    if (stage.isCompleted)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF27AE60).withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF27AE60)),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.check_circle,
-                                color: Color(0xFF27AE60), size: 16),
-                            SizedBox(width: 6),
-                            Text(
-                              'COMPLETED',
-                              style: TextStyle(
-                                color: Color(0xFF27AE60),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Start / Replay Stage Button
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: stage.isCurrent
-                        ? const Color(0xFFF1C40F)
-                        : const Color(0xFF2ECC71),
-                    foregroundColor:
-                        stage.isCurrent ? Colors.black : Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 6,
-                  ),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    if (stage.isCurrent) {
-                      // Demo: Advance stage to next milestone
-                      setState(() {
-                        if (_activeMilestoneIndex < _stages.length - 1) {
-                          _activeMilestoneIndex++;
-                          _stages = MilestoneStage.getDummyStages(
-                            activeIndex: _activeMilestoneIndex,
-                          );
-                        }
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '🎉 Stage #${stage.stageNumber} completed! Advanced to Stage #${_activeMilestoneIndex + 1}.',
-                          ),
-                          backgroundColor: const Color(0xFF27AE60),
-                        ),
-                      );
-                      _scrollToActiveMilestone(animate: true);
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Replaying ${stage.title}...'),
-                          backgroundColor: const Color(0xFF2ECC71),
-                        ),
-                      );
-                    }
-                  },
-                  child: Text(
-                    stage.isCurrent
-                        ? 'START STAGE #${stage.stageNumber}'
-                        : 'REPLAY STAGE',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 }

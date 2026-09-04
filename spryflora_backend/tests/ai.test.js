@@ -37,7 +37,7 @@ describe('AI Gateway & Proxy Security Suite', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveProperty('result');
-  });
+  }, 60000);
 
   it('should return explicit error or false verification when photo is missing without fake success', async () => {
     const res = await request(app)

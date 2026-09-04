@@ -3,14 +3,15 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../services/user_service.dart';
 import '../services/auth_service.dart';
-import '../theme/skeuo_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/fun_bouncy_button.dart';
+import '../widgets/leaves_particle_overlay.dart';
+import 'forgot_password_screen.dart';
 import 'home_screen.dart';
 import 'profile_setup_screen.dart';
 import 'register_screen.dart';
 
-/// Screen 5: Login Screen (from 255.jpg)
+/// Kids Psychology UI Login Screen with Mascot Graduate Artwork holding the Card Container
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -20,14 +21,16 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailCtrl = TextEditingController(text: 'hero@spryflora.com');
+  final _identifierCtrl = TextEditingController(text: 'hero@spryflora.com');
   final _passCtrl = TextEditingController(text: 'spryflora123');
+
   bool _obscurePass = true;
+  bool _rememberMe = true;
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _emailCtrl.dispose();
+    _identifierCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
   }
@@ -39,7 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final authService = AuthService();
       await authService.login(
-        email: _emailCtrl.text.trim(),
+        email: _identifierCtrl.text.trim(),
         password: _passCtrl.text,
       );
 
@@ -50,6 +53,10 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
 
+      // Show Mascot Graduation Celebration Dialog
+      await _showLoginSuccessDialog(context);
+
+      if (!mounted) return;
       if (hasUser && userService.currentUser != null) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -71,186 +78,358 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _showLoginSuccessDialog(BuildContext context) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        backgroundColor: const Color(0xFF2E7D32),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Mascot Graduate Artwork
+              SizedBox(
+                width: 140,
+                height: 140,
+                child: Image.asset(
+                  'assets/sprites/mascot_graduate_logo.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.school_rounded,
+                    size: 80,
+                    color: Color(0xFFF1C40F),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Welcome Back! 🌸',
+                style: GoogleFonts.nunito(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Successfully Logged In! Ready to grow your plants?',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFFE8F5E9),
+                ),
+              ),
+              const SizedBox(height: 20),
+              FunBouncyButton(
+                text: 'Let\'s Go! 🚀',
+                onPressed: () => Navigator.of(ctx).pop(),
+                color: const Color(0xFFF1C40F),
+                textColor: Colors.black,
+                height: 48,
+                fontSize: 16,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: AppBackground(
         child: Stack(
+          fit: StackFit.expand,
           children: [
-          // ── Top Botanical Leaf Frame Accent ──────────────────────────────
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 180,
-            child: CustomPaint(
-              painter: _TopBotanicalLeavesPainter(),
+            // 1. Floating Leaves Particle Effect
+            const Positioned.fill(
+              child: LeavesParticleOverlay(),
             ),
-          ),
 
-          // ── Main Content ──────────────────────────────────────────────────
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-              physics: const BouncingScrollPhysics(),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 60),
-
-                    // Title
-                    Text(
-                      'Welcome Back!',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.nunito(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFF2E7D32),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Login to continue',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.nunito(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF757575),
-                      ),
-                    ),
-
-                    const SizedBox(height: 40),
-
-                    // Email Field
-                    _buildInputField(
-                      controller: _emailCtrl,
-                      hintText: 'Email',
-                      icon: Icons.mail_outline_rounded,
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (val) {
-                        if (val == null || val.trim().isEmpty) {
-                          return 'Please enter your email';
-                        }
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Password Field
-                    _buildInputField(
-                      controller: _passCtrl,
-                      hintText: 'Password',
-                      icon: Icons.lock_outline_rounded,
-                      obscureText: _obscurePass,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePass
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          color: const Color(0xFF81C784),
-                        ),
-                        onPressed: () {
-                          setState(() => _obscurePass = !_obscurePass);
-                        },
-                      ),
-                      validator: (val) {
-                        if (val == null || val.isEmpty) {
-                          return 'Please enter your password';
-                        }
-                        return null;
-                      },
-                    ),
-
-                    // Forgot Password
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'Password reset instructions sent to email.'),
-                              backgroundColor: SkeuoTheme.primaryGreen,
-                            ),
-                          );
-                        },
-                        child: Text(
-                          'Forgot Password?',
-                          style: GoogleFonts.nunito(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF4CAF50),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Green Login Button
-                    _isLoading
-                        ? const Center(
-                            child: CircularProgressIndicator(
-                              color: Color(0xFF4CAF50),
-                            ),
-                          )
-                        : FunBouncyButton(
-                            text: 'Login',
-                            onPressed: _handleLogin,
-                            color: const Color(0xFF4CAF50),
-                            textColor: Colors.white,
-                            height: 54,
-                            fontSize: 18,
-                          ),
-
-                    const SizedBox(height: 32),
-
-                    // Don't have an account? Sign Up
-                    Row(
+            // 2. Main Content Layout
+            SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  physics: const BouncingScrollPhysics(),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          "Don't have an account? ",
-                          style: GoogleFonts.nunito(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF757575),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const RegisterScreen(),
+                        const SizedBox(height: 20),
+
+                        // Mascot Holding Card Wrapper (Peek-a-boo Mascot Graduate + Emerald Card)
+                        Stack(
+                          alignment: Alignment.topCenter,
+                          clipBehavior: Clip.none,
+                          children: [
+                            // Main Emerald Green Kids Card Container
+                            Container(
+                              margin: const EdgeInsets.only(top: 80),
+                              padding: const EdgeInsets.fromLTRB(22, 60, 22, 22),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2ECC71).withValues(alpha: 0.95),
+                                borderRadius: BorderRadius.circular(28),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 3,
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black38,
+                                    blurRadius: 18,
+                                    offset: Offset(0, 8),
+                                  ),
+                                ],
                               ),
-                            );
-                          },
-                          child: Text(
-                            'Sign Up',
-                            style: GoogleFonts.nunito(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF2E7D32),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Card Title inside container
+                                  Text(
+                                    'LOGIN',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.nunito(
+                                      fontSize: 30,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 2.0,
+                                      color: Colors.white,
+                                      shadows: const [
+                                        Shadow(
+                                          color: Colors.black38,
+                                          offset: Offset(0, 2),
+                                          blurRadius: 4,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Login to continue your plant adventure!',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.nunito(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFFF9E79F),
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 24),
+
+                                  // Username / Email Input Field
+                                  _buildInputField(
+                                    controller: _identifierCtrl,
+                                    hintText: 'Email ID or Username',
+                                    icon: Icons.person_outline_rounded,
+                                    validator: (val) {
+                                      if (val == null || val.trim().isEmpty) {
+                                        return 'Enter your email or username';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 16),
+
+                                  // Password Input Field
+                                  _buildInputField(
+                                    controller: _passCtrl,
+                                    hintText: 'Password',
+                                    icon: Icons.lock_outline_rounded,
+                                    obscureText: _obscurePass,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePass
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        color: const Color(0xFF27AE60),
+                                      ),
+                                      onPressed: () {
+                                        setState(() => _obscurePass = !_obscurePass);
+                                      },
+                                    ),
+                                    validator: (val) {
+                                      if (val == null || val.isEmpty) {
+                                        return 'Enter your password';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 12),
+
+                                  // Remember Me & Forgot Password Row
+                                  Row(
+                                    children: [
+                                      SizedBox(
+                                        height: 24,
+                                        width: 24,
+                                        child: Checkbox(
+                                          value: _rememberMe,
+                                          activeColor: const Color(0xFFF1C40F),
+                                          checkColor: Colors.black,
+                                          side: const BorderSide(color: Colors.white, width: 2),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(4)),
+                                          onChanged: (val) {
+                                            setState(() => _rememberMe = val ?? true);
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Remember me',
+                                        style: GoogleFonts.nunito(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      GestureDetector(
+                                        onTap: () async {
+                                          final updatedEmail = await Navigator.of(context).push<String>(
+                                            MaterialPageRoute(
+                                              builder: (_) => ForgotPasswordScreen(
+                                                initialIdentifier: _identifierCtrl.text,
+                                              ),
+                                            ),
+                                          );
+                                          if (updatedEmail != null && updatedEmail.isNotEmpty) {
+                                            setState(() {
+                                              _identifierCtrl.text = updatedEmail;
+                                            });
+                                          }
+                                        },
+                                        child: Text(
+                                          'Forgot password?',
+                                          style: GoogleFonts.nunito(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                            color: const Color(0xFFF9E79F),
+                                            decoration: TextDecoration.underline,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                  const SizedBox(height: 22),
+
+                                  // Green Bouncy Sign In Button
+                                  _isLoading
+                                      ? const Center(
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : FunBouncyButton(
+                                          text: 'SIGN IN 🌿',
+                                          onPressed: _handleLogin,
+                                          color: const Color(0xFF1E8449),
+                                          textColor: Colors.white,
+                                          height: 52,
+                                          fontSize: 18,
+                                        ),
+
+                                  const SizedBox(height: 20),
+
+                                  // Don't have an account? Sign Up Link
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        "Don't have an account? ",
+                                        style: GoogleFonts.nunito(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) => const RegisterScreen(),
+                                            ),
+                                          );
+                                        },
+                                        child: Text(
+                                          'Sign Up',
+                                          style: GoogleFonts.nunito(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w900,
+                                            color: const Color(0xFFF1C40F),
+                                            decoration: TextDecoration.underline,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+
+                            // Mascot Graduate Header Standing above and holding card
+                            Positioned(
+                              top: 0,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Container(
+                                    width: 110,
+                                    height: 110,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white,
+                                      border: Border.all(color: const Color(0xFFF1C40F), width: 3),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Colors.black26,
+                                          blurRadius: 10,
+                                          offset: Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 100,
+                                    height: 100,
+                                    child: Image.asset(
+                                      'assets/sprites/mascot_graduate_logo.png',
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (_, __, ___) => Image.asset(
+                                        'assets/logo/mascot_transparent.png',
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
+
+                        const SizedBox(height: 20),
                       ],
                     ),
-                    const SizedBox(height: 24),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildInputField({
     required TextEditingController controller,
@@ -265,17 +444,13 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: const Color(0xFF2E7D32).withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black12,
+            blurRadius: 8,
+            offset: Offset(0, 3),
           ),
         ],
-        border: Border.all(
-          color: const Color(0xFFE8F5E9),
-          width: 1.5,
-        ),
       ),
       child: TextFormField(
         controller: controller,
@@ -284,16 +459,17 @@ class _LoginScreenState extends State<LoginScreen> {
         validator: validator,
         style: GoogleFonts.nunito(
           fontSize: 16,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w800,
           color: const Color(0xFF2E7D32),
         ),
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: GoogleFonts.nunito(
             fontSize: 15,
-            color: const Color(0xFFA5D6A7),
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade400,
           ),
-          prefixIcon: Icon(icon, color: const Color(0xFF66BB6A), size: 22),
+          prefixIcon: Icon(icon, color: const Color(0xFF27AE60), size: 22),
           suffixIcon: suffixIcon,
           border: InputBorder.none,
           contentPadding:
@@ -302,41 +478,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-}
-
-class _TopBotanicalLeavesPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF81C784).withValues(alpha: 0.28)
-      ..style = PaintingStyle.fill;
-
-    // Top-left leaf cluster
-    final pathLeft = Path()
-      ..moveTo(0, 0)
-      ..quadraticBezierTo(
-          size.width * 0.2, size.height * 0.1, size.width * 0.35, 0)
-      ..close();
-    canvas.drawPath(pathLeft, paint);
-
-    // Top-right leaf cluster
-    final paintRight = Paint()
-      ..color = const Color(0xFF66BB6A).withValues(alpha: 0.25)
-      ..style = PaintingStyle.fill;
-    final pathRight = Path()
-      ..moveTo(size.width, 0)
-      ..quadraticBezierTo(
-          size.width * 0.8, size.height * 0.25, size.width * 0.65, 0)
-      ..close();
-    canvas.drawPath(pathRight, paintRight);
-
-    // Soft yellow star accent
-    final starPaint = Paint()
-      ..color = const Color(0xFFFFD54F).withValues(alpha: 0.5);
-    canvas.drawCircle(
-        Offset(size.width * 0.88, size.height * 0.35), 4, starPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

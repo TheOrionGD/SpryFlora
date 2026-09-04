@@ -10,6 +10,7 @@ import '../widgets/app_photo_view.dart';
 import '../widgets/fun_bouncy_button.dart';
 import '../widgets/fun_confetti_overlay.dart';
 import '../widgets/skeuo_live_camera_screen.dart';
+import '../widgets/app_background.dart';
 
 /// Screen 12: Daily Check-in (from 255.jpg)
 class DailyCheckinScreen extends StatefulWidget {
@@ -303,12 +304,13 @@ class _DailyCheckinScreenState extends State<DailyCheckinScreen> {
       isActive: _showSuccessSplash,
       mode: RewardSplashMode.waterSplash,
       child: Scaffold(
-        backgroundColor: SkeuoTheme.background,
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Top Bar: < Daily Check-in
-              _buildAppBar(),
+        backgroundColor: Colors.transparent,
+        body: AppBackground(
+          child: SafeArea(
+            child: Column(
+              children: [
+                // Top Bar: < Daily Check-in
+                _buildAppBar(),
 
               // Body
               Expanded(
@@ -429,8 +431,9 @@ class _DailyCheckinScreenState extends State<DailyCheckinScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildAppBar() {
     return Padding(

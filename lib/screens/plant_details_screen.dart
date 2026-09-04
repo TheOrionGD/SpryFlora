@@ -17,6 +17,7 @@ import '../widgets/skeuo_status_badge.dart';
 import 'ai_analysis_screen.dart';
 import 'daily_checkin_screen.dart';
 import 'certificate_screen.dart';
+import '../widgets/app_background.dart';
 
 /// Screen 11: Plant Details
 /// Features:
@@ -213,12 +214,13 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
     }
 
     return Scaffold(
-      backgroundColor: SkeuoTheme.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Header: < Plant Details
-            _buildAppBar(),
+      backgroundColor: Colors.transparent,
+      body: AppBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Top Header: < Plant Details
+              _buildAppBar(),
 
             // Scrollable Body
             Expanded(
@@ -351,8 +353,9 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildAppBar() {
     return Padding(

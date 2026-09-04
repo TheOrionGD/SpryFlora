@@ -13,6 +13,7 @@ import '../widgets/fun_confetti_overlay.dart';
 import '../widgets/professional_landscape_certificate.dart';
 import '../widgets/skeuo_button.dart';
 import 'home_screen.dart';
+import '../widgets/app_background.dart';
 import 'my_certifications_screen.dart';
 
 /// 4-Step Interactive Professional Landscape Certificate Flow:
@@ -176,11 +177,13 @@ class _CertificateScreenState extends State<CertificateScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SkeuoTheme.background,
-      body: SafeArea(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 400),
-          child: _buildCurrentScreen(),
+      backgroundColor: Colors.transparent,
+      body: AppBackground(
+        child: SafeArea(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 400),
+            child: _buildCurrentScreen(),
+          ),
         ),
       ),
     );

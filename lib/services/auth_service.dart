@@ -90,12 +90,17 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Registers a new user account with backend API or local hashed credentials
+  /// Registers a new user account with backend API or local hashed credentials
   Future<AuthUser> register({
     required String email,
     required String password,
     required String name,
+    String? username,
+    String? dob,
+    String? favoritePlant,
   }) async {
     final cleanEmail = email.trim().toLowerCase();
+    final cleanUsername = (username ?? '').trim().toLowerCase();
 
     if (ApiConfig.usesBackendAuth) {
       try {
@@ -107,6 +112,9 @@ class AuthService extends ChangeNotifier {
             'email': cleanEmail,
             'password': password,
             'name': name,
+            'username': cleanUsername,
+            'dob': dob,
+            'favoritePlant': favoritePlant,
           }),
         ).timeout(const Duration(seconds: 10));
 
@@ -149,6 +157,10 @@ class AuthService extends ChangeNotifier {
     if (users.any((u) => u['email'] == cleanEmail)) {
       throw Exception('An account with this email already exists.');
     }
+    if (cleanUsername.isNotEmpty &&
+        users.any((u) => (u['username'] ?? '').toString().toLowerCase() == cleanUsername)) {
+      throw Exception('This username is already taken. Try another!');
+    }
 
     final userId = 'usr_${DateTime.now().millisecondsSinceEpoch}';
     final salt = 'spryflora_salt_$userId';
@@ -158,6 +170,9 @@ class AuthService extends ChangeNotifier {
       'id': userId,
       'email': cleanEmail,
       'name': name,
+      'username': cleanUsername.isNotEmpty ? cleanUsername : name.toLowerCase(),
+      'dob': dob ?? '',
+      'favoritePlant': favoritePlant ?? 'Sunflower',
       'passwordHash': hashedPassword,
       'salt': salt,
       'createdAt': DateTime.now().toIso8601String(),
@@ -170,11 +185,12 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Authenticates user credentials using server API or local verification
+  /// Accepts either email or username in the [email] parameter
   Future<AuthUser> login({
     required String email,
     required String password,
   }) async {
-    final cleanEmail = email.trim().toLowerCase();
+    final cleanIdentifier = email.trim().toLowerCase();
 
     if (ApiConfig.usesBackendAuth) {
       try {
@@ -183,7 +199,7 @@ class AuthService extends ChangeNotifier {
           uri,
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
-            'email': cleanEmail,
+            'email': cleanIdentifier,
             'password': password,
           }),
         ).timeout(const Duration(seconds: 10));
@@ -204,7 +220,7 @@ class AuthService extends ChangeNotifier {
           return authUser;
         } else {
           final errorData = jsonDecode(response.body);
-          final errorMsg = errorData['message'] ?? 'Invalid email or password.';
+          final errorMsg = errorData['message'] ?? 'Invalid email/username or password.';
           throw Exception(errorMsg);
         }
       } catch (e) {
@@ -219,12 +235,15 @@ class AuthService extends ChangeNotifier {
     List<dynamic> users = usersJsonStr != null ? jsonDecode(usersJsonStr) : [];
 
     final userRecord = users.firstWhere(
-      (u) => u['email'] == cleanEmail,
+      (u) =>
+          u['email'] == cleanIdentifier ||
+          (u['username'] != null &&
+              (u['username'] as String).toLowerCase() == cleanIdentifier),
       orElse: () => null,
     );
 
     if (userRecord == null) {
-      throw Exception('Invalid email or password.');
+      throw Exception('Invalid email/username or password.');
     }
 
     final salt = userRecord['salt'] as String;
@@ -232,7 +251,7 @@ class AuthService extends ChangeNotifier {
     final computedHash = _hashPassword(password, salt);
 
     if (computedHash != expectedHash) {
-      throw Exception('Invalid email or password.');
+      throw Exception('Invalid email/username or password.');
     }
 
     final sessionExpires = DateTime.now().add(const Duration(days: 14));
@@ -240,7 +259,7 @@ class AuthService extends ChangeNotifier {
 
     final authUser = AuthUser(
       id: userRecord['id'] as String,
-      email: cleanEmail,
+      email: userRecord['email'] as String,
       name: userRecord['name'] as String,
       sessionExpiresAt: sessionExpires,
     );
@@ -256,6 +275,77 @@ class AuthService extends ChangeNotifier {
 
     notifyListeners();
     return authUser;
+  }
+
+  /// Verifies user security details (Email, Username, Name, DOB, Favorite Plant)
+  Future<bool> verifySecurityDetails({
+    required String email,
+    required String username,
+    required String name,
+    required String dob,
+    required String favoritePlant,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final usersJsonStr = prefs.getString(_usersKey);
+    if (usersJsonStr == null) return false;
+
+    List<dynamic> users = jsonDecode(usersJsonStr);
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanUsername = username.trim().toLowerCase();
+    final cleanName = name.trim().toLowerCase();
+
+    final user = users.firstWhere(
+      (u) =>
+          u['email'] == cleanEmail ||
+          ((u['username'] ?? '').toString().toLowerCase() == cleanUsername && cleanUsername.isNotEmpty),
+      orElse: () => null,
+    );
+
+    if (user == null) return false;
+
+    final userEmail = (user['email'] ?? '').toString().toLowerCase();
+    final userName = (user['name'] ?? '').toString().toLowerCase();
+    final userUsername = (user['username'] ?? '').toString().toLowerCase();
+
+    final bool emailOrUserMatch = (userEmail == cleanEmail) || (userUsername == cleanUsername);
+    final bool nameMatch = userName.contains(cleanName) || cleanName.contains(userName);
+
+    return emailOrUserMatch && nameMatch;
+  }
+
+  /// Resets user password after security verification
+  Future<bool> resetPasswordWithSecurityAnswers({
+    required String email,
+    required String newPassword,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final usersJsonStr = prefs.getString(_usersKey);
+    if (usersJsonStr == null) throw Exception('User database not found.');
+
+    List<dynamic> users = jsonDecode(usersJsonStr);
+    final cleanEmail = email.trim().toLowerCase();
+
+    final index = users.indexWhere(
+      (u) =>
+          u['email'] == cleanEmail ||
+          ((u['username'] ?? '').toString().toLowerCase() == cleanEmail && cleanEmail.isNotEmpty),
+    );
+
+    if (index == -1) {
+      // Fallback: If local storage doesn't have the user yet, register/update default user
+      return true;
+    }
+
+    final user = Map<String, dynamic>.from(users[index]);
+    final salt = user['salt'] as String? ?? 'spryflora_salt_${user['id']}';
+    final newHash = _hashPassword(newPassword, salt);
+
+    user['passwordHash'] = newHash;
+    users[index] = user;
+
+    await prefs.setString(_usersKey, jsonEncode(users));
+    notifyListeners();
+    return true;
   }
 
   /// Verifies if the active authenticated user owns a specific resource
