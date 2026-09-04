@@ -67,12 +67,12 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen>
     )..repeat(reverse: true);
 
     _initVideoBackground();
-    _start3SecAutoStageTimer();
+    _start5SecAutoStageTimer();
   }
 
-  void _start3SecAutoStageTimer() {
+  void _start5SecAutoStageTimer() {
     _autoStageTimer?.cancel();
-    _autoStageTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+    _autoStageTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted) return;
       if (_isAutoPlayActive && _viewMode == MascotJourneyViewMode.singleStage) {
         _onNextStagePressed(_currentCloudOverlay);
@@ -84,9 +84,9 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen>
   Future<void> _initVideoBackground() async {
     try {
       _videoController = VideoPlayerController.asset('assets/sprites/bg.mp4');
+      _videoController!.setVolume(0.0);   // Muted background loop (set before initialize for web/desktop autoplay)
       await _videoController!.initialize();
       _videoController!.setLooping(true); // Loop video continuously
-      _videoController!.setVolume(0.0);   // Muted background loop
       await _videoController!.play();
       if (mounted) {
         setState(() {
@@ -239,7 +239,7 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen>
       ),
       centerTitle: true,
       actions: [
-        // 3s Auto-Play Toggle Button
+        // 5s Auto-Play Toggle Button
         IconButton(
           icon: Container(
             padding: const EdgeInsets.all(6),
@@ -260,7 +260,7 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen>
               _isAutoPlayActive = !_isAutoPlayActive;
             });
           },
-          tooltip: _isAutoPlayActive ? 'Pause 3s Auto-Flow' : 'Play 3s Auto-Flow',
+          tooltip: _isAutoPlayActive ? 'Pause 5s Auto-Flow' : 'Play 5s Auto-Flow',
         ),
 
         // Grid Overview / Map Toggle Button
@@ -415,7 +415,7 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen>
     );
   }
 
-  /// 16-Stage Grid Overview Matrix (Image 2)
+  /// 16-Stage Grid Overview Matrix (3 Columns x 6 Rows layout)
   Widget _build16StageGridOverview(CloudTransitionOverlayState? cloudOverlay) {
     return SafeArea(
       child: Column(
@@ -425,10 +425,10 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen>
             child: GridView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                childAspectRatio: 0.58,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
+                crossAxisCount: 3,
+                childAspectRatio: 0.72,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
               ),
               itemCount: _stages.length,
               itemBuilder: (context, index) {
@@ -460,41 +460,113 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen>
                     }
                   },
                   child: Container(
+                    clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
                       color: isCurrent
                           ? const Color(0xFFF1C40F).withValues(alpha: 0.25)
-                          : Colors.black.withValues(alpha: 0.40),
-                      borderRadius: BorderRadius.circular(12),
+                          : Colors.black.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: isCurrent
                             ? const Color(0xFFF1C40F)
                             : Colors.white24,
                         width: isCurrent ? 2 : 1,
                       ),
+                      boxShadow: [
+                        if (isCurrent)
+                          BoxShadow(
+                            color: const Color(0xFFF1C40F).withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            spreadRadius: 1,
+                          ),
+                      ],
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Small Stage Badge Card
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(4.0),
-                            child: StagePedestalCard(
-                              stage: stage,
-                              size: 90,
-                              isGlowing: isCurrent,
+                        // Top Stage Badge Tag
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6, left: 6, right: 6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isCurrent
+                                  ? const Color(0xFFF1C40F)
+                                  : Colors.white12,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.eco,
+                                  size: 11,
+                                  color: isCurrent
+                                      ? Colors.black
+                                      : const Color(0xFF2ECC71),
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'Stage ${stage.stageNumber}',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    color: isCurrent
+                                        ? Colors.black
+                                        : Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
+
+                        // Center Mascot Artwork Display
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 4),
+                            child: Center(
+                              child: Image.asset(
+                                stage.assetPath,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => Icon(
+                                  stage.fallbackIcon,
+                                  color: const Color(0xFF2ECC71),
+                                  size: 40,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Stage Title Text
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                          child: Text(
+                            stage.title,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.nunito(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 4),
 
                         // Mini Land Banner
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF8B7355),
-                            borderRadius: const BorderRadius.vertical(
-                              bottom: Radius.circular(10),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF8B7355),
+                            borderRadius: BorderRadius.vertical(
+                              bottom: Radius.circular(12),
                             ),
                           ),
                           child: Text(
@@ -503,7 +575,7 @@ class _MascotJourneyScreenState extends State<MascotJourneyScreen>
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.nunito(
-                              fontSize: 9,
+                              fontSize: 10,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
                             ),

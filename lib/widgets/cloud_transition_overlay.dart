@@ -63,19 +63,16 @@ class CloudTransitionOverlayState extends State<CloudTransitionOverlay>
       builder: (context, _) {
         final val = widget.animationValue ?? _internalAnimCtrl.value;
 
-        if (val <= 0.0 || val >= 1.0) {
-          return widget.child;
-        }
-
         return Stack(
           fit: StackFit.expand,
           children: [
             widget.child,
-            IgnorePointer(
-              child: CustomPaint(
-                painter: _CloudTransitionPainter(progress: val),
+            if (val > 0.0 && val < 1.0)
+              IgnorePointer(
+                child: CustomPaint(
+                  painter: _CloudTransitionPainter(progress: val),
+                ),
               ),
-            ),
           ],
         );
       },

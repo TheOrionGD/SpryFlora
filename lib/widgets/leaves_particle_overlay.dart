@@ -47,7 +47,7 @@ class _LeavesParticleOverlayState extends State<LeavesParticleOverlay>
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (widget.child != null) widget.child!,
+        // 1. Particle Layer (Background)
         AnimatedBuilder(
           animation: _leavesCtrl,
           builder: (context, _) {
@@ -61,6 +61,8 @@ class _LeavesParticleOverlayState extends State<LeavesParticleOverlay>
             );
           },
         ),
+        // 2. Main Content & Cards (Foreground - On top of particles)
+        if (widget.child != null) widget.child!,
       ],
     );
   }
@@ -84,15 +86,15 @@ class _HighThroughputLeavesPainter extends CustomPainter {
         return _LeafParticleData(
           x: rand.nextDouble(),
           yStart: rand.nextDouble(),
-          speed: 0.025 + rand.nextDouble() * 0.065,
-          size: 7.0 + rand.nextDouble() * 16.0,
+          speed: 0.020 + rand.nextDouble() * 0.045,
+          size: 5.0 + rand.nextDouble() * 11.0,
           phase: rand.nextDouble() * math.pi * 2,
-          opacity: 0.20 + rand.nextDouble() * 0.45,
+          opacity: 0.12 + rand.nextDouble() * 0.28,
           colorIdx: i % 6,
           leafType: i % 5, // 5 distinct leaf geometries
-          rotationSpeed: 0.5 + rand.nextDouble() * 2.0,
-          swayAmplitude: 0.02 + rand.nextDouble() * 0.05,
-          isForeground: i % 3 == 0,
+          rotationSpeed: 0.4 + rand.nextDouble() * 1.5,
+          swayAmplitude: 0.02 + rand.nextDouble() * 0.04,
+          isForeground: false,
         );
       });
     }

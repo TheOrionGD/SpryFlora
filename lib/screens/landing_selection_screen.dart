@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../services/auth_service.dart';
+import '../services/user_service.dart';
 import 'home_screen.dart';
 import 'mascot_journey_screen.dart';
 import 'onboarding_screen.dart';
@@ -177,12 +179,30 @@ class LandingSelectionScreen extends StatelessWidget {
 
                   // ── Quick Access Home Dashboard ────────────────────────────
                   TextButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => const HomeScreen(),
-                        ),
-                      );
+                    onPressed: () async {
+                      final userService = UserService();
+                      await userService.loadUserData();
+                      await AuthService().restoreSession();
+
+                      final hasUser = await userService.hasUserData() ||
+                          AuthService().isAuthenticated;
+
+                      if (context.mounted) {
+                        if (hasUser) {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => const HomeScreen(),
+                            ),
+                          );
+                        } else {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const OnboardingScreen(initialPage: 8),
+                            ),
+                          );
+                        }
+                      }
                     },
                     icon: const Icon(Icons.space_dashboard_rounded,
                         color: Color(0xFF2ECC71)),

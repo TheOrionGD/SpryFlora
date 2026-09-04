@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/api_config.dart';
 import '../config/app_version.dart';
 import '../models/user_model.dart';
+import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../services/plant_repository.dart';
 import '../services/user_service.dart';
 import '../theme/skeuo_theme.dart';
@@ -12,6 +15,7 @@ import '../widgets/app_photo_view.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/fun_bouncy_button.dart';
 import 'ai_eco_buddy_screen.dart';
+import 'login_screen.dart';
 import 'my_plants_screen.dart';
 import '../widgets/app_background.dart';
 import '../widgets/leaves_particle_overlay.dart';
@@ -34,7 +38,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
 
   UserProfile? _user;
   bool _notificationsEnabled = true;
-  bool _waterRemindersEnabled = true;
+  bool _soundEnabled = true;
 
   late AnimationController _headerCtrl;
   late Animation<double> _headerFade;
@@ -43,12 +47,84 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
   void initState() {
     super.initState();
     _user = _userService.currentUser;
+    _loadPreferences();
     _headerCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 700));
     _headerFade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _headerCtrl, curve: Curves.easeOut),
     );
     _headerCtrl.forward();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authService = AuthService();
+      if (!authService.isAuthenticated) {
+        _showAuthRequiredDialog();
+      }
+    });
+  }
+
+  Future<void> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _notificationsEnabled = prefs.getBool('spryflora_reminders_enabled') ?? true;
+        _soundEnabled = prefs.getBool('spryflora_sound_enabled') ?? true;
+      });
+    }
+  }
+
+  void _showAuthRequiredDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SkeuoTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            const Text('🔒', style: TextStyle(fontSize: 22)),
+            const SizedBox(width: 8),
+            Text(
+              'Sign In Required',
+              style: SkeuoTheme.funHeading(size: 17, color: SkeuoTheme.textPrimary),
+            ),
+          ],
+        ),
+        content: Text(
+          'Please log in to your SpryFlora account to access Profile & Settings and sync your plant data.',
+          style: SkeuoTheme.funBody(size: 14, color: SkeuoTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.of(context).pop();
+            },
+            child: Text('Cancel',
+                style: SkeuoTheme.funBody(
+                    size: 14,
+                    color: SkeuoTheme.textMuted,
+                    weight: FontWeight.w700)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SkeuoTheme.primaryGreen,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+            child: const Text('Sign In 🌿',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -160,10 +236,17 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                           _buildSettingsTile(
                             icon: Icons.edit_rounded,
                             title: 'Edit Profile',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) => const ProfileSetupScreen()),
-                            ),
+                            onTap: () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                    builder: (_) => const ProfileSetupScreen()),
+                              );
+                              if (mounted) {
+                                setState(() {
+                                  _user = _userService.currentUser;
+                                });
+                              }
+                            },
                           ),
                           const Divider(height: 1, color: Color(0xFFF1F8EE)),
                           _buildSettingsTile(
@@ -183,36 +266,64 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                           ),
                           const Divider(height: 1, color: Color(0xFFF1F8EE)),
                           _buildSettingsTile(
-                            icon: Icons.notifications_none_rounded,
+                            icon: _notificationsEnabled
+                                ? Icons.notifications_active_rounded
+                                : Icons.notifications_none_rounded,
                             title: 'Plant Care Reminders',
-                            onTap: () {
+                            onTap: () async {
+                              final messenger = ScaffoldMessenger.of(context);
                               setState(() {
                                 _notificationsEnabled = !_notificationsEnabled;
-                                _waterRemindersEnabled = !_waterRemindersEnabled;
                               });
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(_notificationsEnabled
-                                      ? '🔔 Reminders enabled!'
-                                      : '🔕 Reminders muted'),
-                                  backgroundColor: SkeuoTheme.primaryGreen,
-                                  duration: const Duration(seconds: 1),
-                                ),
-                              );
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.setBool(
+                                  'spryflora_reminders_enabled', _notificationsEnabled);
+
+                              if (_notificationsEnabled) {
+                                NotificationService().sendSystemNotification(
+                                  title: '🌿 Plant Care Reminders Active',
+                                  body:
+                                      'SpryFlora mobile notifications enabled! You will receive system alerts when plants need hydration.',
+                                );
+                              }
+                              if (mounted) {
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(_notificationsEnabled
+                                        ? '🔔 Reminders enabled! System notification posted.'
+                                        : '🔕 Reminders muted'),
+                                    backgroundColor: SkeuoTheme.primaryGreen,
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              }
                             },
                           ),
                           const Divider(height: 1, color: Color(0xFFF1F8EE)),
                           _buildSettingsTile(
-                            icon: Icons.volume_up_rounded,
+                            icon: _soundEnabled
+                                ? Icons.volume_up_rounded
+                                : Icons.volume_off_rounded,
                             title: 'Sound & Music',
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('🎵 Sound effects are on!'),
-                                  backgroundColor: SkeuoTheme.primaryGreen,
-                                  duration: Duration(seconds: 1),
-                                ),
-                              );
+                            onTap: () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              setState(() {
+                                _soundEnabled = !_soundEnabled;
+                              });
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.setBool(
+                                  'spryflora_sound_enabled', _soundEnabled);
+                              if (mounted) {
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(_soundEnabled
+                                        ? '🎵 Sound effects enabled!'
+                                        : '🔇 Sound effects muted'),
+                                    backgroundColor: SkeuoTheme.primaryGreen,
+                                    duration: const Duration(seconds: 1),
+                                  ),
+                                );
+                              }
                             },
                           ),
                           const Divider(height: 1, color: Color(0xFFF1F8EE)),
@@ -233,7 +344,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                             icon: Icons.logout_rounded,
                             title: 'Sign Out',
                             titleColor: SkeuoTheme.alertRed,
-                            onTap: _showResetConfirm,
+                            onTap: _showSignOutDialog,
                           ),
                         ],
                       ),
@@ -648,6 +759,52 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                     size: 14,
                     color: SkeuoTheme.primaryGreen,
                     weight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSignOutDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: SkeuoTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text('🚪 Sign Out',
+            style: SkeuoTheme.funHeading(size: 18, color: SkeuoTheme.alertRed)),
+        content: Text(
+          'Are you sure you want to sign out of your SpryFlora account?',
+          style: SkeuoTheme.funBody(size: 14, color: SkeuoTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text('Cancel',
+                style: SkeuoTheme.funBody(
+                    size: 14,
+                    color: SkeuoTheme.primaryGreen,
+                    weight: FontWeight.w800)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SkeuoTheme.alertRed,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await AuthService().logout();
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
+            },
+            child: const Text('Sign Out',
+                style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),

@@ -98,6 +98,46 @@ class NotificationService {
     } catch (_) {}
   }
 
+  /// Displays a native mobile system notification in the phone's notification center shade
+  Future<void> sendSystemNotification({
+    required String title,
+    required String body,
+    String? payload,
+    int? notificationId,
+  }) async {
+    try {
+      await initialize();
+
+      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+        'spryflora_general_channel',
+        'SpryFlora Botanical Alerts',
+        channelDescription: 'System notifications for plant care, diagnostics & reminders',
+        importance: Importance.max,
+        priority: Priority.high,
+        showWhen: true,
+        icon: '@mipmap/ic_launcher',
+        enableVibration: true,
+        playSound: true,
+      );
+
+      const NotificationDetails platformDetails = NotificationDetails(
+        android: androidDetails,
+      );
+
+      final id = notificationId ?? DateTime.now().millisecondsSinceEpoch.remainder(100000);
+
+      await _notificationsPlugin.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: platformDetails,
+        payload: payload,
+      );
+    } catch (e) {
+      debugPrint('Notification display error: $e');
+    }
+  }
+
   /// Checks all plants and dispatches system notifications for any plant due today or overdue
   Future<void> checkAndNotifyDuePlants(List<PlantModel> plants) async {
     await reconcileNotifications(plants);

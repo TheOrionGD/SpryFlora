@@ -525,9 +525,9 @@ class HuggingFaceProvider implements AIProvider {
   }
 }
 
-class GrokProvider implements AIProvider {
+class GroqProvider implements AIProvider {
   final String apiKey;
-  GrokProvider({this.apiKey = ''});
+  GroqProvider({this.apiKey = ''});
 
   @override
   Future<PlantIdentificationResult> identifyPlant({
@@ -536,7 +536,7 @@ class GrokProvider implements AIProvider {
   }) async {
     return const PlantIdentificationResult(
       status: AIResultStatus.providerError,
-      errorMessage: 'Grok vision is unconfigured.',
+      errorMessage: 'Groq vision is unconfigured.',
     );
   }
 
@@ -550,7 +550,7 @@ class GrokProvider implements AIProvider {
     return const WateringVerificationResult(
       status: AIResultStatus.providerError,
       isVerified: false,
-      errorMessage: 'Grok vision is unconfigured.',
+      errorMessage: 'Groq vision is unconfigured.',
     );
   }
 
@@ -559,19 +559,19 @@ class GrokProvider implements AIProvider {
     if (apiKey.isEmpty) {
       return const BuddyResponse(
         status: AIResultStatus.authenticationError,
-        answerText: 'Grok API key is missing.',
+        answerText: 'Groq API key is missing.',
       );
     }
 
     try {
       final response = await http.post(
-        Uri.parse(ApiConfig.grokApiUrl),
+        Uri.parse(ApiConfig.groqApiUrl),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $apiKey',
         },
         body: jsonEncode({
-          'model': ApiConfig.grokModel,
+          'model': ApiConfig.groqModel,
           'messages': [
             {'role': 'user', 'content': prompt}
           ],
@@ -591,7 +591,7 @@ class GrokProvider implements AIProvider {
       }
       return const BuddyResponse(
         status: AIResultStatus.providerError,
-        answerText: 'Grok returned error response.',
+        answerText: 'Groq returned error response.',
       );
     } catch (e) {
       return BuddyResponse(

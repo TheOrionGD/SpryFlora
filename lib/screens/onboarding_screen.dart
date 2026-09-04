@@ -11,12 +11,18 @@ import '../widgets/fun_confetti_overlay.dart';
 import '../widgets/leaves_particle_overlay.dart';
 import '../widgets/video_background_backdrop.dart';
 import 'landing_selection_screen.dart';
+import 'login_screen.dart';
 
 /// 9-Screen 50-Second Automated Cloud Flow Onboarding
 /// Features 5-second auto-timer per screen, custom cloud transition sweep between screens,
 /// zero skip/next buttons, and background Render engine warming.
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+  final int initialPage;
+
+  const OnboardingScreen({
+    super.key,
+    this.initialPage = 0,
+  });
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -101,10 +107,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     ),
     _OnboardPage(
       imagePath: 'assets/sprites/mascot_celebrating_confetti.png',
-      title: 'Cloud Engine\nReady for Launch!',
+      title: 'Sign In / Register\nto SpryFlora Cloud',
       subtitle:
-          'SpryFlora cloud engine is hot, synchronized &\nready for instant AI & data requests.',
-      badgeText: '09 • CLOUD READY',
+          'Login or create your botanical account to save plant logs & sync companion data.',
+      badgeText: '09 • LOGIN & AUTHENTICATION',
       accentColor: Color(0xFF2ECC71),
     ),
   ];
@@ -112,7 +118,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   @override
   void initState() {
     super.initState();
-    _pageController = PageController();
+    _currentPage = widget.initialPage;
+    _pageController = PageController(initialPage: widget.initialPage);
+    if (_currentPage == _pages.length - 1) {
+      _showConfetti = true;
+    }
 
     _floatCtrl = AnimationController(
       vsync: this,
@@ -151,11 +161,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   void _start5SecSlideFlow() {
+    if (_currentPage >= _pages.length - 1) {
+      _autoFlowTimer?.cancel();
+      _slideTimerCtrl.stop();
+      return;
+    }
+
     _slideTimerCtrl.forward(from: 0.0);
 
     _autoFlowTimer?.cancel();
     _autoFlowTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted) return;
+      if (_currentPage >= _pages.length - 1) {
+        _autoFlowTimer?.cancel();
+        _slideTimerCtrl.stop();
+        return;
+      }
       _triggerCloudTransitionToNextPage();
     });
   }
@@ -180,7 +201,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         setState(() {
           _currentPage = nextIdx;
         });
-        _slideTimerCtrl.forward(from: 0.0);
+        if (nextIdx < _pages.length - 1) {
+          _slideTimerCtrl.forward(from: 0.0);
+        } else {
+          _autoFlowTimer?.cancel();
+          _slideTimerCtrl.stop();
+        }
       });
     } else {
       _finishOnboarding();
@@ -259,87 +285,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 ),
               ),
 
-              // 2. Top Header Branding Badge
-              Positioned(
-                top: MediaQuery.of(context).padding.top + 8,
-                left: 16,
-                right: 16,
-                child: Center(
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.25),
-                      ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x20000000),
-                          blurRadius: 8,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Color(0xFF2ECC71),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'SpryFlora • Botanical Journey 🌿',
-                          style: GoogleFonts.nunito(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              // Top Left Back Button to return to Portal
-              Positioned(
-                top: MediaQuery.of(context).padding.top + 6,
-                left: 14,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.25),
-                    ),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.arrow_back_rounded,
-                        color: Colors.white, size: 20),
-                    onPressed: () {
-                      if (Navigator.of(context).canPop()) {
-                        Navigator.of(context).pop();
-                      } else {
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                              builder: (_) => const LandingSelectionScreen()),
-                        );
-                      }
-                    },
-                    tooltip: 'Return to Portal',
-                  ),
-                ),
-              ),
-
-              // 3. Automated & Interactive PageView Content
+              // 2. Automated & Interactive PageView Content
               PageView.builder(
                 controller: _pageController,
                 physics: const BouncingScrollPhysics(),
@@ -347,10 +293,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   setState(() {
                     _currentPage = index;
                   });
-                  _slideTimerCtrl.forward(from: 0.0);
+                  if (index >= _pages.length - 1) {
+                    _autoFlowTimer?.cancel();
+                    _slideTimerCtrl.stop();
+                  } else {
+                    _start5SecSlideFlow();
+                  }
                 },
                 itemCount: _pages.length,
                 itemBuilder: (context, index) {
+                  if (index == _pages.length - 1) {
+                    return const LoginScreen();
+                  }
                   final p = _pages[index];
                   return Column(
                     key: ValueKey('onboard_page_$index'),
@@ -563,6 +517,96 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     ],
                   );
                 },
+              ),
+
+              // 3. Top Header Branding Badge
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 8,
+                left: 16,
+                right: 16,
+                child: Center(
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.25),
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x20000000),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color(0xFF2ECC71),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'SpryFlora • Botanical Journey 🌿',
+                          style: GoogleFonts.nunito(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // 4. Top Left Back Button to return to Previous Slide or Portal
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 6,
+                left: 14,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded,
+                        color: Colors.white, size: 20),
+                    onPressed: () {
+                      if (_currentPage > 0) {
+                        if (_pageController.hasClients) {
+                          _pageController.animateToPage(
+                            _currentPage - 1,
+                            duration: const Duration(milliseconds: 350),
+                            curve: Curves.easeInOut,
+                          );
+                        }
+                      } else {
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        } else {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                                builder: (_) => const LandingSelectionScreen()),
+                          );
+                        }
+                      }
+                    },
+                    tooltip: 'Back',
+                  ),
+                ),
               ),
             ],
           ),

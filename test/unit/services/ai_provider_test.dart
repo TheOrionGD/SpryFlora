@@ -31,9 +31,9 @@ void main() {
       expect(result.isPlantDetected, isFalse);
     });
 
-    test('GrokProvider askBuddy returns authenticationError when API key is missing', () async {
-      final provider = GrokProvider(apiKey: '');
-      final result = await provider.askBuddy(prompt: 'Hello Grok');
+    test('GroqProvider askBuddy returns authenticationError when API key is missing', () async {
+      final provider = GroqProvider(apiKey: '');
+      final result = await provider.askBuddy(prompt: 'Hello Groq');
 
       expect(result.status, AIResultStatus.authenticationError);
       expect(result.answerText.contains('missing') || result.answerText.contains('unavailable'), isTrue);

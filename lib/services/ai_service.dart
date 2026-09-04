@@ -142,9 +142,9 @@ Do not wrap in markdown quotes. Return pure JSON only.
             preferredApiKey: ApiConfig.geminiApiKey1,
           );
 
-          // Tier 3: Grok Failover AI Reasoning Provider if Gemini is unavailable
-          if ((visionResponse == null || visionResponse.isEmpty) && ApiConfig.grokApiKey.isNotEmpty) {
-            visionResponse = await _callGrokApi(prompt);
+          // Tier 3: Groq Failover AI Reasoning Provider if Gemini is unavailable
+          if ((visionResponse == null || visionResponse.isEmpty) && ApiConfig.groqApiKey.isNotEmpty) {
+            visionResponse = await _callGroqApi(prompt);
           }
 
           if (visionResponse != null && visionResponse.isNotEmpty) {
@@ -855,19 +855,19 @@ Return JSON only:
     return null;
   }
 
-  /// Grok API (xAI) for fallback reasoning
-  Future<String?> _callGrokApi(String prompt) async {
-    if (ApiConfig.grokApiKey.isEmpty) return null;
+  /// Groq API for fallback reasoning
+  Future<String?> _callGroqApi(String prompt) async {
+    if (ApiConfig.groqApiKey.isEmpty) return null;
     try {
-      final uri = Uri.parse(ApiConfig.grokApiUrl);
+      final uri = Uri.parse(ApiConfig.groqApiUrl);
       final response = await http.post(
         uri,
         headers: {
-          'Authorization': 'Bearer ${ApiConfig.grokApiKey}',
+          'Authorization': 'Bearer ${ApiConfig.groqApiKey}',
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'model': ApiConfig.grokModel,
+          'model': ApiConfig.groqModel,
           'messages': [
             {'role': 'user', 'content': prompt}
           ],
@@ -880,7 +880,7 @@ Return JSON only:
         return map['choices']?[0]?['message']?['content'] as String?;
       }
     } catch (e) {
-      debugPrint('Grok API error: $e');
+      debugPrint('Groq API error: $e');
     }
     return null;
   }
