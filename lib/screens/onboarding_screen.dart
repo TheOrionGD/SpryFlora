@@ -163,12 +163,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   void _triggerCloudTransitionToNextPage() {
     if (_currentPage < _pages.length - 1) {
       final nextIdx = _currentPage + 1;
-      _cloudAnimCtrl.forward(from: 0.0);
+      _cloudAnimCtrl.forward(from: 0.0).then((_) {
+        if (mounted) _cloudAnimCtrl.reset();
+      });
 
-      // Jump page right at peak cloud cover (400ms mark)
+      // Animate page right at peak cloud cover (400ms mark)
       Timer(const Duration(milliseconds: 400), () {
         if (!mounted) return;
-        _pageController.jumpToPage(nextIdx);
+        if (_pageController.hasClients) {
+          _pageController.animateToPage(
+            nextIdx,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeInOut,
+          );
+        }
         setState(() {
           _currentPage = nextIdx;
         });
@@ -191,16 +199,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     await userService.setOnboardingCompleted(true);
 
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (_, a1, a2) => const LandingSelectionScreen(),
-        transitionsBuilder: (_, a1, a2, child) => FadeTransition(
-          opacity: a1,
-          child: child,
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (_, a1, a2) => const LandingSelectionScreen(),
+          transitionsBuilder: (_, a1, a2, child) => FadeTransition(
+            opacity: a1,
+            child: child,
+          ),
+          transitionDuration: const Duration(milliseconds: 800),
         ),
-        transitionDuration: const Duration(milliseconds: 800),
-      ),
-    );
+      );
+    }
   }
 
   @override
@@ -297,10 +309,46 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 ),
               ),
 
-              // 3. Automated PageView Content (No Manual Swiping / Buttons)
+              // Top Left Back Button to return to Portal
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 6,
+                left: 14,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded,
+                        color: Colors.white, size: 20),
+                    onPressed: () {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      } else {
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                              builder: (_) => const LandingSelectionScreen()),
+                        );
+                      }
+                    },
+                    tooltip: 'Return to Portal',
+                  ),
+                ),
+              ),
+
+              // 3. Automated & Interactive PageView Content
               PageView.builder(
                 controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(), // Disables manual touch swipe to enforce 5s flow
+                physics: const BouncingScrollPhysics(),
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentPage = index;
+                  });
+                  _slideTimerCtrl.forward(from: 0.0);
+                },
                 itemCount: _pages.length,
                 itemBuilder: (context, index) {
                   final p = _pages[index];
@@ -452,7 +500,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
                                   const SizedBox(height: 14),
 
-                                  // 9 Step Progress Dots (No Skip / Next Buttons)
+                                  // 9 Step Progress Dots (Clickable)
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: List.generate(
@@ -460,22 +508,34 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                       (dotIdx) {
                                         final isAct = dotIdx == index;
                                         final isPast = dotIdx < index;
-                                        return AnimatedContainer(
-                                          duration: const Duration(
-                                              milliseconds: 350),
-                                          margin: const EdgeInsets.symmetric(
-                                              horizontal: 3),
-                                          width: isAct ? 22 : 8,
-                                          height: 8,
-                                          decoration: BoxDecoration(
-                                            color: isAct
-                                                ? p.accentColor
-                                                : isPast
-                                                    ? SkeuoTheme.primaryGreen
-                                                        .withValues(alpha: 0.5)
-                                                    : const Color(0xFFD0E0D0),
-                                            borderRadius:
-                                                BorderRadius.circular(4),
+                                        return GestureDetector(
+                                          onTap: () {
+                                            if (_pageController.hasClients) {
+                                              _pageController.animateToPage(
+                                                dotIdx,
+                                                duration: const Duration(
+                                                    milliseconds: 350),
+                                                curve: Curves.easeInOut,
+                                              );
+                                            }
+                                          },
+                                          child: AnimatedContainer(
+                                            duration: const Duration(
+                                                milliseconds: 350),
+                                            margin: const EdgeInsets.symmetric(
+                                                horizontal: 3),
+                                            width: isAct ? 22 : 8,
+                                            height: 8,
+                                            decoration: BoxDecoration(
+                                              color: isAct
+                                                  ? p.accentColor
+                                                  : isPast
+                                                      ? SkeuoTheme.primaryGreen
+                                                          .withValues(alpha: 0.5)
+                                                      : const Color(0xFFD0E0D0),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
                                           ),
                                         );
                                       },
