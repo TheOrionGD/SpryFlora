@@ -33,7 +33,18 @@ if (env.nodeEnv !== 'test') {
   app.use(apiLimiter);
 }
 
-// Health Probes
+// Root & Health Probes
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: '🚀 SpryFlora Cloud REST API & AI Gateway is Active!',
+    status: 'online',
+    health: '/health',
+    readiness: '/ready',
+    accountDeletionPortal: '/delete-account',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'ok',

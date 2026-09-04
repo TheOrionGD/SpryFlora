@@ -1,14 +1,20 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// Clash of Clans (CoC) Style Cloud Transition Overlay Widget.
-/// Animates 4 puffy cloud layers from all screen edges (left, right, top, bottom)
-/// to fully occlude the screen at 50% progress, executes onCovered(), and parts outward.
+/// A custom cloud transition overlay that sweeps animated fluffy clouds
+/// across the screen to create a seamless, magical cloud transition between screens & stages.
+///
+/// Can be used either:
+/// 1) Declaratively with [animationValue] (e.g. driven by external AnimationController).
+/// 2) Imperatively via `CloudTransitionOverlay.of(context)?.triggerTransition(onCovered: ...)`.
 class CloudTransitionOverlay extends StatefulWidget {
+  final double? animationValue;
   final Widget child;
 
   const CloudTransitionOverlay({
     super.key,
+    this.animationValue,
     required this.child,
   });
 
@@ -22,58 +28,56 @@ class CloudTransitionOverlay extends StatefulWidget {
 
 class CloudTransitionOverlayState extends State<CloudTransitionOverlay>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _animCtrl;
-  VoidCallback? _onCoveredCallback;
-  bool _hasTriggeredCovered = false;
+  late AnimationController _internalAnimCtrl;
 
   @override
   void initState() {
     super.initState();
-    _animCtrl = AnimationController(
+    _internalAnimCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 800),
     );
+  }
 
-    _animCtrl.addListener(() {
-      if (_animCtrl.value >= 0.5 && !_hasTriggeredCovered) {
-        _hasTriggeredCovered = true;
-        _onCoveredCallback?.call();
+  @override
+  void dispose() {
+    _internalAnimCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Triggers a cloud transition sweep. Invokes [onCovered] at peak cloud cover (400ms mark).
+  void triggerTransition({VoidCallback? onCovered}) {
+    _internalAnimCtrl.forward(from: 0.0).then((_) {
+      _internalAnimCtrl.reverse();
+    });
+
+    Timer(const Duration(milliseconds: 400), () {
+      if (mounted && onCovered != null) {
+        onCovered();
       }
     });
   }
 
   @override
-  void dispose() {
-    _animCtrl.dispose();
-    super.dispose();
-  }
-
-  /// Triggers the full Clash of Clans cloud sweep transition.
-  void triggerTransition({required VoidCallback onCovered}) {
-    if (_animCtrl.isAnimating) return;
-    _onCoveredCallback = onCovered;
-    _hasTriggeredCovered = false;
-    _animCtrl.forward(from: 0.0);
-  }
-
-  @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _animCtrl,
+      animation: _internalAnimCtrl,
       builder: (context, _) {
-        final progress = _animCtrl.value;
+        final val = widget.animationValue ?? _internalAnimCtrl.value;
+
+        if (val <= 0.0 || val >= 1.0) {
+          return widget.child;
+        }
 
         return Stack(
+          fit: StackFit.expand,
           children: [
             widget.child,
-            if (progress > 0.0 && progress < 1.0)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: _CoCCloudSweepPainter(progress: progress),
-                  ),
-                ),
+            IgnorePointer(
+              child: CustomPaint(
+                painter: _CloudTransitionPainter(progress: val),
               ),
+            ),
           ],
         );
       },
@@ -81,164 +85,121 @@ class CloudTransitionOverlayState extends State<CloudTransitionOverlay>
   }
 }
 
-class _CoCCloudSweepPainter extends CustomPainter {
+class _CloudTransitionPainter extends CustomPainter {
   final double progress;
 
-  _CoCCloudSweepPainter({required this.progress});
+  _CloudTransitionPainter({required this.progress});
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Envelope: 0.0 -> 0.5 (clouds close to 100% coverage), 0.5 -> 1.0 (clouds part)
-    final double coverage = (progress <= 0.5)
-        ? (progress / 0.5)
-        : (1.0 - (progress - 0.5) / 0.5);
+    // Envelope: 0.0 -> 0.5 (climbing to 1.0 coverage) -> 1.0 (dropping back to 0.0)
+    final coverage = math.sin(progress * math.pi);
+    if (coverage <= 0.01) return;
 
-    final double cubicCoverage = Curves.easeOutQuart.transform(coverage);
+    final w = size.width;
+    final h = size.height;
 
-    final Paint mainCloudPaint = Paint()
-      ..color = const Color(0xFFF7F9F9)
+    // 1. Semi-transparent misty background wash
+    final mistPaint = Paint()
+      ..color = const Color(0xFFE0F7FA).withValues(alpha: coverage * 0.88)
       ..style = PaintingStyle.fill;
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), mistPaint);
 
-    final Paint shadowCloudPaint = Paint()
-      ..color = const Color(0xFFD6EAF8).withValues(alpha: 0.90)
-      ..style = PaintingStyle.fill;
+    // 2. Multi-layered cloud puffs sweeping from edges to center
+    _drawCloudLayer(
+      canvas: canvas,
+      size: size,
+      coverage: coverage,
+      cloudColor: const Color(0xFFFFFFFF).withValues(alpha: coverage * 0.95),
+      speedFactor: 1.0,
+    );
 
-    final Paint accentCloudPaint = Paint()
-      ..color = const Color(0xFFA9CCE3).withValues(alpha: 0.70)
-      ..style = PaintingStyle.fill;
+    _drawCloudLayer(
+      canvas: canvas,
+      size: size,
+      coverage: coverage,
+      cloudColor: const Color(0xFFB2EBF2).withValues(alpha: coverage * 0.65),
+      speedFactor: 0.75,
+    );
 
-    final double maxMoveX = size.width * 0.60;
-    final double maxMoveY = size.height * 0.60;
-
-    final double topOffset = (cubicCoverage * maxMoveY) - (size.height * 0.25);
-    final double bottomOffset = size.height - (cubicCoverage * maxMoveY) + (size.height * 0.25);
-    final double leftOffset = (cubicCoverage * maxMoveX) - (size.width * 0.25);
-    final double rightOffset = size.width - (cubicCoverage * maxMoveX) + (size.width * 0.25);
-
-    // 1. Top Cloud Layer
-    _drawHorizontalPuffyClouds(canvas, size, topOffset, isTop: true, mainPaint: mainCloudPaint, shadowPaint: shadowCloudPaint, accentPaint: accentCloudPaint);
-
-    // 2. Bottom Cloud Layer
-    _drawHorizontalPuffyClouds(canvas, size, bottomOffset, isTop: false, mainPaint: mainCloudPaint, shadowPaint: shadowCloudPaint, accentPaint: accentCloudPaint);
-
-    // 3. Left Cloud Layer
-    _drawVerticalPuffyClouds(canvas, size, leftOffset, isLeft: true, mainPaint: mainCloudPaint, shadowPaint: shadowCloudPaint);
-
-    // 4. Right Cloud Layer
-    _drawVerticalPuffyClouds(canvas, size, rightOffset, isLeft: false, mainPaint: mainCloudPaint, shadowPaint: shadowCloudPaint);
+    _drawCloudLayer(
+      canvas: canvas,
+      size: size,
+      coverage: coverage,
+      cloudColor: const Color(0xFFE8F5E9).withValues(alpha: coverage * 0.75),
+      speedFactor: 1.25,
+    );
   }
 
-  void _drawHorizontalPuffyClouds(
-    Canvas canvas,
-    Size size,
-    double baseY, {
-    required bool isTop,
-    required Paint mainPaint,
-    required Paint shadowPaint,
-    required Paint accentPaint,
+  void _drawCloudLayer({
+    required Canvas canvas,
+    required Size size,
+    required double coverage,
+    required Color cloudColor,
+    required double speedFactor,
   }) {
-    final double dir = isTop ? 1.0 : -1.0;
-    final Path pathMain = Path();
-    final Path pathShadow = Path();
+    final paint = Paint()..color = cloudColor;
+    final path = Path();
+    final w = size.width;
+    final h = size.height;
 
-    if (isTop) {
-      pathMain.moveTo(0, 0);
-      pathMain.lineTo(0, baseY);
-      pathShadow.moveTo(0, 0);
-      pathShadow.lineTo(0, baseY - 25 * dir);
-    } else {
-      pathMain.moveTo(0, size.height);
-      pathMain.lineTo(0, baseY);
-      pathShadow.moveTo(0, size.height);
-      pathShadow.lineTo(0, baseY - 25 * dir);
+    // Top cloud wave
+    path.moveTo(0, 0);
+    path.lineTo(w, 0);
+    path.lineTo(w, h * 0.5 * coverage);
+
+    // Fluffy cloud arcs across width
+    final puffs = 6;
+    final step = w / puffs;
+
+    for (int i = puffs; i >= 0; i--) {
+      final cx = (i - 0.5) * step;
+      final cy = h * 0.5 * coverage + math.sin(i * 1.5 + progress * 4) * 25;
+      final ry = 60 * coverage;
+      path.quadraticBezierTo(cx, cy + ry, i * step, h * 0.45 * coverage);
     }
+    path.close();
+    canvas.drawPath(path, paint);
 
-    const int puffs = 8;
-    final double step = size.width / (puffs - 1);
+    // Bottom cloud wave floating upwards
+    final botPath = Path();
+    botPath.moveTo(0, h);
+    botPath.lineTo(w, h);
+    botPath.lineTo(w, h - h * 0.55 * coverage);
 
-    for (int i = 0; i < puffs; i++) {
-      final double x = i * step;
-      final double nextX = (i + 1) * step;
-      final double puffRadius = step * 0.75;
-      final double wave = math.sin(i * 1.8) * 18;
+    for (int i = puffs; i >= 0; i--) {
+      final cx = (i - 0.5) * step;
+      final cy = h - (h * 0.55 * coverage) - math.cos(i * 2.0 + progress * 3) * 20;
+      final ry = 70 * coverage;
+      botPath.quadraticBezierTo(cx, cy - ry, i * step, h - (h * 0.5 * coverage));
+    }
+    botPath.close();
+    canvas.drawPath(botPath, paint);
 
-      pathMain.quadraticBezierTo(
-        x + step / 2,
-        baseY + (puffRadius * dir) + wave,
-        nextX,
-        baseY,
+    // Center cloud circles swelling during peak coverage
+    if (coverage > 0.3) {
+      final centerPaint = Paint()..color = cloudColor;
+      final centerScale = (coverage - 0.3) / 0.7;
+      canvas.drawCircle(
+        Offset(w * 0.3, h * 0.4),
+        w * 0.45 * centerScale,
+        centerPaint,
       );
-
-      pathShadow.quadraticBezierTo(
-        x + step / 2,
-        baseY + ((puffRadius + 20) * dir) + wave,
-        nextX,
-        baseY - 12 * dir,
+      canvas.drawCircle(
+        Offset(w * 0.7, h * 0.55),
+        w * 0.5 * centerScale,
+        centerPaint,
       );
-    }
-
-    if (isTop) {
-      pathMain.lineTo(size.width, 0);
-      pathShadow.lineTo(size.width, 0);
-    } else {
-      pathMain.lineTo(size.width, size.height);
-      pathShadow.lineTo(size.width, size.height);
-    }
-
-    pathMain.close();
-    pathShadow.close();
-
-    canvas.drawPath(pathShadow, shadowPaint);
-    canvas.drawPath(pathMain, mainPaint);
-  }
-
-  void _drawVerticalPuffyClouds(
-    Canvas canvas,
-    Size size,
-    double baseX, {
-    required bool isLeft,
-    required Paint mainPaint,
-    required Paint shadowPaint,
-  }) {
-    final double dir = isLeft ? 1.0 : -1.0;
-    final Path pathMain = Path();
-
-    if (isLeft) {
-      pathMain.moveTo(0, 0);
-      pathMain.lineTo(baseX, 0);
-    } else {
-      pathMain.moveTo(size.width, 0);
-      pathMain.lineTo(baseX, 0);
-    }
-
-    const int puffs = 10;
-    final double step = size.height / (puffs - 1);
-
-    for (int i = 0; i < puffs; i++) {
-      final double y = i * step;
-      final double nextY = (i + 1) * step;
-      final double puffRadius = step * 0.70;
-      final double wave = math.cos(i * 1.6) * 16;
-
-      pathMain.quadraticBezierTo(
-        baseX + (puffRadius * dir) + wave,
-        y + step / 2,
-        baseX,
-        nextY,
+      canvas.drawCircle(
+        Offset(w * 0.5, h * 0.48),
+        w * 0.55 * centerScale,
+        centerPaint,
       );
     }
-
-    if (isLeft) {
-      pathMain.lineTo(0, size.height);
-    } else {
-      pathMain.lineTo(size.width, size.height);
-    }
-
-    pathMain.close();
-    canvas.drawPath(pathMain, mainPaint);
   }
 
   @override
-  bool shouldRepaint(_CoCCloudSweepPainter oldDelegate) =>
-      oldDelegate.progress != progress;
+  bool shouldRepaint(covariant _CloudTransitionPainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
 }
