@@ -534,10 +534,99 @@ class GroqProvider implements AIProvider {
     required String base64Image,
     List<int>? rawBytes,
   }) async {
-    return const PlantIdentificationResult(
-      status: AIResultStatus.providerError,
-      errorMessage: 'Groq vision is unconfigured.',
-    );
+    final effectiveKey = apiKey.isNotEmpty ? apiKey : ApiConfig.groqApiKey;
+    if (effectiveKey.isEmpty) {
+      return const PlantIdentificationResult(
+        status: AIResultStatus.authenticationError,
+        errorMessage: 'Groq API key is missing.',
+      );
+    }
+
+    try {
+      final prompt = '''
+You are an expert AI vision botanist.
+Analyze this photo carefully.
+Return a JSON object in this exact format:
+{
+  "isPlantDetected": true or false,
+  "detectedObjectType": "<'Plant / Leaf' if plant/seedling/leaf detected, or specific non-plant object name>",
+  "rejectionReason": "<If false, explain why>",
+  "identifiedSpecies": "<Common English species name e.g. Tulsi, Rose, Aloe Vera, Money Plant, Tomato>",
+  "confidencePercent": <integer 80-99>
+}
+Return JSON only without markdown formatting.
+''';
+
+      final imageUrl = base64Image.startsWith('data:image')
+          ? base64Image
+          : 'data:image/jpeg;base64,$base64Image';
+
+      final response = await http.post(
+        Uri.parse(ApiConfig.groqApiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $effectiveKey',
+        },
+        body: jsonEncode({
+          'model': ApiConfig.groqVisionModel,
+          'messages': [
+            {
+              'role': 'user',
+              'content': [
+                {'type': 'text', 'text': prompt},
+                {
+                  'type': 'image_url',
+                  'image_url': {'url': imageUrl}
+                }
+              ]
+            }
+          ],
+          'temperature': 0.2,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['choices']?[0]?['message']?['content']?.toString();
+        if (content != null) {
+          final cleaned = content.replaceAll('```json', '').replaceAll('```', '').trim();
+          final map = jsonDecode(cleaned);
+          final isPlant = map['isPlantDetected'] == true;
+          final objectType = map['detectedObjectType']?.toString() ?? 'Object';
+          final rejection = map['rejectionReason']?.toString();
+          final species = map['identifiedSpecies']?.toString() ?? 'Unknown Species';
+          final confidence = (map['confidencePercent'] as num?)?.toInt() ?? 85;
+
+          if (!isPlant) {
+            return PlantIdentificationResult(
+              status: AIResultStatus.rejected,
+              isPlantDetected: false,
+              detectedObjectType: objectType,
+              rejectionReason: rejection ?? 'No plant detected in photo.',
+              identifiedSpecies: 'Not a Plant',
+              confidencePercent: 0,
+            );
+          }
+
+          return PlantIdentificationResult(
+            status: AIResultStatus.success,
+            isPlantDetected: true,
+            detectedObjectType: 'Plant / Leaf',
+            identifiedSpecies: species,
+            confidencePercent: confidence,
+          );
+        }
+      }
+      return const PlantIdentificationResult(
+        status: AIResultStatus.providerError,
+        errorMessage: 'Groq vision API returned unexpected status.',
+      );
+    } catch (e) {
+      return PlantIdentificationResult(
+        status: AIResultStatus.networkError,
+        errorMessage: e.toString(),
+      );
+    }
   }
 
   @override
