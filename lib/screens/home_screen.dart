@@ -14,12 +14,13 @@ import '../widgets/fun_animated_plant.dart';
 import '../widgets/fun_bouncy_button.dart';
 import '../widgets/fun_confetti_overlay.dart';
 import 'add_plant_screen.dart';
-import 'ai_eco_buddy_screen.dart';
 import 'my_plants_screen.dart';
 import 'plant_details_screen.dart';
 import 'profile_settings_screen.dart';
-import 'virtual_companion_screen.dart';
-import 'mascot_journey_screen.dart';
+import 'ai_eco_buddy_screen.dart';
+import 'garden_screen.dart';
+import 'notification_center_screen.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -277,12 +278,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         // Notification bell icon in circular card (Screen 08)
         GestureDetector(
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('🔔 You are up to date on all plant care tasks!'),
-                backgroundColor: SkeuoTheme.primaryGreen,
-                duration: Duration(seconds: 2),
-              ),
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: (_) => const NotificationCenterScreen()),
             );
           },
           child: Container(
@@ -388,7 +386,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const MascotJourneyScreen()),
+          MaterialPageRoute(builder: (_) => const GardenScreen()),
         );
       },
       child: Container(
@@ -1123,8 +1121,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             break;
           case 2:
             Navigator.of(context)
-                .push(
-                    MaterialPageRoute(builder: (_) => const AIEcoBuddyScreen()))
+                .push(MaterialPageRoute(
+                    builder: (_) => const AIEcoBuddyScreen()))
                 .then((_) {
               _loadData();
               setState(() => _currentNavIndex = 0);
@@ -1132,8 +1130,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             break;
           case 3:
             Navigator.of(context)
-                .push(MaterialPageRoute(
-                    builder: (_) => const VirtualCompanionScreen()))
+                .push(MaterialPageRoute(builder: (_) => const GardenScreen()))
                 .then((_) {
               _loadData();
               setState(() => _currentNavIndex = 0);

@@ -7,7 +7,6 @@ import '../config/api_config.dart';
 import '../config/app_version.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
-import '../services/notification_service.dart';
 import '../services/plant_repository.dart';
 import '../services/user_service.dart';
 import '../theme/skeuo_theme.dart';
@@ -21,7 +20,13 @@ import '../widgets/app_background.dart';
 import '../widgets/leaves_particle_overlay.dart';
 import 'my_certifications_screen.dart';
 import 'profile_setup_screen.dart';
-import 'virtual_companion_screen.dart';
+import 'garden_screen.dart';
+import 'mascot_journey_screen.dart';
+import 'notification_center_screen.dart';
+import 'reminders_screen.dart';
+import 'widget_guide_screen.dart';
+import 'help_faq_screen.dart';
+
 
 /// Profile & Settings Screen — Fun childish redesign
 class ProfileSettingsScreen extends StatefulWidget {
@@ -37,7 +42,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
   final PlantRepository _plantRepository = PlantRepository();
 
   UserProfile? _user;
-  bool _notificationsEnabled = true;
   bool _soundEnabled = true;
 
   late AnimationController _headerCtrl;
@@ -67,7 +71,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
-        _notificationsEnabled = prefs.getBool('spryflora_reminders_enabled') ?? true;
         _soundEnabled = prefs.getBool('spryflora_sound_enabled') ?? true;
       });
     }
@@ -250,6 +253,15 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                           ),
                           const Divider(height: 1, color: Color(0xFFF1F8EE)),
                           _buildSettingsTile(
+                            icon: Icons.map_rounded,
+                            title: 'Mascot Journey Map',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const MascotJourneyScreen()),
+                            ),
+                          ),
+                          const Divider(height: 1, color: Color(0xFFF1F8EE)),
+                          _buildSettingsTile(
                             icon: Icons.workspace_premium_rounded,
                             title: 'My Certifications',
                             onTap: () => Navigator.of(context).push(
@@ -260,44 +272,30 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                           ),
                           const Divider(height: 1, color: Color(0xFFF1F8EE)),
                           _buildSettingsTile(
-                            icon: Icons.widgets_rounded,
-                            title: 'Home Screen Widget',
-                            onTap: _showWidgetGuide,
+                            icon: Icons.notifications_active_rounded,
+                            title: 'Notification Center',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const NotificationCenterScreen()),
+                            ),
                           ),
                           const Divider(height: 1, color: Color(0xFFF1F8EE)),
                           _buildSettingsTile(
-                            icon: _notificationsEnabled
-                                ? Icons.notifications_active_rounded
-                                : Icons.notifications_none_rounded,
+                            icon: Icons.alarm_rounded,
                             title: 'Plant Care Reminders',
-                            onTap: () async {
-                              final messenger = ScaffoldMessenger.of(context);
-                              setState(() {
-                                _notificationsEnabled = !_notificationsEnabled;
-                              });
-                              final prefs = await SharedPreferences.getInstance();
-                              await prefs.setBool(
-                                  'spryflora_reminders_enabled', _notificationsEnabled);
-
-                              if (_notificationsEnabled) {
-                                NotificationService().sendSystemNotification(
-                                  title: '🌿 Plant Care Reminders Active',
-                                  body:
-                                      'SpryFlora mobile notifications enabled! You will receive system alerts when plants need hydration.',
-                                );
-                              }
-                              if (mounted) {
-                                messenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text(_notificationsEnabled
-                                        ? '🔔 Reminders enabled! System notification posted.'
-                                        : '🔕 Reminders muted'),
-                                    backgroundColor: SkeuoTheme.primaryGreen,
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
-                              }
-                            },
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const RemindersScreen()),
+                            ),
+                          ),
+                          const Divider(height: 1, color: Color(0xFFF1F8EE)),
+                          _buildSettingsTile(
+                            icon: Icons.widgets_rounded,
+                            title: 'Home Screen Widget',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const WidgetGuideScreen()),
+                            ),
                           ),
                           const Divider(height: 1, color: Color(0xFFF1F8EE)),
                           _buildSettingsTile(
@@ -330,7 +328,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                           _buildSettingsTile(
                             icon: Icons.help_outline_rounded,
                             title: 'Help & FAQ',
-                            onTap: _showHelp,
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const HelpFaqScreen()),
+                            ),
                           ),
                           const Divider(height: 1, color: Color(0xFFF1F8EE)),
                           _buildSettingsTile(
@@ -417,7 +418,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
         case 3:
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-                builder: (_) => const VirtualCompanionScreen()),
+                builder: (_) => const GardenScreen()),
           );
           break;
       }
@@ -595,175 +596,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
     );
   }
 
-  void _showHelp() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: SkeuoTheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text('❓ Help & Tips',
-            style:
-                SkeuoTheme.funHeading(size: 18, color: SkeuoTheme.textPrimary)),
-        content: Text(
-          'SpryFlora is 100% offline! 🌿\n\n'
-          '• Add plants using the species database\n'
-          '• Check in daily to track health & watering\n'
-          '• Watch your plant grow with animations\n'
-          '• Get notified when plants need water 💧',
-          style: SkeuoTheme.funBody(size: 14, color: SkeuoTheme.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Got it! 👍',
-                style: SkeuoTheme.funBody(
-                    size: 14,
-                    color: SkeuoTheme.primaryGreen,
-                    weight: FontWeight.w800)),
-          ),
-        ],
-      ),
-    );
-  }
 
-  void _showWidgetGuide() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: SkeuoTheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            const Text('📱', style: TextStyle(fontSize: 24)),
-            const SizedBox(width: 8),
-            Text(
-              'Home Screen Widget',
-              style: SkeuoTheme.funHeading(
-                  size: 18, color: SkeuoTheme.textPrimary),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Mini visual preview card of the Home Screen Widget
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFF1FAF4), Color(0xFFE4F3E8)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFA5D6A7), width: 1.8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.green.withValues(alpha: 0.15),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          const Text('🌿', style: TextStyle(fontSize: 16)),
-                          const SizedBox(width: 4),
-                          Text('SpryFlora',
-                              style: GoogleFonts.cinzel(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: const Color(0xFF1B4D3E))),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFC8E6C9),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text('96% Health',
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF2E7D32))),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Live Plant Status',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14,
-                                  color: Color(0xFF1B3B2B))),
-                          Text('Active Botanical Growth',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF558B2F))),
-                        ],
-                      ),
-                      const Text('🌱', style: TextStyle(fontSize: 22)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('💧 Water in 2 days',
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1565C0))),
-                      Text('☀️ 4h Sun',
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFE65100))),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'How to add to your phone:\n'
-              '1. Go to your phone\'s home screen\n'
-              '2. Long-press on an empty area\n'
-              '3. Tap "Widgets"\n'
-              '4. Search for "SpryFlora" and drag it to your screen!',
-              style: TextStyle(
-                  fontSize: 12.5, color: Colors.black87, height: 1.45),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Awesome! 👍',
-                style: SkeuoTheme.funBody(
-                    size: 14,
-                    color: SkeuoTheme.primaryGreen,
-                    weight: FontWeight.w800)),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showSignOutDialog() {
     showDialog(

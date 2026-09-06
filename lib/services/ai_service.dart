@@ -247,29 +247,16 @@ Do not wrap in markdown quotes. Return pure JSON only.
     }
 
     // ── Cross-reference with local Plant Species Database ──
-    PlantSpecies? dbMatch = _excelService.getSpeciesByName(detectedSpeciesName);
+    PlantSpecies dbMatch = _excelService.matchSpeciesFromAIPrediction(
+      detectedSpeciesName,
+      detectedObjectType: detectedObjectType,
+    );
+
+    detectedSpeciesName = dbMatch.name;
+
     bool isNewDiscovery = false;
     String? discoveryBadge;
     String? discoveryReward;
-
-    if (dbMatch == null) {
-      // New plant species discovered not previously in database!
-      isNewDiscovery = true;
-      final newSpecies = PlantSpecies(
-        commonName: detectedSpeciesName,
-        lifespanDays: 180,
-        wateringIntervalDays: 3,
-        sunlight: 'Bright Indirect Light',
-        targetSunlightHours: 4,
-        description: 'Newly discovered botanical species identified by SpryFlora AI.',
-      );
-      await _excelService.addNewSpecies(newSpecies);
-      dbMatch = newSpecies;
-
-      discoveryBadge = '🌱 Botanical Explorer Badge';
-      discoveryReward =
-          '🎉 Congratulations! You discovered a new species "$detectedSpeciesName" and added it to the SpryFlora catalogue! (+150 Garden Points)';
-    }
 
     return PlantAIAnalysisResult(
       healthPercent: health,

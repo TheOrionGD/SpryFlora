@@ -1,6 +1,7 @@
 class DailyCheckinModel {
   final String id;
   final String plantId;
+  final String userId;
   final DateTime checkinDate;
   final bool watered;
   final int sunlightHours;
@@ -13,6 +14,7 @@ class DailyCheckinModel {
   DailyCheckinModel({
     required this.id,
     required this.plantId,
+    this.userId = 'usr_default',
     required this.checkinDate,
     required this.watered,
     this.sunlightHours = 4,
@@ -27,6 +29,7 @@ class DailyCheckinModel {
     return {
       'id': id,
       'plantId': plantId,
+      'userId': userId,
       'checkinDate': checkinDate.toIso8601String(),
       'watered': watered,
       'sunlightHours': sunlightHours,
@@ -42,6 +45,7 @@ class DailyCheckinModel {
     return DailyCheckinModel(
       id: json['id'] as String,
       plantId: json['plantId'] as String,
+      userId: json['userId'] as String? ?? 'usr_default',
       checkinDate: DateTime.parse(json['checkinDate'] as String),
       watered: json['watered'] as bool? ?? false,
       sunlightHours: (json['sunlightHours'] as num?)?.toInt() ?? 4,

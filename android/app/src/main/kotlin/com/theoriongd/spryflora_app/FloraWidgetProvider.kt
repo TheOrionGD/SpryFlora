@@ -28,12 +28,21 @@ class FloraWidgetProvider : AppWidgetProvider() {
                 )
                 setOnClickPendingIntent(R.id.widget_container, pendingIntent)
 
-                // Populate dynamic data saved from Flutter
-                val plantName = widgetData.getString("widget_plant_name", "SpryFlora Garden")
-                val plantStage = widgetData.getString("widget_plant_stage", "Active Growth")
-                val plantHealth = widgetData.getString("widget_plant_health", "100% Health")
-                val waterStatus = widgetData.getString("widget_water_status", "💧 All watered")
-                val sunStatus = widgetData.getString("widget_sun_status", "☀️ Sun: Optimal")
+                // Try per-widget configured data first, then fallback to global garden default
+                val defaultPlantName = widgetData.getString("widget_plant_name", "SpryFlora Garden")
+                val plantName = widgetData.getString("widget_plant_name.$appWidgetId", defaultPlantName)
+
+                val defaultPlantStage = widgetData.getString("widget_plant_stage", "Active Growth")
+                val plantStage = widgetData.getString("widget_plant_stage.$appWidgetId", defaultPlantStage)
+
+                val defaultPlantHealth = widgetData.getString("widget_plant_health", "100% Health")
+                val plantHealth = widgetData.getString("widget_plant_health.$appWidgetId", defaultPlantHealth)
+
+                val defaultWaterStatus = widgetData.getString("widget_water_status", "💧 All watered")
+                val waterStatus = widgetData.getString("widget_water_status.$appWidgetId", defaultWaterStatus)
+
+                val defaultSunStatus = widgetData.getString("widget_sun_status", "☀️ Sun: Optimal")
+                val sunStatus = widgetData.getString("widget_sun_status.$appWidgetId", defaultSunStatus)
 
                 setTextViewText(R.id.widget_plant_name, plantName)
                 setTextViewText(R.id.widget_plant_stage, plantStage)

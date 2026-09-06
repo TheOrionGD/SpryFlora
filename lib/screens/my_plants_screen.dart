@@ -14,7 +14,7 @@ import 'add_plant_screen.dart';
 import 'ai_eco_buddy_screen.dart';
 import 'plant_details_screen.dart';
 import 'profile_settings_screen.dart';
-import 'virtual_companion_screen.dart';
+import 'garden_screen.dart';
 
 /// Screen 10: My Plants (from 255.jpg)
 class MyPlantsScreen extends StatefulWidget {
@@ -133,7 +133,7 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
               case 3:
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                      builder: (_) => const VirtualCompanionScreen()),
+                      builder: (_) => const GardenScreen()),
                 );
                 break;
               case 4:

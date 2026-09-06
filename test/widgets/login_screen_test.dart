@@ -17,14 +17,12 @@ void main() {
           home: LoginScreen(),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.text('Welcome Back!'), findsOneWidget);
-      expect(find.text('Login to continue'), findsOneWidget);
-      expect(find.text('Forgot Password?'), findsOneWidget);
-      expect(find.text('Login'), findsOneWidget);
-      expect(find.text('G'), findsOneWidget);
-      expect(find.byIcon(Icons.apple), findsOneWidget);
+      expect(find.text('LOGIN'), findsOneWidget);
+      expect(find.text('Login to continue your plant adventure!'), findsOneWidget);
+      expect(find.text('Forgot password?'), findsOneWidget);
+      expect(find.text('SIGN IN 🌿'), findsOneWidget);
     });
 
     testWidgets('Shows validation errors when email or password is cleared and login is tapped', (tester) async {
@@ -33,7 +31,7 @@ void main() {
           home: LoginScreen(),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
 
       // Clear both text fields
       final textFields = find.byType(TextFormField);
@@ -42,11 +40,11 @@ void main() {
       await tester.pump();
 
       // Tap Login button
-      await tester.tap(find.text('Login'));
-      await tester.pumpAndSettle();
+      await tester.tap(find.text('SIGN IN 🌿'));
+      await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.text('Please enter your email'), findsOneWidget);
-      expect(find.text('Please enter your password'), findsOneWidget);
+      expect(find.text('Enter your email or username'), findsOneWidget);
+      expect(find.text('Enter your password'), findsOneWidget);
     });
 
     testWidgets('Toggles password visibility when eye icon is clicked', (tester) async {
@@ -55,11 +53,11 @@ void main() {
           home: LoginScreen(),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
       await tester.tap(find.byIcon(Icons.visibility_outlined));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.byIcon(Icons.visibility_off_outlined), findsOneWidget);
     });

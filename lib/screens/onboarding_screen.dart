@@ -10,7 +10,6 @@ import '../widgets/cloud_transition_overlay.dart';
 import '../widgets/fun_confetti_overlay.dart';
 import '../widgets/leaves_particle_overlay.dart';
 import '../widgets/video_background_backdrop.dart';
-import 'landing_selection_screen.dart';
 import 'login_screen.dart';
 
 /// 9-Screen 50-Second Automated Cloud Flow Onboarding
@@ -225,20 +224,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     await userService.setOnboardingCompleted(true);
 
     if (!mounted) return;
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-    } else {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (_, a1, a2) => const LandingSelectionScreen(),
-          transitionsBuilder: (_, a1, a2, child) => FadeTransition(
-            opacity: a1,
-            child: child,
-          ),
-          transitionDuration: const Duration(milliseconds: 800),
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (_, a1, a2) => const LoginScreen(),
+        transitionsBuilder: (_, a1, a2, child) => FadeTransition(
+          opacity: a1,
+          child: child,
         ),
-      );
-    }
+        transitionDuration: const Duration(milliseconds: 800),
+      ),
+    );
   }
 
   @override
@@ -569,7 +564,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 ),
               ),
 
-              // 4. Top Left Back Button to return to Previous Slide or Portal
+              // 4. Top Left Back Button & Top Right Skip Button
               Positioned(
                 top: MediaQuery.of(context).padding.top + 6,
                 left: 14,
@@ -594,17 +589,36 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           );
                         }
                       } else {
-                        if (Navigator.of(context).canPop()) {
-                          Navigator.of(context).pop();
-                        } else {
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                                builder: (_) => const LandingSelectionScreen()),
-                          );
-                        }
+                        _finishOnboarding();
                       }
                     },
                     tooltip: 'Back',
+                  ),
+                ),
+              ),
+
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 6,
+                right: 14,
+                child: GestureDetector(
+                  onTap: _finishOnboarding,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Text(
+                      'Skip',
+                      style: GoogleFonts.nunito(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
                 ),
               ),

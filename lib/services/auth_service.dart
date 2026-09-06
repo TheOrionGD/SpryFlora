@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
+import 'user_service.dart';
+import 'plant_repository.dart';
 
 class AuthUser {
   final String id;
@@ -78,6 +80,8 @@ class AuthService extends ChangeNotifier {
         if (!user.isSessionExpired) {
           _currentUser = user;
           _authToken = map['token'] as String?;
+          await UserService().setCurrentUser(user.id);
+          await PlantRepository().setCurrentUser(user.id);
           notifyListeners();
           return;
         } else {
@@ -89,7 +93,6 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Registers a new user account with backend API or local hashed credentials
   /// Registers a new user account with backend API or local hashed credentials
   Future<AuthUser> register({
     required String email,
@@ -134,6 +137,9 @@ class AuthService extends ChangeNotifier {
 
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(_sessionKey, jsonEncode({'user': authUser.toJson(), 'token': token}));
+
+          await UserService().setCurrentUser(authUser.id);
+          await PlantRepository().setCurrentUser(authUser.id);
 
           notifyListeners();
           return authUser;
@@ -216,6 +222,9 @@ class AuthService extends ChangeNotifier {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(_sessionKey, jsonEncode({'user': authUser.toJson(), 'token': token}));
 
+          await UserService().setCurrentUser(authUser.id);
+          await PlantRepository().setCurrentUser(authUser.id);
+
           notifyListeners();
           return authUser;
         } else {
@@ -272,6 +281,9 @@ class AuthService extends ChangeNotifier {
       'token': token,
     };
     await prefs.setString(_sessionKey, jsonEncode(sessionData));
+
+    await UserService().setCurrentUser(authUser.id);
+    await PlantRepository().setCurrentUser(authUser.id);
 
     notifyListeners();
     return authUser;
@@ -358,6 +370,8 @@ class AuthService extends ChangeNotifier {
   Future<void> logout() async {
     _currentUser = null;
     _authToken = null;
+    UserService().clearInMemoryData();
+    PlantRepository().clearInMemoryData();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_sessionKey);
     notifyListeners();

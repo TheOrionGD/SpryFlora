@@ -8,6 +8,11 @@ import '../theme/skeuo_theme.dart';
 import '../widgets/speech_visualizer.dart';
 import '../widgets/app_background.dart';
 import '../widgets/leaves_particle_overlay.dart';
+import '../widgets/bottom_nav_bar.dart';
+import 'home_screen.dart';
+import 'my_plants_screen.dart';
+import 'garden_screen.dart';
+import 'profile_settings_screen.dart';
 
 /// Screen 15: AI Eco Buddy Chat (from 255.jpg)
 /// - Top Bar: Back button + "AI Eco Buddy"
@@ -375,6 +380,35 @@ class _AIEcoBuddyScreenState extends State<AIEcoBuddyScreen> {
             ],
           ),
         ),
+      ),
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: 2,
+        onTap: (index) {
+          if (index == 2) return;
+          switch (index) {
+            case 0:
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const HomeScreen()),
+                (route) => false,
+              );
+              break;
+            case 1:
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const MyPlantsScreen()),
+              );
+              break;
+            case 3:
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const GardenScreen()),
+              );
+              break;
+            case 4:
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const ProfileSettingsScreen()),
+              );
+              break;
+          }
+        },
       ),
     );
   }

@@ -151,4 +151,70 @@ class ExcelService {
       return null;
     }
   }
+
+  /// Smart botanical cross-matching algorithm against local dataset
+  PlantSpecies matchSpeciesFromAIPrediction(String rawAiLabel, {String? detectedObjectType}) {
+    final query = ('$rawAiLabel ${detectedObjectType ?? ''}').toLowerCase().trim();
+
+    // 1. Direct exact match check
+    final exact = getSpeciesByName(rawAiLabel);
+    if (exact != null) return exact;
+
+    // 2. Tree & Forest keyword heuristic cross-checks
+    if (query.contains('tree') ||
+        query.contains('forest') ||
+        query.contains('wood') ||
+        query.contains('conifer') ||
+        query.contains('evergreen') ||
+        query.contains('branch') ||
+        query.contains('canopy') ||
+        query.contains('pine') ||
+        query.contains('neem') ||
+        query.contains('banyan') ||
+        query.contains('ficus') ||
+        query.contains('oak') ||
+        query.contains('woodland')) {
+      if (query.contains('banyan')) return getSpeciesByName('Banyan Tree') ?? _cachedSpecies.first;
+      if (query.contains('pine')) return getSpeciesByName('Pine Tree') ?? _cachedSpecies.first;
+      if (query.contains('ficus')) return getSpeciesByName('Ficus Tree') ?? _cachedSpecies.first;
+      if (query.contains('mango')) return getSpeciesByName('Mango Tree') ?? _cachedSpecies.first;
+      if (query.contains('gulmohar')) return getSpeciesByName('Gulmohar Tree') ?? _cachedSpecies.first;
+      return getSpeciesByName('Neem Tree') ?? (_cachedSpecies.isNotEmpty ? _cachedSpecies.first : PlantSpecies(commonName: 'Neem Tree', lifespanDays: 3650, wateringIntervalDays: 4));
+    }
+
+    // 3. Specific species keyword matching
+    if (query.contains('tulsi') || query.contains('basil')) {
+      return getSpeciesByName('Tulsi') ?? _cachedSpecies.first;
+    }
+    if (query.contains('money') || query.contains('pothos') || query.contains('vine')) {
+      return getSpeciesByName('Money Plant') ?? _cachedSpecies.first;
+    }
+    if (query.contains('aloe') || query.contains('succulent')) {
+      return getSpeciesByName('Aloe Vera') ?? _cachedSpecies.first;
+    }
+    if (query.contains('snake') || query.contains('sansevieria')) {
+      return getSpeciesByName('Snake Plant') ?? _cachedSpecies.first;
+    }
+    if (query.contains('peace') || query.contains('lily')) {
+      return getSpeciesByName('Peace Lily') ?? _cachedSpecies.first;
+    }
+    if (query.contains('spider')) {
+      return getSpeciesByName('Spider Plant') ?? _cachedSpecies.first;
+    }
+    if (query.contains('jade')) {
+      return getSpeciesByName('Jade Plant') ?? _cachedSpecies.first;
+    }
+    if (query.contains('rose')) {
+      return getSpeciesByName('Rose') ?? _cachedSpecies.first;
+    }
+
+    // 4. Substring matching against cached species
+    for (final s in _cachedSpecies) {
+      if (query.contains(s.name.toLowerCase()) || s.name.toLowerCase().contains(query)) {
+        return s;
+      }
+    }
+
+    return _cachedSpecies.isNotEmpty ? _cachedSpecies.first : PlantSpecies(commonName: rawAiLabel, lifespanDays: 180, wateringIntervalDays: 3);
+  }
 }

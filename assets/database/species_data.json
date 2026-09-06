@@ -1,10 +1,58 @@
 [
   {
+    "name": "Neem Tree",
+    "lifespanDays": 3650,
+    "wateringIntervalDays": 4,
+    "sunlight": "Full Direct Sun",
+    "description": "Resilient tropical evergreen tree with medicinal, air-purifying, and shady green canopy foliage.",
+    "idealTemp": "20°C - 38°C"
+  },
+  {
+    "name": "Banyan Tree",
+    "lifespanDays": 3650,
+    "wateringIntervalDays": 5,
+    "sunlight": "Full Direct Sun",
+    "description": "Majestic forest tree with spreading branches, aerial roots, and thick glossy green leaves.",
+    "idealTemp": "20°C - 35°C"
+  },
+  {
+    "name": "Pine Tree",
+    "lifespanDays": 3650,
+    "wateringIntervalDays": 6,
+    "sunlight": "Full Direct Sun",
+    "description": "Tall evergreen forest tree with slender needle leaves and natural pine scent.",
+    "idealTemp": "10°C - 25°C"
+  },
+  {
+    "name": "Ficus Tree",
+    "lifespanDays": 1000,
+    "wateringIntervalDays": 4,
+    "sunlight": "Bright Indirect",
+    "description": "Popular ornamental indoor/outdoor tree with dense emerald leaves.",
+    "idealTemp": "16°C - 28°C"
+  },
+  {
+    "name": "Mango Tree",
+    "lifespanDays": 3650,
+    "wateringIntervalDays": 4,
+    "sunlight": "Full Direct Sun",
+    "description": "Tropical fruit-bearing shade tree with long lanceolate leaves.",
+    "idealTemp": "22°C - 38°C"
+  },
+  {
+    "name": "Gulmohar Tree",
+    "lifespanDays": 2000,
+    "wateringIntervalDays": 5,
+    "sunlight": "Full Sun",
+    "description": "Vibrant flowering canopy tree with feathery fern-like leaves and orange-red blooms.",
+    "idealTemp": "20°C - 35°C"
+  },
+  {
     "name": "Rose",
     "lifespanDays": 150,
     "wateringIntervalDays": 3,
     "sunlight": "Full Sun",
-    "description": "Fragrant flowering perennial shrub with rich petals.",
+    "description": "Fragrant flowering perennial shrub with rich colorful petals.",
     "idealTemp": "18°C - 28°C"
   },
   {

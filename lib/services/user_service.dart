@@ -2,17 +2,20 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
+import 'auth_service.dart';
 import 'plant_repository.dart';
 import 'sync_service.dart';
 
 class UserService {
   static final UserService _instance = UserService._internal();
 
+  String? _currentUserId;
   UserProfile? _currentUser;
   VirtualPlant? _virtualPlant;
   bool _isInitialized = false;
-  static const String _storageKey = 'spryflora_user';
-  static const String _onboardingKey = 'spryflora_onboarding_completed';
+
+  static const String _legacyStorageKey = 'spryflora_user';
+  static const String _legacyOnboardingKey = 'spryflora_onboarding_completed';
 
   UserService._internal();
 
@@ -20,8 +23,13 @@ class UserService {
     return _instance;
   }
 
+  String get activeUserId => AuthService().currentUser?.id ?? _currentUserId ?? 'usr_default';
+  String get _storageKey => 'spryflora_user_$activeUserId';
+  String get _onboardingKey => 'spryflora_onboarding_completed_$activeUserId';
+
   // In-memory cache getters
   UserProfile? get currentUser => _currentUser;
+  
   // Virtual plant derived dynamically from authoritative PlantRepository
   VirtualPlant? get virtualPlant {
     final repositoryPlants = PlantRepository().plants;
@@ -42,11 +50,26 @@ class UserService {
   }
   bool get isInitialized => _isInitialized;
 
+  /// Sets active user context and reloads user profile
+  Future<void> setCurrentUser(String? userId) async {
+    _currentUserId = userId;
+    await loadUserData();
+  }
+
+  /// Clears in-memory cache upon user logout
+  void clearInMemoryData() {
+    _currentUser = null;
+    _virtualPlant = null;
+    _isInitialized = false;
+  }
+
   /// Check if user has completed onboarding
   Future<bool> isOnboardingCompleted() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getBool(_onboardingKey) ?? false;
+      final userScoped = prefs.getBool(_onboardingKey);
+      if (userScoped != null) return userScoped;
+      return prefs.getBool(_legacyOnboardingKey) ?? false;
     } catch (_) {
       return false;
     }
@@ -64,9 +87,12 @@ class UserService {
   Future<String?> _loadFromStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final stored = prefs.getString(_storageKey);
+      String? stored = prefs.getString(_storageKey);
+      if ((stored == null || stored.isEmpty) && activeUserId == 'usr_default') {
+        stored = prefs.getString(_legacyStorageKey);
+      }
       if (stored != null && stored.isNotEmpty) {
-        debugPrint('✓ Loaded from shared preferences');
+        debugPrint('✓ Loaded user profile from shared preferences ($activeUserId)');
         return stored;
       }
     } catch (e) {
@@ -80,7 +106,7 @@ class UserService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_storageKey, jsonData);
-      debugPrint('✓ Saved to shared preferences');
+      debugPrint('✓ Saved user profile to shared preferences ($activeUserId)');
     } catch (e) {
       debugPrint('Error in _saveToStorage: $e');
     }
@@ -103,11 +129,13 @@ class UserService {
         _isInitialized = true;
         debugPrint('✓ User data successfully loaded and initialized');
       } else {
-        debugPrint('ℹ No existing user data found - first time user');
+        debugPrint('ℹ No existing user data found for $activeUserId');
+        _currentUser = null;
         _isInitialized = false;
       }
     } catch (e) {
       debugPrint('✗ Error loading user data: $e');
+      _currentUser = null;
       _isInitialized = false;
     }
   }
@@ -237,13 +265,14 @@ class UserService {
     }
   }
 
-  // Clear all user data
+  // Clear current active user data
   Future<void> clearUserData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_storageKey);
       await prefs.remove(_onboardingKey);
-      debugPrint('✓ Cleared shared preferences');
+      await PlantRepository().clearCurrentUserData();
+      debugPrint('✓ Cleared user preferences for $activeUserId');
 
       _currentUser = null;
       _virtualPlant = null;

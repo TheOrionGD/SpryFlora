@@ -14,6 +14,8 @@ import '../widgets/app_photo_view.dart';
 import '../widgets/fun_bouncy_button.dart';
 import '../widgets/skeuo_live_camera_screen.dart';
 import '../widgets/app_background.dart';
+import 'plant_analysis_loader_screen.dart';
+
 
 /// Refactored Screen 09: Camera-First & AI Species Identification Add Plant Flow
 /// 1. Direct Camera Capture prompt upon opening
@@ -33,16 +35,13 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
   DateTime _plantingDate = DateTime.now();
   PlantSpecies? _selectedSpecies;
   String _plantEnvironment = 'Pot'; // 'Pot' or 'Outdoor'
-  bool _isLoadingSpecies = true;
   bool _isAnalyzingPhoto = false;
   bool _isSaving = false;
 
   final ExcelService _excelService = ExcelService();
   final PlantRepository _plantRepository = PlantRepository();
   final ImageService _imageService = ImageService();
-  final AIService _aiService = AIService();
 
-  List<PlantSpecies> _speciesList = [];
   String? _initialPhotoPath;
 
   // AI Identification Results
@@ -68,18 +67,12 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
   Future<void> _loadSpeciesAndOpenCamera() async {
     try {
       final list = await _excelService.loadSpeciesDatabase();
-      if (mounted) {
+      if (mounted && list.isNotEmpty) {
         setState(() {
-          _speciesList = list;
-          if (list.isNotEmpty) {
-            _selectedSpecies = list.first;
-          }
-          _isLoadingSpecies = false;
+          _selectedSpecies = list.first;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingSpecies = false);
-    }
+    } catch (_) {}
 
     // Automatically trigger Camera Capture on opening if no photo present yet
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -107,26 +100,15 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
   Future<void> _processCapturedPhoto(String photoPath) async {
     setState(() {
       _initialPhotoPath = photoPath;
-      _isAnalyzingPhoto = true;
     });
 
-    // Create a temporary dummy model for analysis
-    final tempPlant = PlantModel(
-      id: 'temp',
-      plantName: 'New Plant',
-      speciesName: _selectedSpecies?.name ?? 'Tulsi',
-      plantingDate: DateTime.now(),
-      lifespanDays: 120,
-      wateringIntervalDays: 3,
+    final result = await Navigator.of(context).push<PlantAIAnalysisResult>(
+      MaterialPageRoute(
+        builder: (_) => PlantAnalysisLoaderScreen(photoPath: photoPath),
+      ),
     );
 
-    // Analyze captured photo using Groq Vision, Hugging Face, and Gemini API
-    final result = await _aiService.analyzePlantPhoto(
-      plant: tempPlant,
-      photoPath: photoPath,
-    );
-
-    if (!mounted) return;
+    if (result == null || !mounted) return;
 
     setState(() {
       _isAnalyzingPhoto = false;
@@ -138,7 +120,6 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
       _isNewDiscovery = result.isNewDiscovery;
 
       if (result.isPlantDetected) {
-        // Find or assign matching species in database
         if (result.matchedSpecies != null) {
           _selectedSpecies = result.matchedSpecies;
         } else {
@@ -152,7 +133,6 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
           );
         }
 
-        // Auto-fill plant name if controller is empty
         if (_nameController.text.trim().isEmpty) {
           _nameController.text = result.identifiedSpecies;
         }
@@ -314,7 +294,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                                 SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    'Groq & Hugging Face AI analyzing plant species...',
+                                    'SpryFlora analyzing your plant species...',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold,
@@ -332,12 +312,18 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
 
                         // ── Step 3: Plant Details Confirmation Form ───────────
                         if (_isPlantDetected) ...[
-                          // Plant Name Input
+                          // Identified Data-Driven Species Card
+                          _buildFieldLabel('Species & Classification (Data-Driven)'),
+                          const SizedBox(height: 6),
+                          _buildDataDrivenSpeciesCard(),
+                          const SizedBox(height: 16),
+
+                          // Plant Nickname Input
                           _buildFieldLabel('Plant Nickname'),
                           const SizedBox(height: 6),
                           _buildTextInput(
                             controller: _nameController,
-                            hint: 'Enter plant name (e.g. Tulsi, Rose)',
+                            hint: 'Enter plant nickname (e.g. My Neem Tree)',
                             validator: (val) {
                               if (val == null || val.trim().isEmpty) {
                                 return 'Please enter a plant name';
@@ -347,10 +333,8 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                           ),
                           const SizedBox(height: 16),
 
-                          // Identified Plant Species Selector
-                          _buildFieldLabel('Species & Classification'),
-                          const SizedBox(height: 6),
-                          _buildSpeciesDropdown(),
+                          // Kid Care Guide Steps
+                          _buildKidCareStepsSection(),
                           const SizedBox(height: 16),
 
                           // Planting Date Selector
@@ -670,7 +654,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
-              _isNewDiscovery ? 'NEW SPECIES' : 'GROQ & HF VERIFIED',
+              _isNewDiscovery ? 'NEW SPECIES' : 'SPRYFLORA VERIFIED',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 10,
@@ -734,54 +718,227 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
     );
   }
 
-  Widget _buildSpeciesDropdown() {
-    if (_isLoadingSpecies) {
-      return const Center(child: CircularProgressIndicator());
-    }
+  Widget _buildDataDrivenSpeciesCard() {
+    final speciesName = _selectedSpecies?.name ??
+        (_identifiedSpeciesName.isNotEmpty
+            ? _identifiedSpeciesName
+            : 'Neem Tree');
+    final description = _selectedSpecies?.description ??
+        'Identified botanical species from SpryFlora database.';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE8F5E9), width: 1.5),
+        color: const Color(0xFFF1F8EE),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFA5D6A7), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2E7D32).withValues(alpha: 0.04),
-            blurRadius: 8,
+            color: const Color(0xFF2E7D32).withValues(alpha: 0.05),
+            blurRadius: 10,
             offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<PlantSpecies>(
-          value: _selectedSpecies,
-          isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded,
-              color: SkeuoTheme.primaryGreen),
-          style: GoogleFonts.nunito(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: SkeuoTheme.textPrimary,
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFC8E6C9),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.verified_rounded,
+                color: Color(0xFF2E7D32), size: 26),
           ),
-          items: _speciesList.map((species) {
-            return DropdownMenuItem<PlantSpecies>(
-              value: species,
-              child: Text(species.name),
-            );
-          }).toList(),
-          onChanged: (val) {
-            if (val != null) {
-              setState(() {
-                _selectedSpecies = val;
-                if (_nameController.text.isEmpty) {
-                  _nameController.text = val.name;
-                }
-              });
-            }
-          },
-        ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        speciesName,
+                        style: GoogleFonts.nunito(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          color: SkeuoTheme.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2E7D32),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'DATA-DRIVEN',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: GoogleFonts.nunito(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: SkeuoTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildKidCareStepsSection() {
+    final species = _selectedSpecies;
+    final interval = species?.wateringIntervalDays ?? 3;
+    final sunlight = species?.sunlight ?? 'Bright Light';
+    final targetHours = species?.targetSunlightHours ?? 4;
+    final temp = species?.idealTemp ?? '18°C - 30°C';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE5EBD8), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('🌟', style: TextStyle(fontSize: 18)),
+              const SizedBox(width: 6),
+              Text(
+                'Kid Care Guide — 5 Easy Steps',
+                style: GoogleFonts.nunito(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: SkeuoTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildCareStepRow(
+            stepNumber: '1',
+            icon: Icons.water_drop_rounded,
+            iconColor: const Color(0xFF03A9F4),
+            title: 'Watering Goal',
+            subtitle: 'Water every $interval days in the morning',
+          ),
+          const SizedBox(height: 10),
+          _buildCareStepRow(
+            stepNumber: '2',
+            icon: Icons.wb_sunny_rounded,
+            iconColor: const Color(0xFFFFA000),
+            title: 'Sunlight Target',
+            subtitle: '$sunlight ($targetHours hours of light daily)',
+          ),
+          const SizedBox(height: 10),
+          _buildCareStepRow(
+            stepNumber: '3',
+            icon: Icons.thermostat_rounded,
+            iconColor: const Color(0xFFE74C3C),
+            title: 'Ideal Temperature',
+            subtitle: 'Thrives best in $temp',
+          ),
+          const SizedBox(height: 10),
+          _buildCareStepRow(
+            stepNumber: '4',
+            icon: Icons.spa_rounded,
+            iconColor: const Color(0xFF4CAF50),
+            title: 'Growth Stage',
+            subtitle: 'Starting at Seedling / Sprout stage',
+          ),
+          const SizedBox(height: 10),
+          _buildCareStepRow(
+            stepNumber: '5',
+            icon: Icons.stars_rounded,
+            iconColor: const Color(0xFF9C27B0),
+            title: 'Daily Check-in Mission',
+            subtitle: 'Check in daily to water, log sunlight & earn Eco XP!',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCareStepRow({
+    required String stepNumber,
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              stepNumber,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                color: iconColor,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Icon(icon, color: iconColor, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.nunito(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: SkeuoTheme.textPrimary,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: GoogleFonts.nunito(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: SkeuoTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

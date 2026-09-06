@@ -8,5 +8,7 @@
     android:initialLayout="@layout/flora_widget_layout"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
+    android:widgetFeatures="reconfigurable"
+    android:configure="com.theoriongd.spryflora_app.WidgetConfigurationActivity"
     android:description="@string/widget_description">
 </appwidget-provider>

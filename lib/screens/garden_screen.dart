@@ -1,25 +1,26 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/plant_model.dart';
 import '../services/plant_repository.dart';
 import '../services/user_service.dart';
+import '../theme/skeuo_theme.dart';
+import '../widgets/app_background.dart';
 import '../widgets/bottom_nav_bar.dart';
+import '../widgets/fun_bouncy_button.dart';
+import '../widgets/leaves_particle_overlay.dart';
 import '../widgets/plant_growth_animation.dart';
 import 'add_plant_screen.dart';
 import 'home_screen.dart';
 import 'my_plants_screen.dart';
 import 'plant_details_screen.dart';
 import 'profile_settings_screen.dart';
+import 'ai_eco_buddy_screen.dart';
+import 'notification_center_screen.dart';
 
-/// Complete Redesign of My Garden matching the reference image:
-/// - Top Bar: Avatar + "My Garden" + Notification Bell + Overhanging leafy branches
-/// - Stats Row: "My Plants" count card + "Garden Health" average percentage card
-/// - Large 3D Floating Isometric Island with rolling hills backdrop
-/// - Rich plants, trees, flowers & sprouts growing directly in the island plots
-/// - Mission Card: "Today's Mission" (Watering goal + progress bar) & "Next Reward" (Mystery Seed)
-/// - Pinned "+ Add New Plant" Button
+/// Redesigned Kid-Friendly Magical Garden Screen
+/// Vibrant, skeuomorphic, highly interactive garden world with Eco-Buddy mascot guidance,
+/// individual botanical plot cards, quick water actions, and daily quest progression.
 class GardenScreen extends StatefulWidget {
   const GardenScreen({super.key});
 
@@ -59,9 +60,51 @@ class _GardenScreenState extends State<GardenScreen>
     super.dispose();
   }
 
+  Future<void> _quickWaterPlant(PlantModel plant) async {
+    final now = DateTime.now();
+    final updated = plant.copyWith(
+      health: (plant.health + 15).clamp(0, 100),
+      hydrationScore: (plant.hydrationScore + 20).clamp(0, 100),
+      lastWateredDate: now,
+      nextWateringDate: now.add(Duration(days: plant.wateringIntervalDays)),
+    );
+    await _plantRepo.updatePlant(updated);
+    await _userService.addXp(25);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('💧 Watered ${plant.plantName}! +25 XP 🌱'),
+          backgroundColor: SkeuoTheme.primaryGreen,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _waterAllDuePlants() async {
+    final plants = _plantRepo.plants;
+    final duePlants = plants.where((p) => p.isWateringDue).toList();
+    if (duePlants.isEmpty) return;
+
+    for (final plant in duePlants) {
+      await _quickWaterPlant(plant);
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🎉 All ${duePlants.length} due plants watered! Garden Thriving! 🌟'),
+          backgroundColor: const Color(0xFF2E7D32),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Safety check for hot reloads
+    // Safety re-initialization check for hot reloads
     try {
       _windCtrl.isAnimating;
     } catch (_) {
@@ -74,126 +117,113 @@ class _GardenScreenState extends State<GardenScreen>
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFD7F0E5),
-      body: AnimatedBuilder(
-        animation: Listenable.merge([_plantRepo, _ambientCtrl, _windCtrl]),
-        builder: (context, _) {
-          final plants = _plantRepo.plants;
+      backgroundColor: Colors.transparent,
+      body: LeavesParticleOverlay(
+        maxThroughput: true,
+        child: AppBackground(
+          child: SafeArea(
+            child: AnimatedBuilder(
+              animation: Listenable.merge([_plantRepo, _ambientCtrl, _windCtrl]),
+              builder: (context, _) {
+                final plants = _plantRepo.plants;
 
-          // Watered Today calculation
-          final today = DateTime.now();
-          final int wateredTodayCount = plants.where((p) {
-            final lw = p.lastWateredDate;
-            return lw.year == today.year &&
-                lw.month == today.month &&
-                lw.day == today.day;
-          }).length;
+                // Watered Today calculation
+                final today = DateTime.now();
+                final int wateredTodayCount = plants.where((p) {
+                  final lw = p.lastWateredDate;
+                  return lw.year == today.year &&
+                      lw.month == today.month &&
+                      lw.day == today.day;
+                }).length;
 
-          // Goal based strictly on total plant count
-          final int missionGoal = plants.isEmpty ? 1 : plants.length;
-          final int missionProgress = math.min(wateredTodayCount, missionGoal);
+                final int dueCount = plants.where((p) => p.isWateringDue).length;
+                final int totalPlants = plants.length;
+                final int gardenHealth = plants.isEmpty
+                    ? 100
+                    : (plants.fold<int>(0, (sum, p) => sum + p.health) / totalPlants).round();
+                final int streakDays = _userService.currentUser?.careStreakDays ?? 1;
 
-          // Garden Health calculated directly from the hydration rate
-          final int gardenHealth = plants.isEmpty
-              ? 100
-              : ((wateredTodayCount / plants.length) * 100).round();
-
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              // 1. Scenic Sunny Meadow & Distant Hills Landscape
-              const Positioned.fill(
-                child: _GardenScenicBackdrop(),
-              ),
-
-              // 2. Overhanging Leaf Vines in top corners
-              Positioned(
-                top: 0,
-                left: 0,
-                child: _buildCornerLeaves(isLeft: true),
-              ),
-              Positioned(
-                top: 0,
-                right: 0,
-                child: _buildCornerLeaves(isLeft: false),
-              ),
-
-              // 3. Scrollable Page Content
-              SafeArea(
-                child: Column(
+                return Column(
                   children: [
-                    const SizedBox(height: 12),
+                    // Top App Header: Wooden Title Sign & Bell
+                    _buildGardenHeader(),
 
-                    // Title & Subtitle
-                    _buildGardenTitle(),
-
-                    const SizedBox(height: 10),
-
-                    // Quick Stats Row: My Plants (count) & Garden Health (%)
-                    _buildStatsRow(
-                        plantCount: plants.length, avgHealth: gardenHealth),
-
-                    const SizedBox(height: 6),
-
-                    // Center: Large 3D Isometric Island
                     Expanded(
-                      child: Center(
-                        child: _LargeIsometricIsland(
-                          plants: plants,
-                          windValue: _windCtrl.value,
-                          ambientValue: _ambientCtrl.value,
-                          onPlantTap: (plant) {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    PlantDetailsScreen(plantId: plant.id),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Eco-Buddy Mascot Advice Banner
+                            _buildMascotBanner(dueCount: dueCount, totalPlants: totalPlants),
+                            const SizedBox(height: 16),
+
+                            // Quick Stats Row: My Plants | Garden Health | Care Streak
+                            _buildStatsRow(
+                              plantCount: totalPlants,
+                              avgHealth: gardenHealth,
+                              streakDays: streakDays,
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Magical Garden World Section Header
+                            _buildSectionHeader(
+                              title: '🌿 My Botanical Plots',
+                              subtitle: totalPlants > 0
+                                  ? '$totalPlants active plant${totalPlants > 1 ? 's' : ''} in your sanctuary'
+                                  : 'Start your garden adventure today!',
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Main Interactive Garden Plots Grid
+                            if (totalPlants == 0)
+                              _buildEmptyGardenHeroCard()
+                            else
+                              _buildGardenPlotsGrid(plants),
+
+                            const SizedBox(height: 24),
+
+                            // Today's Mission & Batch Water Quest Card
+                            _buildDailyQuestCard(
+                              wateredCount: wateredTodayCount,
+                              totalPlants: totalPlants,
+                              dueCount: dueCount,
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Pinned "+ Add New Plant" Skeuomorphic Action Button
+                            SizedBox(
+                              width: double.infinity,
+                              child: FunBouncyButton(
+                                text: 'Add New Plant',
+                                icon: Icons.add_rounded,
+                                onPressed: () async {
+                                  final added = await Navigator.of(context).push<bool>(
+                                    MaterialPageRoute(builder: (_) => const AddPlantScreen()),
+                                  );
+                                  if (added == true) _plantRepo.loadLocalData();
+                                },
+                                color: const Color(0xFF2E7D32),
+                                height: 52,
                               ),
-                            );
-                          },
-                          onAddSeedTap: () async {
-                            final added =
-                                await Navigator.of(context).push<bool>(
-                              MaterialPageRoute(
-                                  builder: (_) => const AddPlantScreen()),
-                            );
-                            if (added == true) _plantRepo.loadLocalData();
-                          },
+                            ),
+                            const SizedBox(height: 16),
+                          ],
                         ),
                       ),
                     ),
-
-                    // Bottom Section: Mission Card & "+ Add New Plant" Action Button
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 18),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Today's Mission Card (Next Reward removed)
-                          _buildMissionRewardCard(
-                            progress: missionProgress,
-                            goal: missionGoal,
-                          ),
-
-                          const SizedBox(height: 10),
-
-                          // Pinned "+ Add New Plant" Skeuomorphic Button
-                          _buildAddPlantButton(),
-
-                          const SizedBox(height: 8),
-                        ],
-                      ),
-                    ),
                   ],
-                ),
-              ),
-            ],
-          );
-        },
+                );
+              },
+            ),
+          ),
+        ),
       ),
       bottomNavigationBar: BottomNavBar(
-        currentIndex: 2,
+        currentIndex: 3,
         onTap: (index) {
-          if (index == 2) return;
+          if (index == 3) return;
           switch (index) {
             case 0:
               Navigator.of(context).pushAndRemoveUntil(
@@ -206,10 +236,14 @@ class _GardenScreenState extends State<GardenScreen>
                 MaterialPageRoute(builder: (_) => const MyPlantsScreen()),
               );
               break;
-            case 3:
+            case 2:
               Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                    builder: (_) => const ProfileSettingsScreen()),
+                MaterialPageRoute(builder: (_) => const AIEcoBuddyScreen()),
+              );
+              break;
+            case 4:
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const ProfileSettingsScreen()),
               );
               break;
           }
@@ -218,164 +252,75 @@ class _GardenScreenState extends State<GardenScreen>
     );
   }
 
-  /// Reference Header Title
-  Widget _buildGardenTitle() {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('🍃', style: TextStyle(fontSize: 24)),
-            const SizedBox(width: 4),
-            Text(
-              'My Garden',
-              style: GoogleFonts.fredoka(
-                fontSize: 32,
-                fontWeight: FontWeight.w900,
-                color: const Color(0xFF1B5E20),
-                letterSpacing: -0.5,
-                shadows: [
-                  Shadow(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    offset: const Offset(0, 1),
-                    blurRadius: 2,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 2),
-        Text(
-          'Grow plants, collect friends &\nmake your garden beautiful',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.nunito(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF2E7D32),
-            height: 1.2,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Reference Stats Row: My Plants card & Garden Health card
-  Widget _buildStatsRow({required int plantCount, required int avgHealth}) {
+  /// Wooden Skinned Top Header
+  Widget _buildGardenHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 22),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
       child: Row(
         children: [
-          // Left: My Plants
           Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFA5D6A7), width: 1.5),
                   ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Center(
-                      child: Text('🌱', style: TextStyle(fontSize: 20)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'My Plants',
-                        style: GoogleFonts.nunito(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF558B2F),
-                        ),
+                  child: const Text('🌻', style: TextStyle(fontSize: 22)),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'My Garden',
+                      style: GoogleFonts.fredoka(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF1B5E20),
+                        letterSpacing: -0.3,
                       ),
-                      Text(
-                        '$plantCount',
-                        style: GoogleFonts.fredoka(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF1B5E20),
-                        ),
+                    ),
+                    Text(
+                      'Kid-Friendly Botanical Sanctuary',
+                      style: GoogleFonts.nunito(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF388E3C),
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-
-          const SizedBox(width: 12),
-
-          // Right: Garden Health
-          Expanded(
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationCenterScreen()),
+              );
+            },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white, width: 1.5),
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFC8E6C9), width: 1.5),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
-                    blurRadius: 10,
+                    color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
+                    blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
                 ],
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Center(
-                      child: Text('💚', style: TextStyle(fontSize: 20)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Garden Health',
-                        style: GoogleFonts.nunito(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF558B2F),
-                        ),
-                      ),
-                      Text(
-                        '$avgHealth%',
-                        style: GoogleFonts.fredoka(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF2E7D32),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              child: const Icon(
+                Icons.notifications_active_rounded,
+                color: Color(0xFF2E7D32),
+                size: 22,
               ),
             ),
           ),
@@ -384,22 +329,635 @@ class _GardenScreenState extends State<GardenScreen>
     );
   }
 
-  /// Today's Mission Card (Focused purely on daily watering goal)
-  Widget _buildMissionRewardCard({required int progress, required int goal}) {
-    final double pct = goal > 0 ? (progress / goal).clamp(0.0, 1.0) : 1.0;
-    final bool isCompleted = progress >= goal;
+  /// Mascot Eco-Buddy Guidance Banner
+  Widget _buildMascotBanner({required int dueCount, required int totalPlants}) {
+    String message;
+    if (totalPlants == 0) {
+      message = "Hi Little Planter! 🌿 Tap 'Add New Plant' below to plant your very first seed!";
+    } else if (dueCount > 0) {
+      message = "Water Alert! 💧 $dueCount of your plant${dueCount > 1 ? 's need' : ' needs'} water today. Give them love!";
+    } else {
+      message = "Awesome job! 🌟 Your garden is thriving & fully hydrated today!";
+    }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white, width: 2),
+        border: Border.all(color: const Color(0xFFA5D6A7), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1B5E20).withValues(alpha: 0.14),
+            color: const Color(0xFF2E7D32).withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 52,
+            height: 52,
+            child: Image.asset(
+              'assets/sprites/mascot_pot_happy.png',
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.eco_rounded,
+                size: 40,
+                color: Color(0xFF4CAF50),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'SpryBuddy Helper',
+                      style: GoogleFonts.fredoka(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF1B5E20),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'LIVE TIP',
+                        style: GoogleFonts.nunito(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFF2E7D32),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  message,
+                  style: GoogleFonts.nunito(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: SkeuoTheme.textSecondary,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Skeuomorphic Stats Row: My Plants | Garden Health | Care Streak
+  Widget _buildStatsRow({
+    required int plantCount,
+    required int avgHealth,
+    required int streakDays,
+  }) {
+    return Row(
+      children: [
+        // My Plants
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFC8E6C9), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF2E7D32).withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('🌱', style: TextStyle(fontSize: 14)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'My Plants',
+                      style: GoogleFonts.nunito(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF388E3C),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$plantCount',
+                  style: GoogleFonts.fredoka(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF1B5E20),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+
+        // Garden Health
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFC8E6C9), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF2E7D32).withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('💚', style: TextStyle(fontSize: 14)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Garden Health',
+                      style: GoogleFonts.nunito(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF388E3C),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$avgHealth%',
+                  style: GoogleFonts.fredoka(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF2E7D32),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+
+        // Care Streak
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFFFCC80), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.orange.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('🔥', style: TextStyle(fontSize: 14)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Care Streak',
+                      style: GoogleFonts.nunito(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFFE65100),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${streakDays}d',
+                  style: GoogleFonts.fredoka(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFFE65100),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Section Header
+  Widget _buildSectionHeader({required String title, required String subtitle}) {
+    return Row(
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.fredoka(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF1B5E20),
+              ),
+            ),
+            Text(
+              subtitle,
+              style: GoogleFonts.nunito(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: SkeuoTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Main Interactive Kid-Friendly Botanical Plot Grid
+  Widget _buildGardenPlotsGrid(List<PlantModel> plants) {
+    return Column(
+      children: [
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+            childAspectRatio: 0.72,
+          ),
+          itemCount: plants.length + 1,
+          itemBuilder: (context, index) {
+            if (index < plants.length) {
+              final plant = plants[index];
+              return _buildPlantPlotCard(plant);
+            } else {
+              return _buildAddPlantPlotCard();
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Individual Botanical Plot Card
+  Widget _buildPlantPlotCard(PlantModel plant) {
+    final bool isDue = plant.isWateringDue;
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => PlantDetailsScreen(plantId: plant.id)),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isDue ? const Color(0xFF81C784) : const Color(0xFFE5EBD8),
+            width: isDue ? 2.0 : 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDue
+                  ? const Color(0xFF4CAF50).withValues(alpha: 0.15)
+                  : Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Stack(
+            children: [
+              // Grassy plot backdrop
+              Positioned.fill(
+                child: Column(
+                  children: [
+                    Expanded(
+                      flex: 6,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 4,
+                      child: Container(
+                        color: const Color(0xFFF1F8EE),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Plant Procedural Growth Animation Artwork
+              Positioned(
+                top: 12,
+                left: 12,
+                right: 12,
+                bottom: 82,
+                child: CustomPaint(
+                  painter: ProceduralPlantGrowthPainter(
+                    progress: plant.growthProgress,
+                    speciesName: plant.speciesName,
+                    showPot: false,
+                  ),
+                ),
+              ),
+
+              // Water Status Badge (Top-Right)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isDue ? const Color(0xFFE53935) : const Color(0xFF03A9F4),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    isDue ? '💧 Water Due' : '✨ Hydrated',
+                    style: GoogleFonts.fredoka(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Bottom Details & Quick Water Bar
+              Positioned(
+                left: 10,
+                right: 10,
+                bottom: 10,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Wooden Plant Stake Plaque
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF795548), Color(0xFF5D4037)],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFFD54F), width: 1),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            plant.plantName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.fredoka(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            '${plant.speciesName} • ${plant.growthStageName}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.nunito(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFFFECB3),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Quick Water Action Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 28,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDue ? const Color(0xFF0288D1) : const Color(0xFF4CAF50),
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 2,
+                        ),
+                        onPressed: () => _quickWaterPlant(plant),
+                        icon: const Icon(Icons.water_drop_rounded, size: 14),
+                        label: Text(
+                          isDue ? 'Water Now 💧' : 'Water 💧',
+                          style: GoogleFonts.fredoka(fontSize: 11, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// "+ Plant a New Seed" Interactive Card
+  Widget _buildAddPlantPlotCard() {
+    return GestureDetector(
+      onTap: () async {
+        final added = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(builder: (_) => const AddPlantScreen()),
+        );
+        if (added == true) _plantRepo.loadLocalData();
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF81C784), width: 2.0),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2E7D32).withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(
+                color: Color(0xFFE8F5E9),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: Text('🌱', style: TextStyle(fontSize: 28)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Plant a New Seed',
+              style: GoogleFonts.fredoka(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF1B5E20),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Tap to add plant',
+              style: GoogleFonts.nunito(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF388E3C),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Empty Garden State Hero Card
+  Widget _buildEmptyGardenHeroCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFFA5D6A7), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2E7D32).withValues(alpha: 0.1),
             blurRadius: 12,
             offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            width: 140,
+            height: 140,
+            child: Image.asset(
+              'assets/sprites/boy_planting.png',
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.nature_people_rounded,
+                size: 80,
+                color: Color(0xFF4CAF50),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Your Garden is Ready! 🌱',
+            style: GoogleFonts.fredoka(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFF1B5E20),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Add your first plant to watch it grow, track hydration, and earn XP milestones!',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: SkeuoTheme.textSecondary,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 16),
+          FunBouncyButton(
+            text: 'Plant Your First Seed 🌿',
+            onPressed: () async {
+              final added = await Navigator.of(context).push<bool>(
+                MaterialPageRoute(builder: (_) => const AddPlantScreen()),
+              );
+              if (added == true) _plantRepo.loadLocalData();
+            },
+            color: const Color(0xFF2E7D32),
+            height: 48,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Today's Mission & Batch Water Quest Card
+  Widget _buildDailyQuestCard({
+    required int wateredCount,
+    required int totalPlants,
+    required int dueCount,
+  }) {
+    final int goal = totalPlants == 0 ? 1 : totalPlants;
+    final double pct = (wateredCount / goal).clamp(0.0, 1.0);
+    final bool isCompleted = wateredCount >= goal && totalPlants > 0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFC8E6C9), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2E7D32).withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -407,57 +965,30 @@ class _GardenScreenState extends State<GardenScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Text('💧', style: TextStyle(fontSize: 14)),
-                  const SizedBox(width: 6),
-                  Text(
-                    "Today's Mission",
-                    style: GoogleFonts.fredoka(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF1B5E20),
-                    ),
-                  ),
-                ],
+              const Text('🎯', style: TextStyle(fontSize: 16)),
+              const SizedBox(width: 8),
+              Text(
+                "Today's Daily Quest",
+                style: GoogleFonts.fredoka(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF1B5E20),
+                ),
               ),
+              const Spacer(),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                 decoration: BoxDecoration(
-                  color: isCompleted
-                      ? const Color(0xFF43A047)
-                      : const Color(0xFFE8F5E9),
+                  color: isCompleted ? const Color(0xFF43A047) : const Color(0xFFE8F5E9),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF81C784), width: 1),
                 ),
                 child: Text(
-                  isCompleted
-                      ? '🎉 Completed ($progress/$goal)'
-                      : '$progress/$goal Watered',
+                  isCompleted ? '🎉 Complete ($wateredCount/$goal)' : '$wateredCount/$goal Watered',
                   style: GoogleFonts.fredoka(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                     color: isCompleted ? Colors.white : const Color(0xFF2E7D32),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  goal == 1
-                      ? 'Water your plant to keep the garden green & healthy!'
-                      : 'Water all $goal plants today to maintain 100% garden health!',
-                  style: GoogleFonts.nunito(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF558B2F),
                   ),
                 ),
               ),
@@ -468,606 +999,36 @@ class _GardenScreenState extends State<GardenScreen>
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
               value: pct,
-              minHeight: 8,
+              minHeight: 10,
               backgroundColor: const Color(0xFFE8F5E9),
               valueColor: AlwaysStoppedAnimation<Color>(
                 isCompleted ? const Color(0xFF43A047) : const Color(0xFF66BB6A),
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  /// Pinned "+ Add New Plant" Button
-  Widget _buildAddPlantButton() {
-    return GestureDetector(
-      onTap: () async {
-        final added = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(builder: (_) => const AddPlantScreen()),
-        );
-        if (added == true) _plantRepo.loadLocalData();
-      },
-      child: Container(
-        width: double.infinity,
-        height: 52,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF66BB6A),
-              Color(0xFF43A047),
-              Color(0xFF2E7D32),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: const Color(0xFFA5D6A7), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF1B5E20).withValues(alpha: 0.35),
-              offset: const Offset(0, 5),
-              blurRadius: 10,
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.add_rounded, color: Colors.white, size: 22),
-            const SizedBox(width: 6),
-            Text(
-              'Add New Plant',
-              style: GoogleFonts.fredoka(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-                letterSpacing: 0.2,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Decorative Leaf Vines in top corners
-  Widget _buildCornerLeaves({required bool isLeft}) {
-    return Transform.scale(
-      scaleX: isLeft ? 1 : -1,
-      child: Container(
-        width: 80,
-        height: 80,
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: const Alignment(-1, -1),
-            radius: 0.9,
-            colors: [
-              const Color(0xFF43A047).withValues(alpha: 0.85),
-              const Color(0xFF2E7D32).withValues(alpha: 0.4),
-              Colors.transparent,
-            ],
-          ),
-        ),
-        child: CustomPaint(
-          painter: _VineLeavesPainter(),
-        ),
-      ),
-    );
-  }
-}
-
-/// Large 3D Isometric Island Component
-class _LargeIsometricIsland extends StatelessWidget {
-  final List<PlantModel> plants;
-  final double windValue;
-  final double ambientValue;
-  final Function(PlantModel) onPlantTap;
-  final VoidCallback onAddSeedTap;
-
-  const _LargeIsometricIsland({
-    required this.plants,
-    required this.windValue,
-    required this.ambientValue,
-    required this.onPlantTap,
-    required this.onAddSeedTap,
-  });
-
-  // 4x4 Grid for rich spacious island matching reference!
-  static const int gridSize = 4;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Enlarge island width to fill 98% of container up to 520px!
-        final double islandWidth = math.min(constraints.maxWidth * 0.98, 520.0);
-        final double islandHeight = islandWidth * 0.85;
-
-        final double tileW = islandWidth / gridSize;
-        final double tileH = tileW * 0.50;
-
-        final double originX = islandWidth / 2;
-        final double originY = islandHeight * 0.20;
-
-        // Build list of tile slots sorted by (col + row) for 2.5D depth ordering
-        final List<_PlotSlot> slots = [];
-        int plantIndex = 0;
-
-        for (int row = 0; row < gridSize; row++) {
-          for (int col = 0; col < gridSize; col++) {
-            final double posX = originX + (col - row) * (tileW / 2);
-            final double posY = originY + (col + row) * (tileH / 2);
-            final int depth = col + row;
-
-            PlantModel? plant;
-            bool isAddSlot = false;
-
-            if (plantIndex < plants.length) {
-              plant = plants[plantIndex];
-              plantIndex++;
-            } else if (plantIndex == plants.length) {
-              isAddSlot = true;
-              plantIndex++;
-            }
-
-            slots.add(_PlotSlot(
-              col: col,
-              row: row,
-              posX: posX,
-              posY: posY,
-              depth: depth,
-              plant: plant,
-              isAddSlot: isAddSlot,
-            ));
-          }
-        }
-
-        // Sort by depth so background tiles render first
-        slots.sort((a, b) => a.depth.compareTo(b.depth));
-
-        return SizedBox(
-          width: islandWidth,
-          height: islandHeight,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // 1. Large 3D Isometric Island Base with Cliff Depth & Shadow
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _LargeIsometricIslandPainter(
-                    gridSize: gridSize,
-                    originX: originX,
-                    originY: originY,
-                    tileW: tileW,
-                    tileH: tileH,
-                  ),
+          if (dueCount > 0) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 38,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0288D1),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
                 ),
-              ),
-
-              // 2. Plants & Interactive Plots placed in 2.5D Isometric Space
-              ...slots.map((slot) {
-                if (slot.plant != null) {
-                  return _buildIsometricPlantItem(
-                    slot: slot,
-                    tileW: tileW,
-                    tileH: tileH,
-                  );
-                } else if (slot.isAddSlot) {
-                  return _buildIsometricAddSeedItem(
-                    slot: slot,
-                    tileW: tileW,
-                    tileH: tileH,
-                  );
-                } else {
-                  return const SizedBox.shrink();
-                }
-              }),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  /// Plant Item on the Isometric Island Plot
-  Widget _buildIsometricPlantItem({
-    required _PlotSlot slot,
-    required double tileW,
-    required double tileH,
-  }) {
-    final plant = slot.plant!;
-    final double itemWidth = tileW * 1.25;
-    final double itemHeight = tileW * 1.45;
-
-    // Organic Wind Sway oscillation
-    final double swayAngle =
-        math.sin((windValue * math.pi * 2) + (slot.depth * 1.2)) * 0.05;
-
-    return Positioned(
-      left: slot.posX - (itemWidth / 2),
-      top: slot.posY - itemHeight + (tileH * 0.72),
-      width: itemWidth,
-      height: itemHeight,
-      child: GestureDetector(
-        onTap: () => onPlantTap(plant),
-        behavior: HitTestBehavior.opaque,
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            // Plant Artwork rooted in grass tile (No Pot!)
-            Positioned(
-              bottom: 14,
-              child: Transform.rotate(
-                angle: swayAngle,
-                alignment: Alignment.bottomCenter,
-                child: SizedBox(
-                  width: itemWidth * 0.95,
-                  height: itemHeight * 0.72,
-                  child: CustomPaint(
-                    painter: ProceduralPlantGrowthPainter(
-                      progress: plant.growthProgress,
-                      speciesName: plant.speciesName,
-                      showPot: false,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // Plant Name Plaque
-            Positioned(
-              bottom: 0,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6D4C41), Color(0xFF4E342E)],
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFFD54F), width: 1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1.5),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  plant.plantName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.fredoka(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
+                onPressed: _waterAllDuePlants,
+                icon: const Icon(Icons.water_drop_rounded, size: 18),
+                label: Text(
+                  'Water All Due Plants ($dueCount) 💧',
+                  style: GoogleFonts.fredoka(fontSize: 13, fontWeight: FontWeight.w800),
                 ),
               ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
-
-  /// "+ Plant Seed" Plot Tile
-  Widget _buildIsometricAddSeedItem({
-    required _PlotSlot slot,
-    required double tileW,
-    required double tileH,
-  }) {
-    return Positioned(
-      left: slot.posX - (tileW * 0.38),
-      top: slot.posY - (tileH * 0.38),
-      width: tileW * 0.76,
-      height: tileH * 0.76,
-      child: GestureDetector(
-        onTap: onAddSeedTap,
-        child: Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.35),
-            border: Border.all(color: const Color(0xFFFFD54F), width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF1B5E20).withValues(alpha: 0.25),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: const Center(
-            child: Text('🌱', style: TextStyle(fontSize: 18)),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PlotSlot {
-  final int col;
-  final int row;
-  final double posX;
-  final double posY;
-  final int depth;
-  final PlantModel? plant;
-  final bool isAddSlot;
-
-  _PlotSlot({
-    required this.col,
-    required this.row,
-    required this.posX,
-    required this.posY,
-    required this.depth,
-    this.plant,
-    this.isAddSlot = false,
-  });
-}
-
-/// Large 3D Isometric Island Base Painter with Organic Lawn & Cliff Strata
-class _LargeIsometricIslandPainter extends CustomPainter {
-  final int gridSize;
-  final double originX;
-  final double originY;
-  final double tileW;
-  final double tileH;
-
-  _LargeIsometricIslandPainter({
-    required this.gridSize,
-    required this.originX,
-    required this.originY,
-    required this.tileW,
-    required this.tileH,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double islandCliffDepth = tileH * 1.8;
-
-    // Corner points of the isometric top diamond
-    final topPoint = Offset(originX, originY);
-    final rightPoint = Offset(
-        originX + gridSize * (tileW / 2), originY + gridSize * (tileH / 2));
-    final bottomPoint = Offset(originX, originY + gridSize * tileH);
-    final leftPoint = Offset(
-        originX - gridSize * (tileW / 2), originY + gridSize * (tileH / 2));
-
-    // 1. Soft Ambient Floating Shadow beneath island
-    final shadowPaint = Paint()
-      ..color = const Color(0xFF1B4332).withValues(alpha: 0.35)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 28);
-
-    final shadowPath = Path()
-      ..moveTo(leftPoint.dx * 0.96, bottomPoint.dy + islandCliffDepth + 12)
-      ..lineTo(originX, bottomPoint.dy + islandCliffDepth + 32)
-      ..lineTo(rightPoint.dx * 1.04, bottomPoint.dy + islandCliffDepth + 12)
-      ..lineTo(originX, bottomPoint.dy + islandCliffDepth - 10)
-      ..close();
-    canvas.drawPath(shadowPath, shadowPaint);
-
-    // 2. Left Cliff Strata (Earth & Clay layers)
-    final leftCliffPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Color(0xFF6D4C41),
-          Color(0xFF5D4037),
-          Color(0xFF4E342E),
-          Color(0xFF3E2723),
-        ],
-      ).createShader(Rect.fromLTWH(leftPoint.dx, bottomPoint.dy,
-          originX - leftPoint.dx, islandCliffDepth));
-
-    final leftCliffPath = Path()
-      ..moveTo(leftPoint.dx, leftPoint.dy)
-      ..lineTo(bottomPoint.dx, bottomPoint.dy)
-      ..lineTo(bottomPoint.dx, bottomPoint.dy + islandCliffDepth)
-      ..lineTo(leftPoint.dx, leftPoint.dy + islandCliffDepth)
-      ..close();
-    canvas.drawPath(leftCliffPath, leftCliffPaint);
-
-    // 3. Right Cliff Strata (Darker shaded Earth layer)
-    final rightCliffPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Color(0xFF5D4037),
-          Color(0xFF4E342E),
-          Color(0xFF3E2723),
-          Color(0xFF27150F),
-        ],
-      ).createShader(Rect.fromLTWH(
-          originX, bottomPoint.dy, rightPoint.dx - originX, islandCliffDepth));
-
-    final rightCliffPath = Path()
-      ..moveTo(bottomPoint.dx, bottomPoint.dy)
-      ..lineTo(rightPoint.dx, rightPoint.dy)
-      ..lineTo(rightPoint.dx, rightPoint.dy + islandCliffDepth)
-      ..lineTo(bottomPoint.dx, bottomPoint.dy + islandCliffDepth)
-      ..close();
-    canvas.drawPath(rightCliffPath, rightCliffPaint);
-
-    // 4. Overhanging Jagged Grass Fringe along cliff edge
-    final fringePaint = Paint()..color = const Color(0xFF689F38);
-    for (double i = 0; i <= 1.0; i += 0.04) {
-      final lx = leftPoint.dx + (bottomPoint.dx - leftPoint.dx) * i;
-      final ly = leftPoint.dy + (bottomPoint.dy - leftPoint.dy) * i;
-      canvas.drawCircle(Offset(lx, ly + 3.5), 5.0, fringePaint);
-
-      final rx = bottomPoint.dx + (rightPoint.dx - bottomPoint.dx) * i;
-      final ry = bottomPoint.dy + (rightPoint.dy - bottomPoint.dy) * i;
-      canvas.drawCircle(Offset(rx, ry + 3.5), 5.0, fringePaint);
-    }
-
-    // 5. UNIFIED NATURAL LAWN (Smooth organic garden lawn, NO chess board!)
-    final lawnPath = Path()
-      ..moveTo(topPoint.dx, topPoint.dy)
-      ..lineTo(rightPoint.dx, rightPoint.dy)
-      ..lineTo(bottomPoint.dx, bottomPoint.dy)
-      ..lineTo(leftPoint.dx, leftPoint.dy)
-      ..close();
-
-    final lawnPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Color(0xFFAED581), // Sunlight top green
-          Color(0xFF9CCC65),
-          Color(0xFF8BC34A),
-          Color(0xFF7CB342), // Rich foreground green
-        ],
-        stops: [0.0, 0.35, 0.70, 1.0],
-      ).createShader(Rect.fromLTWH(leftPoint.dx, topPoint.dy,
-          rightPoint.dx - leftPoint.dx, bottomPoint.dy - topPoint.dy));
-
-    canvas.drawPath(lawnPath, lawnPaint);
-
-    // 6. Natural Grass Tufts, Clover & Daisies sprinkled organically across the lawn
-    final tuftPaint = Paint()
-      ..color = const Color(0xFF558B2F).withValues(alpha: 0.7)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6
-      ..strokeCap = StrokeCap.round;
-
-    final flowerWhite = Paint()..color = Colors.white.withValues(alpha: 0.9);
-    final flowerYellow = Paint()..color = const Color(0xFFFFD54F);
-
-    void drawDaisy(double dx, double dy) {
-      canvas.drawCircle(Offset(dx, dy), 3.0, flowerWhite);
-      canvas.drawCircle(Offset(dx, dy), 1.5, flowerYellow);
-    }
-
-    void drawGrassTuft(double cx, double cy) {
-      canvas.drawLine(Offset(cx - 3, cy), Offset(cx - 5, cy - 4), tuftPaint);
-      canvas.drawLine(Offset(cx, cy), Offset(cx, cy - 5), tuftPaint);
-      canvas.drawLine(Offset(cx + 3, cy), Offset(cx + 5, cy - 4), tuftPaint);
-    }
-
-    // Organic distribution across the lawn
-    for (int row = 0; row < gridSize; row++) {
-      for (int col = 0; col < gridSize; col++) {
-        final cx = originX + (col - row) * (tileW / 2);
-        final cy = originY + (col + row) * (tileH / 2) + (tileH * 0.45);
-
-        if ((col + row) % 2 == 0) {
-          drawGrassTuft(cx - 8, cy - 4);
-          drawDaisy(cx + 10, cy + 2);
-        } else {
-          drawGrassTuft(cx + 6, cy - 2);
-          drawDaisy(cx - 12, cy - 6);
-        }
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _LargeIsometricIslandPainter oldDelegate) =>
-      false;
-}
-
-/// Scenic Sunny Meadow & Distant Hills Landscape Painter
-class _GardenScenicBackdrop extends StatelessWidget {
-  const _GardenScenicBackdrop();
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.asset(
-          'assets/sprites/image.png',
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF90CAF9),
-                  Color(0xFFC8E6C9),
-                  Color(0xFFA5D6A7),
-                  Color(0xFF81C784),
-                ],
-              ),
-            ),
-          ),
-        ),
-        CustomPaint(
-          painter: _DistantHillsPainter(),
-        ),
-      ],
-    );
-  }
-}
-
-/// Distant Green Hills & Rolling Meadow Horizon
-class _DistantHillsPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Distant soft blue-green mountains
-    final mountainPaint = Paint()
-      ..color = const Color(0xFF80CBC4).withValues(alpha: 0.45);
-    final mountainPath = Path()
-      ..moveTo(0, size.height * 0.32)
-      ..quadraticBezierTo(size.width * 0.2, size.height * 0.25,
-          size.width * 0.45, size.height * 0.30)
-      ..quadraticBezierTo(
-          size.width * 0.75, size.height * 0.24, size.width, size.height * 0.28)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-    canvas.drawPath(mountainPath, mountainPaint);
-
-    // Fluffy clouds in sky
-    final cloudPaint = Paint()..color = Colors.white.withValues(alpha: 0.65);
-    void drawCloud(double cx, double cy, double r) {
-      canvas.drawCircle(Offset(cx, cy), r, cloudPaint);
-      canvas.drawCircle(
-          Offset(cx + r * 0.7, cy - r * 0.2), r * 0.8, cloudPaint);
-      canvas.drawCircle(Offset(cx + r * 1.4, cy), r * 0.7, cloudPaint);
-    }
-
-    drawCloud(size.width * 0.15, size.height * 0.12, 18);
-    drawCloud(size.width * 0.75, size.height * 0.10, 22);
-  }
-
-  @override
-  bool shouldRepaint(covariant _DistantHillsPainter oldDelegate) => false;
-}
-
-/// Corner Decorative Vine Leaves
-class _VineLeavesPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final leafPaint = Paint()
-      ..color = const Color(0xFF388E3C).withValues(alpha: 0.9);
-
-    void drawLeaf(double x, double y, double angle, double scale) {
-      canvas.save();
-      canvas.translate(x, y);
-      canvas.rotate(angle);
-      final path = Path()
-        ..moveTo(0, 0)
-        ..quadraticBezierTo(14 * scale, -8 * scale, 28 * scale, 0)
-        ..quadraticBezierTo(14 * scale, 8 * scale, 0, 0);
-      canvas.drawPath(path, leafPaint);
-      canvas.restore();
-    }
-
-    drawLeaf(10, 15, 0.4, 1.2);
-    drawLeaf(30, 25, 0.8, 1.0);
-    drawLeaf(45, 12, 0.2, 0.9);
-    drawLeaf(15, 45, 1.2, 1.1);
-  }
-
-  @override
-  bool shouldRepaint(covariant _VineLeavesPainter oldDelegate) => false;
 }

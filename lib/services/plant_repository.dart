@@ -3,50 +3,81 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/plant_model.dart';
 import '../models/daily_checkin_model.dart';
+import 'auth_service.dart';
 import 'widget_sync_service.dart';
 import 'notification_service.dart';
 import 'sync_service.dart';
 
 /// Local & Remote Plant Repository
-/// Manages persistent offline caching and remote synchronization for User Plants & Daily Check-ins
+/// Manages persistent offline caching and remote synchronization for User Plants & Daily Check-ins with User Data Isolation
 class PlantRepository extends ChangeNotifier {
   static final PlantRepository _instance = PlantRepository._internal();
   factory PlantRepository() => _instance;
   PlantRepository._internal();
 
-  static const String _plantsStorageKey = 'spryflora_user_plants';
-  static const String _checkinsStorageKey = 'spryflora_plant_checkins';
+  static const String _legacyPlantsStorageKey = 'spryflora_user_plants';
+  static const String _legacyCheckinsStorageKey = 'spryflora_plant_checkins';
 
+  String? _currentUserId;
   List<PlantModel> _plants = [];
   List<DailyCheckinModel> _checkins = [];
   bool _isLoaded = false;
+
+  String get activeUserId => AuthService().currentUser?.id ?? _currentUserId ?? 'usr_default';
+  String get _plantsStorageKey => 'spryflora_user_plants_$activeUserId';
+  String get _checkinsStorageKey => 'spryflora_plant_checkins_$activeUserId';
 
   List<PlantModel> get plants => List.unmodifiable(_plants);
   List<DailyCheckinModel> get checkins => List.unmodifiable(_checkins);
   bool get isLoaded => _isLoaded;
 
-  /// Loads all plants and checkins from persistent local storage, then syncs with backend if online
+  /// Sets the active user context and reloads user-isolated plants & checkins
+  Future<void> setCurrentUser(String? userId) async {
+    _currentUserId = userId;
+    await loadLocalData();
+  }
+
+  /// Clears in-memory cache upon user logout
+  void clearInMemoryData() {
+    _plants = [];
+    _checkins = [];
+    _isLoaded = false;
+    notifyListeners();
+  }
+
+  /// Loads all plants and checkins for the active userId from persistent local storage
   Future<void> loadLocalData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
       // Load Plants
-      final plantsJsonStr = prefs.getString(_plantsStorageKey);
+      String? plantsJsonStr = prefs.getString(_plantsStorageKey);
+      // Fallback for default/guest account migration from legacy global key
+      if ((plantsJsonStr == null || plantsJsonStr.isEmpty) && activeUserId == 'usr_default') {
+        plantsJsonStr = prefs.getString(_legacyPlantsStorageKey);
+      }
+
       if (plantsJsonStr != null && plantsJsonStr.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(plantsJsonStr) as List<dynamic>;
         _plants = decoded
             .map((item) => PlantModel.fromJson(item as Map<String, dynamic>))
+            .where((p) => p.userId == activeUserId || activeUserId == 'usr_default' || p.userId.isEmpty)
             .toList();
       } else {
         _plants = [];
       }
 
       // Load Check-ins
-      final checkinsJsonStr = prefs.getString(_checkinsStorageKey);
+      String? checkinsJsonStr = prefs.getString(_checkinsStorageKey);
+      if ((checkinsJsonStr == null || checkinsJsonStr.isEmpty) && activeUserId == 'usr_default') {
+        checkinsJsonStr = prefs.getString(_legacyCheckinsStorageKey);
+      }
+
       if (checkinsJsonStr != null && checkinsJsonStr.isNotEmpty) {
         final List<dynamic> decodedCheckins = jsonDecode(checkinsJsonStr) as List<dynamic>;
         _checkins = decodedCheckins
             .map((item) => DailyCheckinModel.fromJson(item as Map<String, dynamic>))
+            .where((c) => c.userId == activeUserId || activeUserId == 'usr_default' || c.userId.isEmpty)
             .toList();
       } else {
         _checkins = [];
@@ -58,7 +89,7 @@ class PlantRepository extends ChangeNotifier {
       // Trigger background sync if remote backend is configured
       final remotePlants = await SyncService().syncPlants(_plants);
       if (remotePlants != null && remotePlants.isNotEmpty) {
-        _plants = remotePlants;
+        _plants = remotePlants.where((p) => p.userId == activeUserId || activeUserId == 'usr_default').toList();
         await _savePlantsToStorage();
         notifyListeners();
       }
@@ -71,18 +102,22 @@ class PlantRepository extends ChangeNotifier {
     }
   }
 
-  /// Adds a newly created plant to database
+  /// Adds a newly created plant for the current user
   Future<PlantModel> addPlant(PlantModel plant) async {
-    _plants.insert(0, plant);
+    final taggedPlant = plant.userId == activeUserId || plant.userId != 'usr_default'
+        ? plant
+        : plant.copyWith(userId: activeUserId);
+
+    _plants.insert(0, taggedPlant);
     await _savePlantsToStorage();
     notifyListeners();
     WidgetSyncService().updateWidgetData(plantsList: _plants);
     NotificationService().reconcileNotifications(_plants);
     SyncService().syncPlants(_plants);
-    return plant;
+    return taggedPlant;
   }
 
-  /// Updates an existing plant
+  /// Updates an existing plant belonging to active user
   Future<void> updatePlant(PlantModel updatedPlant) async {
     final index = _plants.indexWhere((p) => p.id == updatedPlant.id);
     if (index != -1) {
@@ -132,9 +167,25 @@ class PlantRepository extends ChangeNotifier {
     }
   }
 
-  /// Adds a daily check-in record
+  /// Adds a daily check-in record for active user
   Future<void> addCheckin(DailyCheckinModel checkin) async {
-    _checkins.insert(0, checkin);
+    final taggedCheckin = checkin.userId == activeUserId || checkin.userId != 'usr_default'
+        ? checkin
+        : DailyCheckinModel(
+            id: checkin.id,
+            plantId: checkin.plantId,
+            userId: activeUserId,
+            checkinDate: checkin.checkinDate,
+            watered: checkin.watered,
+            sunlightHours: checkin.sunlightHours,
+            environmentCondition: checkin.environmentCondition,
+            photoPath: checkin.photoPath,
+            notes: checkin.notes,
+            aiDiagnosis: checkin.aiDiagnosis,
+            createdAt: checkin.createdAt,
+          );
+
+    _checkins.insert(0, taggedCheckin);
     await _saveCheckinsToStorage();
     notifyListeners();
     SyncService().syncCheckins(_checkins);
@@ -143,6 +194,18 @@ class PlantRepository extends ChangeNotifier {
   /// Gets all check-in records for a given plant
   List<DailyCheckinModel> getCheckinsForPlant(String plantId) {
     return _checkins.where((c) => c.plantId == plantId).toList();
+  }
+
+  /// Clears user data for current active user
+  Future<void> clearCurrentUserData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_plantsStorageKey);
+      await prefs.remove(_checkinsStorageKey);
+      _plants = [];
+      _checkins = [];
+      notifyListeners();
+    } catch (_) {}
   }
 
   Future<void> _savePlantsToStorage() async {

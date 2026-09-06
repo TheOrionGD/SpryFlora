@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'landing_selection_screen.dart';
+import 'onboarding_screen.dart';
 import '../services/backend_warmup_service.dart';
 import '../widgets/leaves_particle_overlay.dart';
 
@@ -74,12 +74,12 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _navigateAfterSplash() {
-    Timer(const Duration(milliseconds: 5000), () async {
+    Timer(const Duration(milliseconds: 3000), () async {
       if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (_, a1, a2) => const LandingSelectionScreen(),
+          pageBuilder: (_, a1, a2) => const OnboardingScreen(),
           transitionsBuilder: (_, a1, a2, child) =>
               FadeTransition(opacity: a1, child: child),
           transitionDuration: const Duration(milliseconds: 800),

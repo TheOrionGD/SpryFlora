@@ -98,16 +98,23 @@ abstract class AIProvider {
 }
 
 class GeminiProvider implements AIProvider {
-  final String apiKey;
-  GeminiProvider({this.apiKey = ''});
+  final String? _explicitKey;
+  GeminiProvider({String? apiKey}) : _explicitKey = apiKey;
 
-  String get _effectiveKey => apiKey.isNotEmpty ? apiKey : ApiConfig.geminiApiKey;
+  String get apiKey => _explicitKey ?? ApiConfig.geminiApiKey;
+  String get _effectiveKey => apiKey;
 
   @override
   Future<PlantIdentificationResult> identifyPlant({
     required String base64Image,
     List<int>? rawBytes,
   }) async {
+    if (_effectiveKey.isEmpty) {
+      return const PlantIdentificationResult(
+        status: AIResultStatus.authenticationError,
+        errorMessage: 'Gemini API key is unconfigured.',
+      );
+    }
     if (ApiConfig.usesBackendProxy) {
       try {
         final uri = Uri.parse('${ApiConfig.aiBackendUrl}${ApiConfig.backendIdentifyEndpoint}');
@@ -255,6 +262,13 @@ Return JSON only:
     required String base64Image,
     List<int>? rawBytes,
   }) async {
+    if (_effectiveKey.isEmpty) {
+      return const WateringVerificationResult(
+        status: AIResultStatus.authenticationError,
+        isVerified: false,
+        userFeedback: 'Gemini API key is unconfigured.',
+      );
+    }
     if (ApiConfig.usesBackendProxy) {
       try {
         final uri = Uri.parse('${ApiConfig.aiBackendUrl}${ApiConfig.backendWateringEndpoint}');

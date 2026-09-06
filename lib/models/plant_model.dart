@@ -1,5 +1,6 @@
 class PlantModel {
   final String id;
+  final String userId;
   final String plantName;
   final String speciesName;
   final DateTime plantingDate;
@@ -25,6 +26,7 @@ class PlantModel {
 
   PlantModel({
     required this.id,
+    this.userId = 'usr_default',
     required this.plantName,
     required this.speciesName,
     required this.plantingDate,
@@ -162,6 +164,7 @@ class PlantModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'userId': userId,
       'plantName': plantName,
       'speciesName': speciesName,
       'plantingDate': plantingDate.toIso8601String(),
@@ -190,6 +193,7 @@ class PlantModel {
   factory PlantModel.fromJson(Map<String, dynamic> json) {
     return PlantModel(
       id: json['id'] as String,
+      userId: json['userId'] as String? ?? 'usr_default',
       plantName: json['plantName'] as String,
       speciesName: json['speciesName'] as String,
       plantingDate: DateTime.parse(json['plantingDate'] as String),
@@ -226,6 +230,7 @@ class PlantModel {
   }
 
   PlantModel copyWith({
+    String? userId,
     String? plantName,
     String? speciesName,
     DateTime? plantingDate,
@@ -250,6 +255,7 @@ class PlantModel {
   }) {
     return PlantModel(
       id: id,
+      userId: userId ?? this.userId,
       plantName: plantName ?? this.plantName,
       speciesName: speciesName ?? this.speciesName,
       plantingDate: plantingDate ?? this.plantingDate,
