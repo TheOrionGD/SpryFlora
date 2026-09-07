@@ -110,5 +110,13 @@
     "sunlight": "Direct Sun",
     "description": "Fleshy miniature tree succulent symbolizing good luck.",
     "idealTemp": "18°C - 24°C"
+  },
+  {
+    "name": "ZZ Plant",
+    "lifespanDays": 1000,
+    "wateringIntervalDays": 14,
+    "sunlight": "Low to Bright Indirect",
+    "description": "Hardy drought-tolerant foliage with shiny waxy leaflets and underground water-storing rhizomes.",
+    "idealTemp": "18°C - 26°C"
   }
 ]

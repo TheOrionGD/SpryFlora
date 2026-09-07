@@ -43,7 +43,17 @@ class _SpeechVisualizerWidgetState extends State<SpeechVisualizerWidget>
   late SpeechLanguage _selectedLanguage;
   bool _isListening = false;
   String _extractedText = '';
+  String _statusMessage = 'Listening... Speak into your microphone';
   late AnimationController _pulseCtrl;
+  final TextEditingController _textController = TextEditingController();
+
+  final List<String> _quickPrompts = const [
+    '💧 How often should I water my plant?',
+    '☀️ How much sunlight does it need?',
+    '🍂 Why are the leaves turning yellow?',
+    '🌱 Is my plant healthy and growing well?',
+    '🐛 How do I protect it from bugs or pests?',
+  ];
 
   @override
   void initState() {
@@ -60,6 +70,7 @@ class _SpeechVisualizerWidgetState extends State<SpeechVisualizerWidget>
   @override
   void dispose() {
     _pulseCtrl.dispose();
+    _textController.dispose();
     _voiceService.stopListening();
     super.dispose();
   }
@@ -67,7 +78,7 @@ class _SpeechVisualizerWidgetState extends State<SpeechVisualizerWidget>
   Future<void> _startListeningSession() async {
     setState(() {
       _isListening = true;
-      _extractedText = 'Listening... (Speak in ${_getLanguageName(_selectedLanguage)})';
+      _statusMessage = 'Listening... Speak in ${_getLanguageName(_selectedLanguage)}';
     });
 
     final extracted = await _voiceService.startListening(
@@ -76,6 +87,8 @@ class _SpeechVisualizerWidgetState extends State<SpeechVisualizerWidget>
         if (mounted) {
           setState(() {
             _extractedText = partial;
+            _textController.text = partial;
+            _statusMessage = 'Transcribing live voice...';
           });
         }
       },
@@ -86,6 +99,12 @@ class _SpeechVisualizerWidgetState extends State<SpeechVisualizerWidget>
         _isListening = false;
         if (extracted != null && extracted.isNotEmpty) {
           _extractedText = extracted;
+          _textController.text = extracted;
+          _statusMessage = 'Speech captured! Tap Use Extracted Text below:';
+        } else if (_textController.text.trim().isNotEmpty) {
+          _statusMessage = 'Voice text ready';
+        } else {
+          _statusMessage = 'Tap mic to speak, select a question, or type below:';
         }
       });
     }
@@ -103,11 +122,25 @@ class _SpeechVisualizerWidgetState extends State<SpeechVisualizerWidget>
   }
 
   void _confirmExtractedText() {
-    if (_extractedText.isNotEmpty &&
-        !_extractedText.startsWith('Listening...')) {
-      widget.onSpeechExtracted(_extractedText);
+    final textToUse = _textController.text.trim().isNotEmpty
+        ? _textController.text.trim()
+        : _extractedText.trim();
+
+    if (textToUse.isNotEmpty &&
+        !textToUse.startsWith('Listening...') &&
+        !textToUse.startsWith('Speak into')) {
+      widget.onSpeechExtracted(textToUse);
       Navigator.of(context).pop();
     }
+  }
+
+  void _selectQuickPrompt(String prompt) {
+    final cleanPrompt = prompt.replaceFirst(RegExp(r'^[^\w\s]+\s*'), '');
+    setState(() {
+      _extractedText = cleanPrompt;
+      _textController.text = cleanPrompt;
+      _statusMessage = 'Quick question selected! Ready to submit.';
+    });
   }
 
   @override
@@ -236,19 +269,72 @@ class _SpeechVisualizerWidgetState extends State<SpeechVisualizerWidget>
             },
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
-          // ── Extracted Live Text Display Box ───────────────────────────────
+          // ── Quick Voice Question Chips ──────────────────────────────────────
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Quick Questions:',
+              style: GoogleFonts.nunito(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF81C784),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 38,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _quickPrompts.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, idx) {
+                final prompt = _quickPrompts[idx];
+                return GestureDetector(
+                  onTap: () => _selectQuickPrompt(prompt),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white24,
+                        width: 1,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        prompt,
+                        style: GoogleFonts.nunito(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Extracted Live Text Display Box (Editable) ─────────────────────
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: _isListening
-                    ? const Color(0xFF00E676).withValues(alpha: 0.5)
+                    ? const Color(0xFF00E676).withValues(alpha: 0.6)
                     : Colors.white24,
+                width: 1.5,
               ),
             ),
             child: Column(
@@ -264,35 +350,50 @@ class _SpeechVisualizerWidgetState extends State<SpeechVisualizerWidget>
                       color: const Color(0xFF81C784),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      _isListening
-                          ? 'Extracting Speech Text...'
-                          : 'Extracted Text:',
-                      style: GoogleFonts.nunito(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF81C784),
+                    Expanded(
+                      child: Text(
+                        _statusMessage,
+                        style: GoogleFonts.nunito(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF81C784),
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  _extractedText.isEmpty
-                      ? 'Speak into microphone to extract text...'
-                      : _extractedText,
+                TextField(
+                  controller: _textController,
+                  maxLines: 2,
                   style: GoogleFonts.nunito(
-                    fontSize: 16,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
-                    height: 1.4,
+                    height: 1.3,
                   ),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                    border: InputBorder.none,
+                    hintText: 'Speak or type your plant question here...',
+                    hintStyle: GoogleFonts.nunito(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white38,
+                    ),
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      _extractedText = val;
+                    });
+                  },
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
           // Action Controls: Mic Retake & Confirm Extracted Text Button
           Row(

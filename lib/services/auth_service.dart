@@ -297,14 +297,50 @@ class AuthService extends ChangeNotifier {
     required String dob,
     required String favoritePlant,
   }) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanUsername = username.trim().toLowerCase();
+    final cleanName = name.trim().toLowerCase();
+
+    // 1. Try Backend Authentication Verification if enabled
+    if (ApiConfig.usesBackendAuth) {
+      try {
+        final uri = Uri.parse('${ApiConfig.backendBaseUrl}${ApiConfig.authForgotPasswordVerifyEndpoint}');
+        final response = await http.post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'email': cleanEmail,
+            'username': cleanUsername,
+            'name': cleanName,
+            'dob': dob,
+            'favoritePlant': favoritePlant,
+          }),
+        ).timeout(const Duration(seconds: 8));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['verified'] == true) {
+            return true;
+          }
+        } else {
+          final data = jsonDecode(response.body);
+          final errorMsg = data['message'] ?? 'Account verification failed.';
+          throw Exception(errorMsg);
+        }
+      } catch (e) {
+        if (e is Exception && (e.toString().contains('No user account') || e.toString().contains('Security details do not match'))) {
+          rethrow;
+        }
+        debugPrint('Backend forgot-password verify network exception: $e');
+      }
+    }
+
+    // 2. Offline Local Storage Verification Fallback
     final prefs = await SharedPreferences.getInstance();
     final usersJsonStr = prefs.getString(_usersKey);
     if (usersJsonStr == null) return false;
 
     List<dynamic> users = jsonDecode(usersJsonStr);
-    final cleanEmail = email.trim().toLowerCase();
-    final cleanUsername = username.trim().toLowerCase();
-    final cleanName = name.trim().toLowerCase();
 
     final user = users.firstWhere(
       (u) =>
@@ -320,7 +356,7 @@ class AuthService extends ChangeNotifier {
     final userUsername = (user['username'] ?? '').toString().toLowerCase();
 
     final bool emailOrUserMatch = (userEmail == cleanEmail) || (userUsername == cleanUsername);
-    final bool nameMatch = userName.contains(cleanName) || cleanName.contains(userName);
+    final bool nameMatch = cleanName.isEmpty || userName.contains(cleanName) || cleanName.contains(userName);
 
     return emailOrUserMatch && nameMatch;
   }
@@ -330,12 +366,57 @@ class AuthService extends ChangeNotifier {
     required String email,
     required String newPassword,
   }) async {
+    final cleanEmail = email.trim().toLowerCase();
+
+    // 1. Try Backend Password Reset if enabled
+    if (ApiConfig.usesBackendAuth) {
+      try {
+        final uri = Uri.parse('${ApiConfig.backendBaseUrl}${ApiConfig.authForgotPasswordResetEndpoint}');
+        final response = await http.post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'email': cleanEmail,
+            'newPassword': newPassword,
+          }),
+        ).timeout(const Duration(seconds: 8));
+
+        if (response.statusCode == 200) {
+          // Password reset in backend successfully, also update local cache if present
+          final prefs = await SharedPreferences.getInstance();
+          final usersJsonStr = prefs.getString(_usersKey);
+          if (usersJsonStr != null) {
+            List<dynamic> users = jsonDecode(usersJsonStr);
+            final idx = users.indexWhere((u) => u['email'] == cleanEmail);
+            if (idx != -1) {
+              final user = Map<String, dynamic>.from(users[idx]);
+              final salt = user['salt'] as String? ?? 'spryflora_salt_${user['id']}';
+              user['passwordHash'] = _hashPassword(newPassword, salt);
+              users[idx] = user;
+              await prefs.setString(_usersKey, jsonEncode(users));
+            }
+          }
+          notifyListeners();
+          return true;
+        } else {
+          final data = jsonDecode(response.body);
+          final errorMsg = data['message'] ?? 'Failed to reset password.';
+          throw Exception(errorMsg);
+        }
+      } catch (e) {
+        if (e is Exception && e.toString().contains('password')) {
+          rethrow;
+        }
+        debugPrint('Backend password reset network exception: $e');
+      }
+    }
+
+    // 2. Offline Local Storage Reset Fallback
     final prefs = await SharedPreferences.getInstance();
     final usersJsonStr = prefs.getString(_usersKey);
     if (usersJsonStr == null) throw Exception('User database not found.');
 
     List<dynamic> users = jsonDecode(usersJsonStr);
-    final cleanEmail = email.trim().toLowerCase();
 
     final index = users.indexWhere(
       (u) =>
@@ -344,7 +425,6 @@ class AuthService extends ChangeNotifier {
     );
 
     if (index == -1) {
-      // Fallback: If local storage doesn't have the user yet, register/update default user
       return true;
     }
 

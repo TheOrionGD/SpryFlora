@@ -33,16 +33,24 @@ class KidsVoiceService {
     _currentLanguage = lang;
   }
 
+  Timer? _animTimer;
+
   /// Initializes underlying SpeechToText engine if supported
   Future<bool> initialize() async {
     if (_isInitialized) return true;
     try {
-      if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS)) {
+      if (!kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.android ||
+              defaultTargetPlatform == TargetPlatform.iOS ||
+              defaultTargetPlatform == TargetPlatform.macOS)) {
         _isInitialized = await _speechToText.initialize(
-          onError: (val) => debugPrint('SpeechToText error: $val'),
+          onError: (val) {
+            debugPrint('SpeechToText error: $val');
+          },
           onStatus: (status) {
             if (status == 'done' || status == 'notListening') {
               _isListening = false;
+              _stopWaveformAnimation();
               _updateVisualizerWithAmplitude(0.0);
             }
           },
@@ -55,6 +63,25 @@ class KidsVoiceService {
       _isInitialized = false;
     }
     return _isInitialized;
+  }
+
+  void _startWaveformAnimation() {
+    _animTimer?.cancel();
+    int tick = 0;
+    _animTimer = Timer.periodic(const Duration(milliseconds: 100), (t) {
+      if (!_isListening) {
+        t.cancel();
+        return;
+      }
+      tick++;
+      final baseAmp = 0.35 + 0.25 * (tick % 5) / 5.0;
+      _updateVisualizerWithAmplitude(baseAmp);
+    });
+  }
+
+  void _stopWaveformAnimation() {
+    _animTimer?.cancel();
+    _animTimer = null;
   }
 
   /// Starts listening to speech input and streams live audio visualizer waveforms based on real microphone sound levels.
@@ -85,20 +112,42 @@ class KidsVoiceService {
 
     final available = await initialize();
     if (!available) {
-      _isListening = false;
-      _updateVisualizerWithAmplitude(0.0);
+      // Platform without native STT (e.g. Windows desktop or simulator)
+      _startWaveformAnimation();
       return null;
     }
 
     String localeId = 'ta_IN';
-    if (_currentLanguage == SpeechLanguage.english) {
-      localeId = 'en_US';
-    } else if (_currentLanguage == SpeechLanguage.tanglish) {
-      localeId = 'ta_IN';
-    }
+    try {
+      final locales = await _speechToText.locales();
+      final systemLoc = await _speechToText.systemLocale();
+      final targetPrefix =
+          _currentLanguage == SpeechLanguage.english ? 'en' : 'ta';
+
+      LocaleName? matched;
+      for (final l in locales) {
+        if (l.localeId.toLowerCase().startsWith(targetPrefix)) {
+          matched = l;
+          break;
+        }
+      }
+      if (matched == null) {
+        for (final l in locales) {
+          if (l.localeId.toLowerCase().startsWith('en')) {
+            matched = l;
+            break;
+          }
+        }
+      }
+      matched ??= systemLoc ?? (locales.isNotEmpty ? locales.first : null);
+      if (matched != null) {
+        localeId = matched.localeId;
+      }
+    } catch (_) {}
 
     final Completer<String?> completer = Completer<String?>();
     String recognizedText = '';
+    _startWaveformAnimation();
 
     try {
       await _speechToText.listen(
@@ -112,21 +161,20 @@ class KidsVoiceService {
           }
         },
         onSoundLevelChange: (level) {
-          // Normalize decibel level (-10dB to +10dB) into 0.1 to 1.0 amplitude
           final normalized = ((level + 10) / 20).clamp(0.1, 1.0);
           _updateVisualizerWithAmplitude(normalized);
         },
         listenOptions: SpeechListenOptions(
           localeId: localeId,
-          cancelOnError: true,
-          listenMode: ListenMode.confirmation,
-          listenFor: const Duration(seconds: 10),
-          pauseFor: const Duration(seconds: 3),
+          cancelOnError: false,
+          listenMode: ListenMode.dictation,
+          listenFor: const Duration(seconds: 15),
+          pauseFor: const Duration(seconds: 4),
         ),
       );
 
-      // Auto resolve after timeout if no final result fired
-      Timer(const Duration(seconds: 10), () {
+      // Timeout fallback
+      Timer(const Duration(seconds: 15), () {
         if (!completer.isCompleted) {
           completer.complete(recognizedText.isNotEmpty ? recognizedText : null);
         }
@@ -138,7 +186,7 @@ class KidsVoiceService {
     } catch (e) {
       debugPrint('Error during speech recognition: $e');
       stopListening();
-      return null;
+      return recognizedText.isNotEmpty ? recognizedText : null;
     }
   }
 
@@ -162,6 +210,7 @@ class KidsVoiceService {
   /// Stops speech recognition listening and resets visualizer waveform to quiet state
   void stopListening() {
     _isListening = false;
+    _stopWaveformAnimation();
     if (_speechToText.isListening) {
       _speechToText.stop();
     }

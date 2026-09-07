@@ -6,6 +6,7 @@ import '../models/user_model.dart';
 import '../services/notification_service.dart';
 import '../services/plant_repository.dart';
 import '../services/user_service.dart';
+import '../services/weather_service.dart';
 import '../theme/skeuo_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_photo_view.dart';
@@ -81,6 +82,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _loadData() async {
     await _plantRepo.loadLocalData();
     await NotificationService().checkAndNotifyDuePlants(_plantRepo.plants);
+    _checkClimateAlerts();
     if (mounted) {
       setState(() {
         _userProfile = _userService.currentUser;
@@ -90,6 +92,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _headerCtrl.forward();
       _staggerCtrl.forward();
     }
+  }
+
+  void _checkClimateAlerts() async {
+    if (_plantRepo.plants.isEmpty) return;
+    try {
+      final weather = await WeatherService().fetchLocalWeather();
+      for (final plant in _plantRepo.plants) {
+        final eval = WeatherService().evaluateClimateForPlant(plant, weather);
+        if (eval.alertTriggered) {
+          await NotificationService().notifyClimateWeatherAlert(
+            plant: plant,
+            weather: weather,
+            evaluation: eval,
+          );
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _waterVirtualPlant() async {

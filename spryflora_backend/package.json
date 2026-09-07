@@ -8,6 +8,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "seed": "node scripts/seedSpecies.js",
+    "clean-db": "node scripts/clean_database.js",
     "lint": "node --check src/server.js src/app.js src/routes/*.js src/models/*.js src/middleware/*.js src/config/*.js src/services/*.js src/utils/*.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testTimeout=30000 --runInBand --detectOpenHandles --forceExit"
   },

@@ -458,13 +458,31 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                         color: SkeuoTheme.textPrimary,
                       ),
                     ),
-                    Text(
-                      _plant.speciesName,
-                      style: GoogleFonts.nunito(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: SkeuoTheme.primaryGreen,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _plant.speciesName,
+                          style: GoogleFonts.nunito(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: SkeuoTheme.primaryGreen,
+                          ),
+                        ),
+                        if (_plant.location.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          const Icon(Icons.place_rounded,
+                              size: 11, color: Color(0xFF66BB6A)),
+                          Text(
+                            _plant.location,
+                            style: GoogleFonts.nunito(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: SkeuoTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
@@ -632,6 +650,35 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
                 color: SkeuoTheme.textPrimary,
+              ),
+            ),
+          ),
+          const Divider(height: 20, color: Color(0xFFF1F8EE)),
+          _infoRow(
+            icon: Icons.place_rounded,
+            iconColor: const Color(0xFF43A047),
+            label: 'Location',
+            valueWidget: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFA5D6A7)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.place, size: 14, color: Color(0xFF2E7D32)),
+                  const SizedBox(width: 4),
+                  Text(
+                    _plant.location.isNotEmpty ? _plant.location : 'Living Room',
+                    style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF2E7D32),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

@@ -180,10 +180,14 @@ Return JSON only:
   "isPlantDetected": true,
   "detectedObjectType": "Plant / Leaf",
   "rejectionReason": null,
-  "identifiedSpecies": "Rose",
+  "identifiedSpecies": "<Identified botanical species name e.g. Tulsi, ZZ Plant, Money Plant>",
   "confidencePercent": 95
 }
 ''';
+
+      final mimeType = (base64Image.startsWith('iVBOR') || base64Image.startsWith('data:image/png'))
+          ? 'image/png'
+          : 'image/jpeg';
 
       final uri = Uri.parse('${ApiConfig.geminiBaseUrl}/${ApiConfig.primaryModel}:generateContent');
       final response = await http.post(
@@ -199,14 +203,20 @@ Return JSON only:
                 {'text': prompt},
                 {
                   'inlineData': {
-                    'mimeType': 'image/jpeg',
+                    'mimeType': mimeType,
                     'data': base64Image,
                   }
                 }
               ]
             }
           ],
-          'generationConfig': {'temperature': 0.3, 'maxOutputTokens': 300}
+          'generationConfig': {
+            'temperature': 0.2,
+            'maxOutputTokens': 2048,
+            'thinkingConfig': {
+              'thinkingBudget': 0,
+            },
+          }
         }),
       ).timeout(const Duration(seconds: 10));
 
@@ -214,7 +224,12 @@ Return JSON only:
         final data = jsonDecode(response.body);
         final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
         if (text != null) {
-          final cleaned = text.replaceAll('```json', '').replaceAll('```', '').trim();
+          String cleaned = text.replaceAll('```json', '').replaceAll('```', '').trim();
+          final startIdx = cleaned.indexOf('{');
+          final endIdx = cleaned.lastIndexOf('}');
+          if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
+            cleaned = cleaned.substring(startIdx, endIdx + 1);
+          }
           final map = jsonDecode(cleaned);
 
           final isPlant = map['isPlantDetected'] == true;
@@ -245,11 +260,19 @@ Return JSON only:
       }
       return const PlantIdentificationResult(
         status: AIResultStatus.providerError,
+        isPlantDetected: false,
+        detectedObjectType: 'Problem on SpryFlora feature',
+        rejectionReason: 'There is a problem on the SpryFlora plant recognition feature. Please try again.',
+        identifiedSpecies: 'Problem on SpryFlora feature',
         errorMessage: 'Gemini provider returned non-200 status code.',
       );
     } catch (e) {
       return PlantIdentificationResult(
         status: AIResultStatus.networkError,
+        isPlantDetected: false,
+        detectedObjectType: 'Problem on SpryFlora feature',
+        rejectionReason: 'There is a problem on the SpryFlora plant recognition feature. Unable to recognize plant: $e',
+        identifiedSpecies: 'Problem on SpryFlora feature',
         errorMessage: e.toString(),
       );
     }
@@ -347,7 +370,13 @@ Return JSON only:
               ]
             }
           ],
-          'generationConfig': {'temperature': 0.3, 'maxOutputTokens': 250}
+          'generationConfig': {
+            'temperature': 0.2,
+            'maxOutputTokens': 1024,
+            'thinkingConfig': {
+              'thinkingBudget': 0,
+            },
+          }
         }),
       ).timeout(const Duration(seconds: 10));
 
@@ -355,7 +384,12 @@ Return JSON only:
         final data = jsonDecode(response.body);
         final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
         if (text != null) {
-          final cleaned = text.replaceAll('```json', '').replaceAll('```', '').trim();
+          String cleaned = text.replaceAll('```json', '').replaceAll('```', '').trim();
+          final startIdx = cleaned.indexOf('{');
+          final endIdx = cleaned.lastIndexOf('}');
+          if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
+            cleaned = cleaned.substring(startIdx, endIdx + 1);
+          }
           final map = jsonDecode(cleaned);
           final isVerified = map['isWateringVerified'] == true;
           final confidence = (map['confidencePercent'] as num?)?.toInt() ?? 0;
@@ -393,7 +427,7 @@ Return JSON only:
           uri,
           headers: AuthService().getAuthorizationHeaders(),
           body: jsonEncode({'prompt': prompt}),
-        ).timeout(const Duration(seconds: 8));
+        ).timeout(const Duration(seconds: 4));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
@@ -436,7 +470,13 @@ Return JSON only:
               ]
             }
           ],
-          'generationConfig': {'temperature': 0.7, 'maxOutputTokens': 250}
+          'generationConfig': {
+            'temperature': 0.7,
+            'maxOutputTokens': 1024,
+            'thinkingConfig': {
+              'thinkingBudget': 0,
+            },
+          }
         }),
       ).timeout(const Duration(seconds: 8));
 

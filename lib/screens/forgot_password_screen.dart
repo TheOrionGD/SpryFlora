@@ -26,12 +26,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   final _emailCtrl = TextEditingController();
   final _usernameCtrl = TextEditingController();
-  final _nameCtrl = TextEditingController(text: 'Leo');
-  final _dobCtrl = TextEditingController(text: '2016-05-14');
-  final _favPlantCtrl = TextEditingController(text: 'Sunflower');
+  final _nameCtrl = TextEditingController();
+  final _dobCtrl = TextEditingController();
+  final _favPlantCtrl = TextEditingController();
 
-  final _newPassCtrl = TextEditingController(text: 'newpass123');
-  final _confirmPassCtrl = TextEditingController(text: 'newpass123');
+  final _newPassCtrl = TextEditingController();
+  final _confirmPassCtrl = TextEditingController();
 
   bool _isVerified = false;
   bool _isLoading = false;
@@ -42,17 +42,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialIdentifier != null && widget.initialIdentifier!.isNotEmpty) {
-      if (widget.initialIdentifier!.contains('@')) {
-        _emailCtrl.text = widget.initialIdentifier!;
-        _usernameCtrl.text = widget.initialIdentifier!.split('@').first;
+    if (widget.initialIdentifier != null && widget.initialIdentifier!.trim().isNotEmpty) {
+      final id = widget.initialIdentifier!.trim();
+      if (id.contains('@')) {
+        _emailCtrl.text = id;
+        _usernameCtrl.text = id.split('@').first;
       } else {
-        _usernameCtrl.text = widget.initialIdentifier!;
-        _emailCtrl.text = '${widget.initialIdentifier!}@spryflora.com';
+        _usernameCtrl.text = id;
       }
-    } else {
-      _emailCtrl.text = 'hero@spryflora.com';
-      _usernameCtrl.text = 'leo_gardener';
     }
   }
 
@@ -113,7 +110,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      if (isMatch || true) {
+      if (isMatch) {
         // Successfully verified
         setState(() {
           _isVerified = true;
@@ -127,6 +124,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               style: GoogleFonts.nunito(fontWeight: FontWeight.bold),
             ),
             backgroundColor: const Color(0xFF27AE60),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Verification failed: No matching account found with these details.'),
+            backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
           ),
         );

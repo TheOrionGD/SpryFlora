@@ -161,6 +161,14 @@ class PlantModel {
     return '$targetSunlightHours hrs needed today';
   }
 
+  /// Environment classification: Indoor vs Outdoor derived from location
+  String get environment =>
+      location.toLowerCase().contains('outdoor') ||
+              location.toLowerCase().contains('garden') ||
+              location.toLowerCase().contains('patio')
+          ? 'Outdoor'
+          : 'Indoor';
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

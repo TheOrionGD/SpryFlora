@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/plant_model.dart';
 import '../services/ai_service.dart';
-import '../services/image_service.dart';
+import '../services/notification_service.dart';
 import '../services/watering_service.dart';
 import '../theme/skeuo_theme.dart';
 import '../widgets/app_photo_view.dart';
@@ -11,6 +11,7 @@ import '../widgets/fun_bouncy_button.dart';
 import '../widgets/fun_confetti_overlay.dart';
 import '../widgets/skeuo_live_camera_screen.dart';
 import '../widgets/app_background.dart';
+import '../widgets/cloud_transition.dart';
 
 /// Screen 12: Daily Check-in (from 255.jpg)
 class DailyCheckinScreen extends StatefulWidget {
@@ -26,7 +27,6 @@ class DailyCheckinScreen extends StatefulWidget {
 }
 
 class _DailyCheckinScreenState extends State<DailyCheckinScreen> {
-  final ImageService _imageService = ImageService();
   final WateringService _wateringService = WateringService();
 
   String? _capturedPhotoPath;
@@ -43,126 +43,19 @@ class _DailyCheckinScreenState extends State<DailyCheckinScreen> {
   }
 
   Future<void> _capturePhoto() async {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Check-in Photo',
-                style: GoogleFonts.nunito(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: SkeuoTheme.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () async {
-                        Navigator.pop(ctx);
-                        final livePhoto =
-                            await Navigator.of(context).push<String?>(
-                          MaterialPageRoute(
-                            builder: (context) => SkeuoLiveCameraScreen(
-                              title: 'Check-in: ${widget.plant.plantName}',
-                              prefix: 'checkin_${widget.plant.id}',
-                            ),
-                          ),
-                        );
-                        if (livePhoto != null && mounted) {
-                          setState(() => _capturedPhotoPath = livePhoto);
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5E9),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                              color: const Color(0xFF81C784), width: 1.5),
-                        ),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.camera_alt_rounded,
-                                size: 32, color: SkeuoTheme.primaryGreen),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Live Camera',
-                              style: GoogleFonts.nunito(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: SkeuoTheme.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () async {
-                        Navigator.pop(ctx);
-                        final path = await _imageService.pickFromGallery(
-                          prefix: 'checkin_${widget.plant.id}',
-                        );
-                        if (path != null && mounted) {
-                          setState(() => _capturedPhotoPath = path);
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5E9),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                              color: const Color(0xFF81C784), width: 1.5),
-                        ),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.photo_library_rounded,
-                                size: 32, color: SkeuoTheme.primaryGreen),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Gallery',
-                              style: GoogleFonts.nunito(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: SkeuoTheme.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+    // Strictly live camera only - no gallery uploads to guarantee authentic real-time watering
+    final livePhoto = await Navigator.of(context).push<String?>(
+      CloudPageRoute(
+        statusMessage: '📷 Opening Camera...',
+        child: SkeuoLiveCameraScreen(
+          title: 'Watering Proof: ${widget.plant.plantName}',
+          prefix: 'checkin_${widget.plant.id}',
         ),
       ),
     );
+    if (livePhoto != null && mounted) {
+      setState(() => _capturedPhotoPath = livePhoto);
+    }
   }
 
   Future<void> _submitCheckin() async {
@@ -181,9 +74,13 @@ class _DailyCheckinScreenState extends State<DailyCheckinScreen> {
 
     try {
       if (_wateredToday && _capturedPhotoPath != null) {
-        final verification = await AIService().verifyWateringPhoto(
-          plant: widget.plant,
-          photoPath: _capturedPhotoPath!,
+        final verification = await CloudTransitionOverlay.run(
+          context,
+          message: '💧 Verifying Hydration Proof...',
+          task: () => AIService().verifyWateringPhoto(
+            plant: widget.plant,
+            photoPath: _capturedPhotoPath!,
+          ),
         );
 
         if (verification['isVerified'] != true) {
@@ -194,9 +91,9 @@ class _DailyCheckinScreenState extends State<DailyCheckinScreen> {
             builder: (ctx) => AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
               backgroundColor: Colors.white,
-              title: Row(
+              title: const Row(
                 children: [
-                  const Text('💧 Verification Failed', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: SkeuoTheme.alertRed)),
+                  Text('💧 Verification Failed', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: SkeuoTheme.alertRed)),
                 ],
               ),
               content: Text(
@@ -216,13 +113,23 @@ class _DailyCheckinScreenState extends State<DailyCheckinScreen> {
         }
       }
 
-      final updatedPlant = await _wateringService.processCheckin(
-        plant: widget.plant,
-        watered: _wateredToday,
-        sunlightHours: _sunlightHours,
-        environmentCondition: _environmentCondition,
-        photoPath: _capturedPhotoPath,
+      if (!mounted) return;
+
+      final updatedPlant = await CloudTransitionOverlay.run(
+        context,
+        message: '🌱 Healing Plant & Updating Health...',
+        task: () => _wateringService.processCheckin(
+          plant: widget.plant,
+          watered: _wateredToday,
+          sunlightHours: _sunlightHours,
+          environmentCondition: _environmentCondition,
+          photoPath: _capturedPhotoPath,
+        ),
       );
+
+      if (_wateredToday) {
+        NotificationService().notifyPlantWatered(updatedPlant);
+      }
 
       if (!mounted) return;
 

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/plant_model.dart';
-import '../services/notification_service.dart';
 import '../services/plant_repository.dart';
 import '../theme/skeuo_theme.dart';
 import '../widgets/app_background.dart';
@@ -26,7 +25,6 @@ class MyPlantsScreen extends StatefulWidget {
 
 class _MyPlantsScreenState extends State<MyPlantsScreen> {
   final PlantRepository _plantRepository = PlantRepository();
-  final NotificationService _notificationService = NotificationService();
   bool _isLoading = true;
   bool _showConfetti = false;
 
@@ -38,7 +36,6 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
 
   Future<void> _loadPlants() async {
     await _plantRepository.loadLocalData();
-    await _notificationService.checkAndNotifyDuePlants(_plantRepository.plants);
     if (mounted) {
       setState(() => _isLoading = false);
     }

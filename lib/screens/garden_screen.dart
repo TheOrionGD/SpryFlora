@@ -17,6 +17,8 @@ import 'plant_details_screen.dart';
 import 'profile_settings_screen.dart';
 import 'ai_eco_buddy_screen.dart';
 import 'notification_center_screen.dart';
+import 'realtime_plant_scanner_screen.dart';
+import 'virtual_garden_screen.dart';
 
 /// Redesigned Kid-Friendly Magical Garden Screen
 /// Vibrant, skeuomorphic, highly interactive garden world with Eco-Buddy mascot guidance,
@@ -176,6 +178,10 @@ class _GardenScreenState extends State<GardenScreen>
                             ),
                             const SizedBox(height: 12),
 
+                            // Floating Interactive Virtual Garden Banner Button
+                            _buildVirtualGardenBanner(),
+                            const SizedBox(height: 14),
+
                             // Main Interactive Garden Plots Grid
                             if (totalPlants == 0)
                               _buildEmptyGardenHeroCard()
@@ -200,7 +206,7 @@ class _GardenScreenState extends State<GardenScreen>
                                 icon: Icons.add_rounded,
                                 onPressed: () async {
                                   final added = await Navigator.of(context).push<bool>(
-                                    MaterialPageRoute(builder: (_) => const AddPlantScreen()),
+                                    MaterialPageRoute(builder: (_) => const RealtimePlantScannerScreen()),
                                   );
                                   if (added == true) _plantRepo.loadLocalData();
                                 },
@@ -325,6 +331,94 @@ class _GardenScreenState extends State<GardenScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Floating Interactive Virtual Garden Banner Button
+  Widget _buildVirtualGardenBanner() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const VirtualGardenScreen()),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1B5E20).withValues(alpha: 0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Text('🏡', style: TextStyle(fontSize: 24)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Virtual Garden World',
+                        style: GoogleFonts.fredoka(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFD54F),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'INTERACTIVE',
+                          style: GoogleFonts.nunito(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            color: const Color(0xFF5D4037),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Explore your plants arranged by age in a 3D landscape',
+                    style: GoogleFonts.nunito(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
+          ],
+        ),
       ),
     );
   }

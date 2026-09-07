@@ -21,8 +21,8 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _identifierCtrl = TextEditingController(text: 'hero@spryflora.com');
-  final _passCtrl = TextEditingController(text: 'spryflora123');
+  final _identifierCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
 
   bool _obscurePass = true;
   bool _rememberMe = true;
@@ -303,11 +303,22 @@ class _LoginScreenState extends State<LoginScreen> {
                                               ),
                                             ),
                                           );
-                                          if (updatedEmail != null && updatedEmail.isNotEmpty) {
-                                            setState(() {
-                                              _identifierCtrl.text = updatedEmail;
-                                            });
-                                          }
+                                           if (updatedEmail != null && updatedEmail.isNotEmpty && context.mounted) {
+                                             setState(() {
+                                               _identifierCtrl.text = updatedEmail;
+                                               _passCtrl.clear();
+                                             });
+                                             ScaffoldMessenger.of(context).showSnackBar(
+                                               SnackBar(
+                                                 content: Text(
+                                                   'Password updated! Please log in with your new password.',
+                                                   style: GoogleFonts.nunito(fontWeight: FontWeight.bold),
+                                                 ),
+                                                 backgroundColor: const Color(0xFF27AE60),
+                                                 behavior: SnackBarBehavior.floating,
+                                               ),
+                                             );
+                                           }
                                         },
                                         child: Text(
                                           'Forgot password?',

@@ -207,6 +207,26 @@ class ExcelService {
     if (query.contains('rose')) {
       return getSpeciesByName('Rose') ?? _cachedSpecies.first;
     }
+    if (query.contains('zz') || query.contains('zamioculcas')) {
+      return getSpeciesByName('ZZ Plant') ?? PlantSpecies(
+        commonName: 'ZZ Plant',
+        lifespanDays: 1000,
+        wateringIntervalDays: 14,
+        sunlight: 'Low to Bright Indirect',
+        description: 'Hardy drought-tolerant foliage with shiny waxy leaflets and underground water-storing rhizomes.',
+        idealTemp: '18°C - 26°C',
+      );
+    }
+    if (query.contains('monstera') || query.contains('deliciosa') || query.contains('swiss cheese')) {
+      return getSpeciesByName('Monstera') ?? PlantSpecies(
+        commonName: 'Monstera Deliciosa',
+        lifespanDays: 1000,
+        wateringIntervalDays: 7,
+        sunlight: 'Bright Indirect Light',
+        description: 'Iconic split-leaf tropical climbing plant.',
+        idealTemp: '18°C - 30°C',
+      );
+    }
 
     // 4. Substring matching against cached species
     for (final s in _cachedSpecies) {
@@ -215,6 +235,24 @@ class ExcelService {
       }
     }
 
-    return _cachedSpecies.isNotEmpty ? _cachedSpecies.first : PlantSpecies(commonName: rawAiLabel, lifespanDays: 180, wateringIntervalDays: 3);
+    // Preserve AI identified species instead of arbitrarily defaulting to Neem Tree
+    final cleanLabel = rawAiLabel.trim();
+    if (cleanLabel.isNotEmpty &&
+        cleanLabel.toLowerCase() != 'unknown' &&
+        cleanLabel.toLowerCase() != 'plant' &&
+        cleanLabel.toLowerCase() != 'unknown species') {
+      return PlantSpecies(
+        commonName: cleanLabel,
+        lifespanDays: 365,
+        wateringIntervalDays: 4,
+        sunlight: 'Bright Indirect Light',
+        description: 'Identified by SpryFlora Botanical AI Vision.',
+        idealTemp: '18°C - 28°C',
+      );
+    }
+
+    return _cachedSpecies.isNotEmpty
+        ? _cachedSpecies.first
+        : PlantSpecies(commonName: rawAiLabel, lifespanDays: 180, wateringIntervalDays: 3);
   }
 }

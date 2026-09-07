@@ -10,5 +10,7 @@ router.post('/register', authLimiter, validateBody(['email', 'password']), authC
 router.post('/login', authLimiter, validateBody(['email', 'password']), authController.login);
 router.get('/verify', authenticateToken, authController.verify);
 router.post('/logout', authenticateToken, authController.logout);
+router.post('/forgot-password/verify', authLimiter, authController.forgotPasswordVerify);
+router.post('/forgot-password/reset', authLimiter, validateBody(['email', 'newPassword']), authController.forgotPasswordReset);
 
 export default router;

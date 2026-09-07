@@ -71,7 +71,7 @@ class _PlantAnalysisLoaderScreenState extends State<PlantAnalysisLoaderScreen>
     final tempPlant = PlantModel(
       id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
       plantName: 'New Plant',
-      speciesName: 'Rose',
+      speciesName: '',
       plantingDate: DateTime.now(),
       lifespanDays: 120,
       wateringIntervalDays: 3,

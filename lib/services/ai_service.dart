@@ -58,6 +58,22 @@ class AIService {
 
   String get apiKey => ApiConfig.geminiApiKey;
 
+  /// Identifies plant species from live camera frames or photo paths
+  Future<PlantAIAnalysisResult> identifyPlantSpecies({
+    required String photoPath,
+    List<PlantSpecies>? cachedSpecies,
+  }) async {
+    final tempPlant = PlantModel(
+      id: 'scan_${DateTime.now().millisecondsSinceEpoch}',
+      plantName: 'Scanned Plant',
+      speciesName: '',
+      plantingDate: DateTime.now(),
+      lifespanDays: 180,
+      wateringIntervalDays: 3,
+    );
+    return analyzePlantPhoto(plant: tempPlant, photoPath: photoPath);
+  }
+
   /// Performs deep multimodal image & botanical diagnostic analysis of a captured plant photo,
   /// cross-referencing against the species database and rewarding new discoveries.
   Future<PlantAIAnalysisResult> analyzePlantPhoto({
@@ -77,6 +93,8 @@ class AIService {
     bool isPlantDetected = true;
     String? rejectionReason;
     String detectedObjectType = 'Plant / Leaf';
+
+    bool aiIdentified = false;
 
     // Multimodal AI Vision Diagnosis with Gemini
     if ((apiKey.isNotEmpty || ApiConfig.usesBackendProxy) && photoPath != null && photoPath.isNotEmpty) {
@@ -103,6 +121,7 @@ class AIService {
             if (hfResult != null && hfResult['label'] != null) {
               detectedSpeciesName = hfResult['label'].toString();
               confidence = (hfResult['confidence'] as int?) ?? confidence;
+              aiIdentified = true;
             }
           }
 
@@ -149,10 +168,15 @@ Do not wrap in markdown quotes. Return pure JSON only.
 
           if (visionResponse != null && visionResponse.isNotEmpty) {
             try {
-              final cleaned = visionResponse
+              String cleaned = visionResponse
                   .replaceAll('```json', '')
                   .replaceAll('```', '')
                   .trim();
+              final startIdx = cleaned.indexOf('{');
+              final endIdx = cleaned.lastIndexOf('}');
+              if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
+                cleaned = cleaned.substring(startIdx, endIdx + 1);
+              }
               final map = jsonDecode(cleaned);
 
               if (map['isPlantDetected'] != null) {
@@ -166,9 +190,12 @@ Do not wrap in markdown quotes. Return pure JSON only.
               }
 
               if (map['identifiedSpecies'] != null &&
-                  map['identifiedSpecies'].toString().trim().isNotEmpty) {
+                  map['identifiedSpecies'].toString().trim().isNotEmpty &&
+                  map['identifiedSpecies'].toString().trim().toLowerCase() != 'unknown' &&
+                  map['identifiedSpecies'].toString().trim().toLowerCase() != 'plant') {
                 detectedSpeciesName =
                     map['identifiedSpecies'].toString().trim();
+                aiIdentified = true;
               }
               health = (map['healthPercent'] as num?)?.toInt() ?? health;
               disease = (map['diseaseStatus'] as String?) ?? disease;
@@ -183,21 +210,42 @@ Do not wrap in markdown quotes. Return pure JSON only.
             } catch (e) {
               debugPrint('Error parsing Vision response JSON: $e');
             }
-          } else if (rawBytes != null) {
+          } else {
+            isPlantDetected = false;
+            detectedObjectType = 'Problem on SpryFlora feature';
+            rejectionReason =
+                'There is a problem on the SpryFlora plant recognition feature. Unable to recognize plant. Please try again.';
+            detectedSpeciesName = 'Problem on SpryFlora feature';
+            confidence = 0;
+          }
+
+          if (!aiIdentified && isPlantDetected && rawBytes != null) {
             final offlineValid = _isBotanicalImageBytes(rawBytes);
             if (!offlineValid) {
               isPlantDetected = false;
               detectedObjectType = 'Wall / Non-Botanical Object';
               rejectionReason =
                   'No plant, leaf, or seedling detected in photo. Please scan a clear image of a plant.';
+            } else {
+              isPlantDetected = false;
+              detectedObjectType = 'Problem on SpryFlora feature';
+              rejectionReason =
+                  'There is a problem on the SpryFlora plant recognition feature. Unable to identify species.';
+              detectedSpeciesName = 'Problem on SpryFlora feature';
+              confidence = 0;
             }
           }
         }
       } catch (e) {
         debugPrint('Multimodal vision analysis failed: $e');
+        isPlantDetected = false;
+        detectedObjectType = 'Problem on SpryFlora feature';
+        rejectionReason =
+            'There is a problem on the SpryFlora plant recognition feature: ${e.toString().replaceAll('Exception: ', '')}';
+        detectedSpeciesName = 'Problem on SpryFlora feature';
+        confidence = 0;
       }
-    }
- else if (photoPath != null && photoPath.isNotEmpty && !kIsWeb && File(photoPath).existsSync()) {
+    } else if (photoPath != null && photoPath.isNotEmpty && !kIsWeb && File(photoPath).existsSync()) {
       try {
         final rawBytes = await File(photoPath).readAsBytes();
         final offlineValid = _isBotanicalImageBytes(rawBytes);
@@ -206,29 +254,50 @@ Do not wrap in markdown quotes. Return pure JSON only.
           detectedObjectType = 'Wall / Non-Botanical Object';
           rejectionReason =
               'No plant, leaf, or seedling detected in photo. Scanner detected a wall, pen, or plain surface.';
+        } else {
+          isPlantDetected = false;
+          detectedObjectType = 'Problem on SpryFlora feature';
+          rejectionReason =
+              'There is a problem on the SpryFlora plant recognition feature. Offline AI vision service unavailable.';
+          detectedSpeciesName = 'Problem on SpryFlora feature';
+          confidence = 0;
         }
       } catch (_) {}
     }
 
     if (!isPlantDetected) {
+      final isFeatureIssue = detectedObjectType.contains('SpryFlora') ||
+          (rejectionReason?.contains('SpryFlora') ?? false);
       return PlantAIAnalysisResult(
         healthPercent: 0,
-        diseaseStatus: 'Invalid Capture',
+        diseaseStatus: isFeatureIssue ? 'Feature Issue' : 'Invalid Capture',
         confidencePercent: 0,
-        recommendations: [
-          'Please capture a photo showing actual plant leaves, seedlings, or stem',
-          'Avoid taking pictures of walls, pens, desks, or background objects',
-          'Ensure adequate lighting focused directly on plant foliage',
-        ],
+        recommendations: isFeatureIssue
+            ? [
+                'There is a problem on the SpryFlora plant recognition feature',
+                'Please check your internet connection and try again',
+                'Or choose your plant species directly from the botanical catalog',
+              ]
+            : [
+                'Please capture a photo showing actual plant leaves, seedlings, or stem',
+                'Avoid taking pictures of walls, pens, desks, or background objects',
+                'Ensure adequate lighting focused directly on plant foliage',
+              ],
         detailedAdvice: rejectionReason ??
-            'No plant, seedling, or leaf detected in photo. Scanner detected $detectedObjectType.',
-        identifiedSpecies: 'Not a Plant ($detectedObjectType)',
+            (isFeatureIssue
+                ? 'There is a problem on the SpryFlora plant recognition feature. Please try again.'
+                : 'No plant, seedling, or leaf detected in photo. Scanner detected $detectedObjectType.'),
+        identifiedSpecies: isFeatureIssue
+            ? 'Problem on SpryFlora feature'
+            : 'Not a Plant ($detectedObjectType)',
         isNewDiscovery: false,
         discoveryBadgeName: null,
         discoveryRewardMessage: null,
         isPlantDetected: false,
         rejectionReason: rejectionReason ??
-            'No plant, seedling, or leaf detected in photo. Detected: $detectedObjectType',
+            (isFeatureIssue
+                ? 'There is a problem on the SpryFlora plant recognition feature.'
+                : 'No plant, seedling, or leaf detected in photo. Detected: $detectedObjectType'),
         detectedObjectType: detectedObjectType,
       );
     }
@@ -252,11 +321,22 @@ Do not wrap in markdown quotes. Return pure JSON only.
       detectedObjectType: detectedObjectType,
     );
 
-    detectedSpeciesName = dbMatch.name;
+    if (dbMatch.name.isNotEmpty && dbMatch.name.toLowerCase() != 'unknown') {
+      detectedSpeciesName = dbMatch.name;
+    }
 
-    bool isNewDiscovery = false;
-    String? discoveryBadge;
-    String? discoveryReward;
+    final bool isKnownBase = _excelService.speciesList.any(
+      (s) => s.name.toLowerCase() == detectedSpeciesName.toLowerCase(),
+    );
+    final bool isNewDiscovery = !isKnownBase && isPlantDetected;
+    final String? discoveryBadge = isNewDiscovery ? 'Botanical Pioneer' : null;
+    final String? discoveryReward = isNewDiscovery
+        ? 'You discovered $detectedSpeciesName! Added to your Flora Journal (+50 Eco Seeds)'
+        : null;
+
+    if (isNewDiscovery) {
+      _excelService.addNewSpecies(dbMatch);
+    }
 
     return PlantAIAnalysisResult(
       healthPercent: health,
@@ -470,7 +550,8 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
     final modelsToTry = [
       ApiConfig.primaryModel,
       ApiConfig.secondaryModel,
-      'gemini-1.5-flash',
+      'gemini-3.6-flash',
+      'gemini-flash-latest',
     ];
 
     for (final currentKey in keysToTry) {
@@ -492,13 +573,16 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
             ],
             'generationConfig': {
               'temperature': 0.7,
-              'maxOutputTokens': 250,
+              'maxOutputTokens': 1024,
+              'thinkingConfig': {
+                'thinkingBudget': 0,
+              },
             }
           });
 
           final response = await http
               .post(uri, headers: headers, body: body)
-              .timeout(const Duration(seconds: 7));
+              .timeout(const Duration(seconds: 8));
 
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
@@ -531,11 +615,14 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
           uri,
           headers: AuthService().getAuthorizationHeaders(),
           body: jsonEncode({'prompt': prompt, 'image': base64Image}),
-        ).timeout(const Duration(seconds: 12));
+        ).timeout(const Duration(seconds: 4));
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data['result'] != null) return data['result'].toString();
           if (data['text'] != null) return data['text'].toString();
+          if (data is Map && data.containsKey('isPlantDetected')) {
+            return response.body;
+          }
         }
       } catch (e) {
         debugPrint('Backend proxy vision AI call failed: $e');
@@ -555,9 +642,13 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
     final modelsToTry = [
       ApiConfig.primaryModel,
       ApiConfig.secondaryModel,
-      'gemini-1.5-flash',
-      'gemini-2.0-flash',
+      'gemini-3.6-flash',
+      'gemini-flash-latest',
     ];
+
+    final mimeType = (base64Image.startsWith('iVBOR') || base64Image.startsWith('data:image/png'))
+        ? 'image/png'
+        : 'image/jpeg';
 
     for (final currentKey in keysToTry) {
       if (currentKey.isEmpty) continue;
@@ -575,7 +666,7 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
                   {'text': prompt},
                   {
                     'inlineData': {
-                      'mimeType': 'image/jpeg',
+                      'mimeType': mimeType,
                       'data': base64Image,
                     }
                   }
@@ -583,8 +674,11 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
               }
             ],
             'generationConfig': {
-              'temperature': 0.4,
-              'maxOutputTokens': 500,
+              'temperature': 0.2,
+              'maxOutputTokens': 2048,
+              'thinkingConfig': {
+                'thinkingBudget': 0,
+              },
             }
           });
 
@@ -753,15 +847,25 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
 
       if ((apiKey.isNotEmpty || ApiConfig.usesBackendProxy) && base64Image != null && base64Image.isNotEmpty) {
         final prompt = '''
-Analyze this image submitted as proof of watering a plant named "${plant.plantName}" (${plant.speciesName}).
-Determine if the photo shows a plant/leaf and signs of watering activity (water droplets, watering container, soil hydration).
+Analyze this real-time camera photo submitted as proof of watering a plant named "${plant.plantName}" (${plant.speciesName}).
+Requirements for verification:
+1. The image MUST show a plant or foliage.
+2. The image MUST show clear evidence of watering:
+   - A watering jug, watering can, mug, bottle, cup, sprayer, or watering container, AND/OR
+   - Fresh water droplets, water stream, or freshly soaked soil/leaves on the plant.
+
+If the photo shows a dry plant with NO watering container or water droplets, or if it is not a plant, reject it!
 
 Return JSON only:
 {
   "isWateringVerified": true,
+  "wateringToolDetected": true,
+  "waterDropletsDetected": true,
   "confidencePercent": 92,
-  "userFeedback": "Great job watering your ${plant.plantName}! 💧"
+  "userFeedback": "Watering verified! Watering container or fresh water detected. 💧"
 }
+
+If not verified, set isWateringVerified to false and provide userFeedback explaining what is missing (e.g. "Watering jug/can or water on plant not detected. Please capture with your watering tool or fresh water droplets on the plant.").
 ''';
 
         final response = await _callGeminiVisionApi(

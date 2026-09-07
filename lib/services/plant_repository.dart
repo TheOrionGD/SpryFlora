@@ -112,7 +112,7 @@ class PlantRepository extends ChangeNotifier {
     await _savePlantsToStorage();
     notifyListeners();
     WidgetSyncService().updateWidgetData(plantsList: _plants);
-    NotificationService().reconcileNotifications(_plants);
+    NotificationService().notifyPlantAdded(taggedPlant);
     SyncService().syncPlants(_plants);
     return taggedPlant;
   }
@@ -125,7 +125,6 @@ class PlantRepository extends ChangeNotifier {
       await _savePlantsToStorage();
       notifyListeners();
       WidgetSyncService().updateWidgetData(plantsList: _plants);
-      NotificationService().reconcileNotifications(_plants);
       SyncService().syncPlants(_plants);
     }
   }
@@ -141,7 +140,6 @@ class PlantRepository extends ChangeNotifier {
       await _savePlantsToStorage();
       notifyListeners();
       WidgetSyncService().updateWidgetData(plantsList: _plants);
-      NotificationService().reconcileNotifications(_plants);
       SyncService().syncPlants(_plants);
     }
   }
@@ -154,7 +152,6 @@ class PlantRepository extends ChangeNotifier {
     await _saveCheckinsToStorage();
     notifyListeners();
     WidgetSyncService().updateWidgetData(plantsList: _plants);
-    NotificationService().reconcileNotifications(_plants);
     SyncService().syncPlants(_plants);
   }
 

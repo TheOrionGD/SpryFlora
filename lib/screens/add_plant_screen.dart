@@ -4,25 +4,40 @@ import 'package:intl/intl.dart';
 
 import '../models/plant_model.dart';
 import '../models/plant_species.dart';
-import '../services/ai_service.dart';
 import '../services/excel_service.dart';
-import '../services/image_service.dart';
 import '../services/plant_repository.dart';
 import '../services/watering_service.dart';
+import '../services/weather_service.dart';
 import '../theme/skeuo_theme.dart';
 import '../widgets/app_photo_view.dart';
 import '../widgets/fun_bouncy_button.dart';
-import '../widgets/skeuo_live_camera_screen.dart';
 import '../widgets/app_background.dart';
-import 'plant_analysis_loader_screen.dart';
+import '../widgets/cloud_transition.dart';
+import 'realtime_plant_scanner_screen.dart';
 
-
-/// Refactored Screen 09: Camera-First & AI Species Identification Add Plant Flow
-/// 1. Direct Camera Capture prompt upon opening
-/// 2. Groq & Hugging Face Vision AI Species Identification & Cross-checking
-/// 3. Plant Details Confirmation & Saving
+/// Screen 09 / Confirmation Screen: AI-Identified Plant Confirmation
+/// Receives auto-captured real-time photo & AI classification from RealtimePlantScannerScreen
 class AddPlantScreen extends StatefulWidget {
-  const AddPlantScreen({super.key});
+  final String? autoCapturedPhotoPath;
+  final PlantSpecies? initialSpecies;
+  final String? identifiedSpeciesName;
+  final int? aiConfidence;
+  final bool isNewDiscovery;
+  final bool isPlantDetected;
+  final String? rejectionReason;
+  final String? detectedObjectType;
+
+  const AddPlantScreen({
+    super.key,
+    this.autoCapturedPhotoPath,
+    this.initialSpecies,
+    this.identifiedSpeciesName,
+    this.aiConfidence,
+    this.isNewDiscovery = false,
+    this.isPlantDetected = true,
+    this.rejectionReason,
+    this.detectedObjectType,
+  });
 
   @override
   State<AddPlantScreen> createState() => _AddPlantScreenState();
@@ -34,13 +49,26 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
 
   DateTime _plantingDate = DateTime.now();
   PlantSpecies? _selectedSpecies;
-  String _plantEnvironment = 'Pot'; // 'Pot' or 'Outdoor'
-  bool _isAnalyzingPhoto = false;
+  String _plantEnvironment = 'Indoor'; // 'Indoor' or 'Outdoor'
+  final _locationController = TextEditingController(text: 'Study Desk');
+  String _selectedLocation = 'Study Desk';
+
+  final List<Map<String, dynamic>> _popularLocations = const [
+    {'name': 'Study Desk', 'emoji': '📚'},
+    {'name': 'My Bedroom', 'emoji': '🛏️'},
+    {'name': 'Window Sill', 'emoji': '🪟'},
+    {'name': 'Balcony Garden', 'emoji': '🌿'},
+    {'name': 'Playroom', 'emoji': '🧸'},
+    {'name': 'Backyard Garden', 'emoji': '🏡'},
+    {'name': 'Classroom', 'emoji': '🎒'},
+    {'name': 'Living Room', 'emoji': '🛋️'},
+  ];
+
+  final bool _isAnalyzingPhoto = false;
   bool _isSaving = false;
 
   final ExcelService _excelService = ExcelService();
   final PlantRepository _plantRepository = PlantRepository();
-  final ImageService _imageService = ImageService();
 
   String? _initialPhotoPath;
 
@@ -49,32 +77,87 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
   String _detectedObjectType = 'Plant / Leaf';
   String? _rejectionReason;
   String _identifiedSpeciesName = '';
-  int _aiConfidence = 95;
+  int _aiConfidence = 90;
   bool _isNewDiscovery = false;
 
   @override
   void initState() {
     super.initState();
+    _isPlantDetected = widget.isPlantDetected;
+    _rejectionReason = widget.rejectionReason;
+    _detectedObjectType = widget.detectedObjectType ?? 'Plant / Leaf';
+
+    final isProblemOnFeature = !_isPlantDetected ||
+        (widget.identifiedSpeciesName?.contains('Problem on SpryFlora') ?? false) ||
+        (widget.detectedObjectType?.contains('Problem on SpryFlora') ?? false) ||
+        (widget.rejectionReason?.contains('Problem on SpryFlora') ?? false);
+
+    if (isProblemOnFeature) {
+      _isPlantDetected = false;
+      _selectedSpecies = null;
+      _identifiedSpeciesName = '';
+      _nameController.text = '';
+      _aiConfidence = 0;
+      _detectedObjectType = widget.detectedObjectType ?? 'Problem on SpryFlora feature';
+      _rejectionReason = widget.rejectionReason ??
+          'There is a problem on the SpryFlora plant recognition feature. Please select your plant species manually below.';
+    } else if (widget.autoCapturedPhotoPath != null) {
+      _initialPhotoPath = widget.autoCapturedPhotoPath;
+      _selectedSpecies = widget.initialSpecies;
+      _identifiedSpeciesName = widget.identifiedSpeciesName ?? (widget.initialSpecies?.name ?? '');
+      _nameController.text = _identifiedSpeciesName.isNotEmpty ? 'My $_identifiedSpeciesName' : '';
+      _aiConfidence = widget.aiConfidence ?? 90;
+      _isNewDiscovery = widget.isNewDiscovery;
+      _plantEnvironment = _detectPlantType(widget.initialSpecies);
+    }
     _loadSpeciesAndOpenCamera();
+    _fetchGpsLocation();
+  }
+
+  String _detectPlantType(PlantSpecies? species) {
+    if (species == null) return 'Indoor';
+    final light = species.sunlight.toLowerCase();
+    final name = species.name.toLowerCase();
+    if (light.contains('indoor') ||
+        light.contains('low') ||
+        name.contains('zz') ||
+        name.contains('snake') ||
+        name.contains('pothos') ||
+        name.contains('money') ||
+        name.contains('spider')) {
+      return 'Indoor';
+    }
+    return 'Outdoor';
+  }
+
+  Future<void> _fetchGpsLocation() async {
+    try {
+      final pos = await WeatherService().getCurrentPosition();
+      if (pos != null) {
+        final loc = await WeatherService().reverseGeocode(pos.latitude, pos.longitude);
+        if (mounted && loc.isNotEmpty) {
+          setState(() {
+            _selectedLocation = loc;
+            _locationController.text = loc;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _locationController.dispose();
     super.dispose();
   }
 
   Future<void> _loadSpeciesAndOpenCamera() async {
     try {
-      final list = await _excelService.loadSpeciesDatabase();
-      if (mounted && list.isNotEmpty) {
-        setState(() {
-          _selectedSpecies = list.first;
-        });
-      }
+      await _excelService.loadSpeciesDatabase();
     } catch (_) {}
 
-    // Automatically trigger Camera Capture on opening if no photo present yet
+    // If opened directly without auto-captured photo, launch live scanner
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_initialPhotoPath == null && mounted) {
         _openLiveCamera();
@@ -83,61 +166,12 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
   }
 
   Future<void> _openLiveCamera() async {
-    final livePhoto = await Navigator.of(context).push<String?>(
-      MaterialPageRoute(
-        builder: (_) => SkeuoLiveCameraScreen(
-          title: 'Capture Plant Photo',
-          prefix: 'plant_${DateTime.now().millisecondsSinceEpoch}',
-        ),
-      ),
+    final navResult = await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const RealtimePlantScannerScreen()),
     );
-
-    if (livePhoto != null && mounted) {
-      _processCapturedPhoto(livePhoto);
+    if (navResult == true && mounted) {
+      Navigator.of(context).pop(true);
     }
-  }
-
-  Future<void> _processCapturedPhoto(String photoPath) async {
-    setState(() {
-      _initialPhotoPath = photoPath;
-    });
-
-    final result = await Navigator.of(context).push<PlantAIAnalysisResult>(
-      MaterialPageRoute(
-        builder: (_) => PlantAnalysisLoaderScreen(photoPath: photoPath),
-      ),
-    );
-
-    if (result == null || !mounted) return;
-
-    setState(() {
-      _isAnalyzingPhoto = false;
-      _isPlantDetected = result.isPlantDetected;
-      _detectedObjectType = result.detectedObjectType;
-      _rejectionReason = result.rejectionReason;
-      _identifiedSpeciesName = result.identifiedSpecies;
-      _aiConfidence = result.confidencePercent;
-      _isNewDiscovery = result.isNewDiscovery;
-
-      if (result.isPlantDetected) {
-        if (result.matchedSpecies != null) {
-          _selectedSpecies = result.matchedSpecies;
-        } else {
-          _selectedSpecies = PlantSpecies(
-            commonName: result.identifiedSpecies,
-            lifespanDays: 180,
-            wateringIntervalDays: 3,
-            sunlight: 'Bright Indirect Light',
-            targetSunlightHours: 4,
-            description: 'Identified by SpryFlora AI Vision.',
-          );
-        }
-
-        if (_nameController.text.trim().isEmpty) {
-          _nameController.text = result.identifiedSpecies;
-        }
-      }
-    });
   }
 
   Future<void> _pickDate() async {
@@ -188,22 +222,30 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
       return;
     }
 
+    if (_selectedSpecies == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select your plant species from the botanical list below.'),
+          backgroundColor: SkeuoTheme.warningOrange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
-      final species = _selectedSpecies ??
-          PlantSpecies(
-            commonName: _identifiedSpeciesName.isNotEmpty
-                ? _identifiedSpeciesName
-                : 'Tulsi',
-            lifespanDays: 180,
-            wateringIntervalDays: 3,
-          );
+      final species = _selectedSpecies!;
 
       final nextWatering = WateringService.calculateInitialNextWatering(
         _plantingDate,
         species.wateringIntervalDays,
       );
+
+      final finalLocation = _locationController.text.trim().isNotEmpty
+          ? _locationController.text.trim()
+          : _selectedLocation;
 
       final newPlant = PlantModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -214,11 +256,17 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
         plantingDate: _plantingDate,
         lastWateredDate: _plantingDate,
         nextWateringDate: nextWatering,
-        location: _plantEnvironment,
+        location: finalLocation,
         initialPhotoPath: _initialPhotoPath,
       );
 
-      await _plantRepository.addPlant(newPlant);
+      await CloudTransitionOverlay.run(
+        context,
+        message: '🌱 Welcoming to My Plants...',
+        task: () async {
+          await _plantRepository.addPlant(newPlant);
+        },
+      );
 
       if (!mounted) return;
       final messenger = ScaffoldMessenger.of(context);
@@ -319,14 +367,14 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                           const SizedBox(height: 16),
 
                           // Plant Nickname Input
-                          _buildFieldLabel('Plant Nickname'),
+                          _buildFieldLabel('Plant Buddy Nickname 🏷️'),
                           const SizedBox(height: 6),
                           _buildTextInput(
                             controller: _nameController,
-                            hint: 'Enter plant nickname (e.g. My Neem Tree)',
+                            hint: 'Give your plant buddy a fun name! (e.g. Leafy, Spikey, Sunny)',
                             validator: (val) {
                               if (val == null || val.trim().isEmpty) {
-                                return 'Please enter a plant name';
+                                return 'Please give your plant buddy a name!';
                               }
                               return null;
                             },
@@ -338,15 +386,21 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                           const SizedBox(height: 16),
 
                           // Planting Date Selector
-                          _buildFieldLabel('Planting Date'),
+                          _buildFieldLabel('Planting Birthday 🎂'),
                           const SizedBox(height: 6),
                           _buildDateSelector(),
                           const SizedBox(height: 18),
 
                           // Environment Selector (Pot / Outdoor)
-                          _buildFieldLabel('Where is it planted?'),
+                          _buildFieldLabel('Where is it growing? 🪴'),
                           const SizedBox(height: 8),
                           _buildEnvironmentSelector(),
+                          const SizedBox(height: 18),
+
+                          // Plant Location Selector & Custom Location Input
+                          _buildFieldLabel('Where do you keep your plant buddy? 📍'),
+                          const SizedBox(height: 8),
+                          _buildLocationSelectorSection(),
                           const SizedBox(height: 28),
 
                           // Submit Action Button
@@ -356,7 +410,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                                       color: SkeuoTheme.primaryGreen),
                                 )
                               : FunBouncyButton(
-                                  text: 'Add Plant to Garden',
+                                  text: '🌱 Welcome Plant to My Garden! 🌟',
                                   onPressed: _savePlant,
                                   color: SkeuoTheme.primaryGreen,
                                   height: 52,
@@ -388,7 +442,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
           ),
           Expanded(
             child: Text(
-              'Add New Plant',
+              'Adopt a Plant Buddy 🌱',
               textAlign: TextAlign.center,
               style: GoogleFonts.nunito(
                 fontSize: 20,
@@ -410,7 +464,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
 
   Widget _buildPhotoCaptureSection() {
     return GestureDetector(
-      onTap: _capturePhotoOptions,
+      onTap: _openLiveCamera,
       child: Container(
         width: double.infinity,
         height: 210,
@@ -527,27 +581,38 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
 
   Widget _buildAIAnalysisBanner() {
     if (!_isPlantDetected) {
+      final isFeatureIssue = _detectedObjectType.contains('SpryFlora') ||
+          (_rejectionReason?.contains('SpryFlora') ?? false);
+
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFEBEE),
+          color: isFeatureIssue ? const Color(0xFFFFF3E0) : const Color(0xFFFFEBEE),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFEF5350), width: 1.5),
+          border: Border.all(
+            color: isFeatureIssue ? const Color(0xFFFFB74D) : const Color(0xFFEF5350),
+            width: 1.5,
+          ),
         ),
         child: Column(
           children: [
             Row(
               children: [
-                const Icon(Icons.warning_amber_rounded,
-                    color: Color(0xFFC62828), size: 24),
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: isFeatureIssue ? const Color(0xFFE65100) : const Color(0xFFC62828),
+                  size: 24,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Non-Plant Image Detected',
+                    isFeatureIssue
+                        ? 'Problem on SpryFlora Feature'
+                        : 'Non-Plant Image Detected',
                     style: GoogleFonts.nunito(
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
-                      color: const Color(0xFFC62828),
+                      color: isFeatureIssue ? const Color(0xFFE65100) : const Color(0xFFC62828),
                     ),
                   ),
                 ),
@@ -556,7 +621,9 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
             const SizedBox(height: 8),
             Text(
               _rejectionReason ??
-                  'The AI scanner detected a $_detectedObjectType instead of a plant. Please capture a clear image of plant leaves.',
+                  (isFeatureIssue
+                      ? 'There is a problem on the SpryFlora plant recognition feature. Please choose your plant species from the botanical catalog below or scan again.'
+                      : 'The AI scanner detected a $_detectedObjectType instead of a plant. Please capture a clear image of plant leaves.'),
               style: GoogleFonts.nunito(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -567,9 +634,9 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
             ElevatedButton.icon(
               onPressed: _openLiveCamera,
               icon: const Icon(Icons.camera_alt_rounded, size: 18),
-              label: const Text('Re-Scan Plant Photo'),
+              label: Text(isFeatureIssue ? 'Re-Scan with SpryFlora Camera' : 'Re-Scan Plant Photo'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD32F2F),
+                backgroundColor: isFeatureIssue ? const Color(0xFFEF6C00) : const Color(0xFFD32F2F),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -794,7 +861,63 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                     color: SkeuoTheme.textSecondary,
                   ),
                 ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _buildMiniBadge(
+                      icon: _plantEnvironment == 'Indoor' ? Icons.home_rounded : Icons.park_rounded,
+                      label: '$_plantEnvironment Plant',
+                      color: const Color(0xFF1E88E5),
+                      bgColor: const Color(0xFFE3F2FD),
+                    ),
+                    _buildMiniBadge(
+                      icon: Icons.my_location_rounded,
+                      label: _selectedLocation.isNotEmpty ? _selectedLocation : 'GPS Location',
+                      color: const Color(0xFF2E7D32),
+                      bgColor: const Color(0xFFE8F5E9),
+                    ),
+                    _buildMiniBadge(
+                      icon: Icons.straighten_rounded,
+                      label: '15-25 cm • Day 0 Sprout',
+                      color: const Color(0xFFE65100),
+                      bgColor: const Color(0xFFFFF3E0),
+                    ),
+                  ],
+                ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniBadge({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required Color bgColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.nunito(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: color,
             ),
           ),
         ],
@@ -987,13 +1110,13 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
     return Row(
       children: [
         _buildEnvOption(
-          label: 'Pot',
-          isSelected: _plantEnvironment == 'Pot',
-          onTap: () => setState(() => _plantEnvironment = 'Pot'),
+          label: 'Flowerpot 🪴',
+          isSelected: _plantEnvironment == 'Indoor' || _plantEnvironment == 'Pot',
+          onTap: () => setState(() => _plantEnvironment = 'Indoor'),
         ),
         const SizedBox(width: 24),
         _buildEnvOption(
-          label: 'Outdoor',
+          label: 'Garden Ground 🌳',
           isSelected: _plantEnvironment == 'Outdoor',
           onTap: () => setState(() => _plantEnvironment = 'Outdoor'),
         ),
@@ -1044,116 +1167,117 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
     );
   }
 
-  Future<void> _capturePhotoOptions() async {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
+  Widget _buildLocationSelectorSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _popularLocations.map((loc) {
+            final name = loc['name'] as String;
+            final emoji = loc['emoji'] as String;
+            final isSelected = _selectedLocation == name &&
+                (_locationController.text.trim() == name ||
+                    _locationController.text.trim().isEmpty);
+
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedLocation = name;
+                  _locationController.text = name;
+                });
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
+                  color: isSelected
+                      ? SkeuoTheme.primaryGreen
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isSelected
+                        ? SkeuoTheme.primaryGreen
+                        : const Color(0xFFC8E6C9),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isSelected
+                          ? const Color(0xFF2E7D32).withValues(alpha: 0.25)
+                          : Colors.black.withValues(alpha: 0.03),
+                      blurRadius: isSelected ? 6 : 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Capture Plant Photo',
-                style: GoogleFonts.nunito(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: SkeuoTheme.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        _openLiveCamera();
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5E9),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                              color: const Color(0xFF81C784), width: 1.5),
-                        ),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.camera_alt_rounded,
-                                size: 32, color: SkeuoTheme.primaryGreen),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Live Camera',
-                              style: GoogleFonts.nunito(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: SkeuoTheme.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(emoji, style: const TextStyle(fontSize: 14)),
+                    const SizedBox(width: 6),
+                    Text(
+                      name,
+                      style: GoogleFonts.nunito(
+                        fontSize: 13,
+                        fontWeight:
+                            isSelected ? FontWeight.w900 : FontWeight.w700,
+                        color: isSelected
+                            ? Colors.white
+                            : SkeuoTheme.textPrimary,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () async {
-                        Navigator.pop(ctx);
-                        final path = await _imageService.pickFromGallery(
-                          prefix:
-                              'plant_${DateTime.now().millisecondsSinceEpoch}',
-                        );
-                        if (path != null && mounted) {
-                          _processCapturedPhoto(path);
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5E9),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                              color: const Color(0xFF81C784), width: 1.5),
-                        ),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.photo_library_rounded,
-                                size: 32, color: SkeuoTheme.primaryGreen),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Gallery',
-                              style: GoogleFonts.nunito(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: SkeuoTheme.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        // Custom Location Text Input
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE8F5E9), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF2E7D32).withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
+          child: TextFormField(
+            controller: _locationController,
+            style: GoogleFonts.nunito(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: SkeuoTheme.textPrimary,
+            ),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.place_rounded,
+                  color: SkeuoTheme.primaryGreen, size: 20),
+              hintText: 'Or type where you keep it (e.g. My Bookshelf, Sunny Corner)',
+              hintStyle: GoogleFonts.nunito(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: SkeuoTheme.textSecondary.withValues(alpha: 0.6),
+              ),
+              border: InputBorder.none,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+            onChanged: (val) {
+              setState(() {
+                _selectedLocation = val.trim();
+              });
+            },
+          ),
         ),
-      ),
+      ],
     );
   }
 }
