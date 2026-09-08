@@ -497,7 +497,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
         ),
         const SizedBox(height: 4),
         Text(
-          'Favorite Plant: ${_user?.favoritePlant ?? "Tulsi"} 🌱',
+          'Favorite Plant: ${_user?.favoritePlant != null && _user!.favoritePlant.isNotEmpty ? _user!.favoritePlant : "Not set"} 🌱',
           style: GoogleFonts.nunito(
             fontSize: 13,
             fontWeight: FontWeight.w600,

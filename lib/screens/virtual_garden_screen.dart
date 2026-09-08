@@ -8,16 +8,16 @@ import '../services/plant_repository.dart';
 import '../services/user_service.dart';
 import '../theme/skeuo_theme.dart';
 import '../widgets/app_photo_view.dart';
-import '../widgets/fun_bouncy_button.dart';
 import '../widgets/isometric_garden_island.dart';
 import '../widgets/leaves_particle_overlay.dart';
 import 'plant_details_screen.dart';
 import 'realtime_plant_scanner_screen.dart';
+import 'virtual_plant_growth_screen.dart';
 
-/// Interactive Virtual Garden Screen — Upgraded with Seasonal Isometric Island
+/// Interactive Virtual Garden Screen — Botanical Sanctuary
 /// Full-screen interactive isometric garden world with pinch-to-zoom, seasonal
-/// theme detection, dynamic sky gradients, quick-water actions, and a botanical
-/// plots list below for users who prefer the traditional layout.
+/// theme detection, dynamic sky gradients, quick-water actions, and botanical
+/// plots list.
 class VirtualGardenScreen extends StatefulWidget {
   const VirtualGardenScreen({super.key});
 
@@ -33,13 +33,13 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
   late AnimationController _breezeCtrl;
 
   late GardenSeason _currentSeason;
-  bool _isAutoSeason = true;
-  bool _showPlotsGrid = false;
+  bool _isAutoSeason = false;
+  int _viewMode = 0; // 0: Island, 1: Plots
 
   @override
   void initState() {
     super.initState();
-    _currentSeason = GardenSeason.currentForDate(DateTime.now());
+    _currentSeason = GardenSeason.spring;
     _plantRepo.addListener(_onRepoUpdate);
     _plantRepo.loadLocalData();
     _userService.loadUserData();
@@ -127,13 +127,19 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           _buildViewToggle(),
-                          Text(
-                            _currentSeason.tagLine,
-                            style: GoogleFonts.nunito(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF2E4032).withValues(alpha: 0.75),
-                              fontStyle: FontStyle.italic,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _currentSeason.tagLine,
+                              textAlign: TextAlign.end,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.nunito(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF2E4032).withValues(alpha: 0.75),
+                                fontStyle: FontStyle.italic,
+                              ),
                             ),
                           ),
                         ],
@@ -143,9 +149,7 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
 
                     // ── Main Content ──────────────────────────────────────
                     Expanded(
-                      child: plants.isEmpty
-                          ? _buildEmptyState()
-                          : _buildContent(plants),
+                      child: _buildContent(plants),
                     ),
                   ],
                 );
@@ -191,7 +195,7 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '🏝️ Virtual Garden',
+                  '🌿 Botanical Sanctuary',
                   style: GoogleFonts.fredoka(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
@@ -199,7 +203,7 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
                   ),
                 ),
                 Text(
-                  'Seasonal isometric sanctuary • Pinch to zoom',
+                  'Seasonal isometric virtual view • Pinch to zoom',
                   style: GoogleFonts.nunito(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
@@ -337,10 +341,16 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _viewChip(label: '🏝️ Island', active: !_showPlotsGrid,
-              onTap: () => setState(() => _showPlotsGrid = false)),
-          _viewChip(label: '📋 Plots', active: _showPlotsGrid,
-              onTap: () => setState(() => _showPlotsGrid = true)),
+          _viewChip(
+            label: '🏝️ 3D Island',
+            active: _viewMode == 0,
+            onTap: () => setState(() => _viewMode = 0),
+          ),
+          _viewChip(
+            label: '📋 Plot Cards',
+            active: _viewMode == 1,
+            onTap: () => setState(() => _viewMode = 1),
+          ),
         ],
       ),
     );
@@ -350,7 +360,7 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: active ? const Color(0xFF2E7D32) : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
@@ -358,7 +368,7 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
         child: Text(
           label,
           style: GoogleFonts.fredoka(
-            fontSize: 12,
+            fontSize: 11.5,
             fontWeight: FontWeight.w600,
             color: active ? Colors.white : const Color(0xFF424242),
           ),
@@ -370,7 +380,7 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
   // ── Main Content ─────────────────────────────────────────────────────────
 
   Widget _buildContent(List<PlantModel> plants) {
-    if (_showPlotsGrid) {
+    if (_viewMode == 1) {
       return _buildPlotsGridView(plants);
     }
     return _buildIsometricView(plants);
@@ -431,13 +441,245 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
               ],
             ),
           ),
+          const SizedBox(height: 18),
+
+          // ── Virtual Plant Growth Hero Container ──
+          _buildVirtualPlantGrowthHeroCard(plants),
           const SizedBox(height: 20),
 
           // Optional collapsible "My Plots" list below the island
-          _buildCollapsiblePlotsSection(plants),
-          const SizedBox(height: 30),
+          if (plants.isNotEmpty) ...[
+            _buildCollapsiblePlotsSection(plants),
+            const SizedBox(height: 30),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildVirtualPlantGrowthHeroCard(List<PlantModel> plants) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1B5E20).withValues(alpha: 0.28),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () => _handleVirtualPlantGrowthTap(plants),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
+                  ),
+                  child: const Center(
+                    child: Text('🌱', style: TextStyle(fontSize: 28)),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Virtual Plant Growth',
+                            style: GoogleFonts.fredoka(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFD54F),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'AI 4-STAGE',
+                              style: GoogleFonts.nunito(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFF1B5E20),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Explore 4-stage AI growth timelines, 6-card tutorial & leaf morphing',
+                        style: GoogleFonts.nunito(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFFC8E6C9),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _handleVirtualPlantGrowthTap(List<PlantModel> plants) {
+    if (plants.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('🌱 Add a plant to your garden first to explore 4-Stage Virtual Growth!'),
+          backgroundColor: SkeuoTheme.primaryGreen,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (plants.length == 1) {
+      _navigateToVirtualPlantGrowth(plants.first);
+    } else {
+      _showPlantPickerModal(plants);
+    }
+  }
+
+  void _navigateToVirtualPlantGrowth(PlantModel plant) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => VirtualPlantGrowthScreen(plant: plant),
+      ),
+    );
+  }
+
+  void _showPlantPickerModal(List<PlantModel> plants) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0E0E0),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Text('🌿', style: TextStyle(fontSize: 20)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Select Plant for 4-Stage Growth',
+                      style: GoogleFonts.fredoka(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF1B5E20),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.45,
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: plants.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                    itemBuilder: (context, idx) {
+                      final plant = plants[idx];
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                        leading: Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFFA5D6A7)),
+                          ),
+                          child: ClipOval(
+                            child: plant.initialPhotoPath != null
+                                ? AppPhotoView(imagePath: plant.initialPhotoPath, fit: BoxFit.cover)
+                                : const Icon(Icons.local_florist_rounded, color: Color(0xFF2E7D32), size: 24),
+                          ),
+                        ),
+                        title: Text(
+                          plant.plantName,
+                          style: GoogleFonts.fredoka(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF2E4032),
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${plant.speciesName} • ${(plant.growthProgress * 100).toInt()}% grown',
+                          style: GoogleFonts.nunito(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF388E3C),
+                          ),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 15, color: Color(0xFF2E7D32)),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _navigateToVirtualPlantGrowth(plant);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -525,7 +767,6 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
 
   Widget _buildPlotCard(PlantModel plant, int index) {
     final isWaterDue = plant.isWateringDue;
-    final age = plant.ageInDays;
 
     return GestureDetector(
       onTap: () {
@@ -535,27 +776,23 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
       },
       child: AnimatedBuilder(
         animation: _breezeCtrl,
-        builder: (context, child) {
-          final sway =
-              math.sin(_breezeCtrl.value * math.pi * 2 + index) * 0.025;
-          return Transform.rotate(
-            angle: sway,
+        builder: (context, _) {
+          final sway = math.sin(_breezeCtrl.value * 2 * math.pi + index) * 2;
+          return Transform.translate(
+            offset: Offset(0, sway),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.95),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
                   color: isWaterDue
-                      ? const Color(0xFF64B5F6)
-                      : const Color(0xFFA5D6A7),
-                  width: 2,
+                      ? const Color(0xFF4FC3F7)
+                      : const Color(0xFFC8E6C9),
+                  width: isWaterDue ? 2 : 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (isWaterDue
-                            ? const Color(0xFF2196F3)
-                            : const Color(0xFF2E7D32))
-                        .withValues(alpha: 0.12),
+                    color: const Color(0xFF2E7D32).withValues(alpha: 0.08),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -563,130 +800,105 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
               ),
               child: Stack(
                 children: [
-                  // Soil base
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: 52,
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF6D4C41),
-                        borderRadius:
-                            BorderRadius.vertical(bottom: Radius.circular(20)),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '🌱 Plot #${index + 1} • Day $age',
+                  // Card content
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Plant Image
+                        Stack(
+                          alignment: Alignment.topRight,
+                          children: [
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F5E9),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: const Color(0xFFA5D6A7), width: 1.5),
+                              ),
+                              child: ClipOval(
+                                child: plant.initialPhotoPath != null
+                                    ? AppPhotoView(
+                                        imagePath: plant.initialPhotoPath,
+                                        fit: BoxFit.cover,
+                                        fallback: Image.asset(
+                                          'assets/sprites/mascot_pot_winking.png',
+                                          fit: BoxFit.contain,
+                                        ),
+                                      )
+                                    : const Icon(Icons.local_florist_rounded,
+                                        color: Color(0xFF2E7D32), size: 38),
+                              ),
+                            ),
+                            if (isWaterDue)
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF1E88E5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.water_drop_rounded,
+                                      color: Colors.white, size: 14),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          plant.plantName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
                           style: GoogleFonts.nunito(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFFFFECB3),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: SkeuoTheme.textPrimary,
                           ),
                         ),
-                      ),
-                    ),
-                  ),
-
-                  // Plant content
-                  Positioned.fill(
-                    bottom: 52,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Container(
-                                width: 72,
-                                height: 72,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: const Color(0xFFE8F5E9),
-                                  border: Border.all(
-                                    color: const Color(0xFF81C784),
-                                    width: 2,
-                                  ),
-                                ),
-                                child: ClipOval(
-                                  child: plant.initialPhotoPath != null
-                                      ? AppPhotoView(
-                                          imagePath: plant.initialPhotoPath!,
-                                          fit: BoxFit.cover,
-                                        )
-                                      : const Icon(Icons.local_florist_rounded,
-                                          color: Color(0xFF2E7D32), size: 38),
-                                ),
-                              ),
-                              if (isWaterDue)
-                                Positioned(
-                                  top: 0,
-                                  right: 0,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF1E88E5),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.water_drop_rounded,
-                                        color: Colors.white, size: 14),
-                                  ),
-                                ),
-                            ],
+                        Text(
+                          plant.speciesName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.nunito(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF388E3C),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            plant.plantName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.nunito(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                              color: SkeuoTheme.textPrimary,
+                        ),
+                        const SizedBox(height: 6),
+                        // Quick water button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 28,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isWaterDue
+                                  ? const Color(0xFF0288D1)
+                                  : const Color(0xFF4CAF50),
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                              elevation: 2,
+                            ),
+                            onPressed: () => _quickWaterPlant(plant),
+                            icon: const Icon(Icons.water_drop_rounded, size: 13),
+                            label: Text(
+                              isWaterDue ? 'Water Now 💧' : 'Water 💧',
+                              style: GoogleFonts.fredoka(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800),
                             ),
                           ),
-                          Text(
-                            plant.speciesName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.nunito(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF388E3C),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          // Quick water button
-                          SizedBox(
-                            width: double.infinity,
-                            height: 28,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isWaterDue
-                                    ? const Color(0xFF0288D1)
-                                    : const Color(0xFF4CAF50),
-                                foregroundColor: Colors.white,
-                                padding: EdgeInsets.zero,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
-                                elevation: 2,
-                              ),
-                              onPressed: () => _quickWaterPlant(plant),
-                              icon: const Icon(Icons.water_drop_rounded, size: 13),
-                              label: Text(
-                                isWaterDue ? 'Water Now 💧' : 'Water 💧',
-                                style: GoogleFonts.fredoka(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -743,78 +955,6 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  // ── Empty State ──────────────────────────────────────────────────────────
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28.0),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: const Color(0xFFA5D6A7), width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE8F5E9),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.local_florist_rounded,
-                    size: 48, color: Color(0xFF2E7D32)),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Your Garden Is Ready!',
-                style: GoogleFonts.fredoka(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF1B5E20),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'No plants added yet. Scan any real plant using the AI recognition scanner to add it to your virtual garden island!',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: SkeuoTheme.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 20),
-              FunBouncyButton(
-                text: '🌱 Scan & Add Plant',
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const RealtimePlantScannerScreen(),
-                    ),
-                  );
-                },
-                color: const Color(0xFF2E7D32),
-                height: 48,
-              ),
-            ],
-          ),
         ),
       ),
     );

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../services/image_service.dart';
@@ -29,6 +30,7 @@ class _SkeuoLiveCameraScreenState extends State<SkeuoLiveCameraScreen>
     with SingleTickerProviderStateMixin {
   final CameraWebBridge _bridge = CameraWebBridge();
   final ImageService _imageService = ImageService();
+  CameraController? _cameraController;
 
   String? _viewId;
   bool _isCameraReady = false;
@@ -50,7 +52,7 @@ class _SkeuoLiveCameraScreenState extends State<SkeuoLiveCameraScreen>
     _initializeLiveCamera();
   }
 
-  void _initializeLiveCamera() {
+  Future<void> _initializeLiveCamera() async {
     if (kIsWeb) {
       _bridge.initCamera(
         onViewCreated: (id) {
@@ -72,9 +74,32 @@ class _SkeuoLiveCameraScreenState extends State<SkeuoLiveCameraScreen>
         },
       );
     } else {
-      setState(() {
-        _isCameraReady = true;
-      });
+      try {
+        final cameras = await availableCameras();
+        if (cameras.isNotEmpty) {
+          final backCamera = cameras.firstWhere(
+            (c) => c.lensDirection == CameraLensDirection.back,
+            orElse: () => cameras.first,
+          );
+          _cameraController = CameraController(
+            backCamera,
+            ResolutionPreset.medium,
+            enableAudio: false,
+          );
+          await _cameraController!.initialize();
+          if (mounted) {
+            setState(() {
+              _isCameraReady = true;
+              _hasError = false;
+            });
+          }
+        } else {
+          if (mounted) setState(() => _isCameraReady = true);
+        }
+      } catch (e) {
+        debugPrint('Camera init error: $e');
+        if (mounted) setState(() => _isCameraReady = true);
+      }
     }
   }
 
@@ -82,6 +107,7 @@ class _SkeuoLiveCameraScreenState extends State<SkeuoLiveCameraScreen>
   void dispose() {
     _reticleCtrl.dispose();
     _bridge.dispose();
+    _cameraController?.dispose();
     super.dispose();
   }
 
@@ -95,6 +121,13 @@ class _SkeuoLiveCameraScreenState extends State<SkeuoLiveCameraScreen>
         if (mounted && dataUrl != null) {
           setState(() {
             _capturedPhotoPath = dataUrl;
+          });
+        }
+      } else if (_cameraController != null && _cameraController!.value.isInitialized) {
+        final xFile = await _cameraController!.takePicture();
+        if (mounted) {
+          setState(() {
+            _capturedPhotoPath = xFile.path;
           });
         }
       } else {
@@ -293,6 +326,9 @@ class _SkeuoLiveCameraScreenState extends State<SkeuoLiveCameraScreen>
                         )
                       else if (kIsWeb && _viewId != null)
                         HtmlElementView(viewType: _viewId!)
+                      else if (_cameraController != null &&
+                          _cameraController!.value.isInitialized)
+                        CameraPreview(_cameraController!)
                       else
                         // Native Camera Viewfinder Placeholder
                         Container(

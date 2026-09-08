@@ -183,10 +183,10 @@ class ExcelService {
     }
 
     // 3. Specific species keyword matching
-    if (query.contains('tulsi') || query.contains('basil')) {
+    if (query.contains('tulsi') || query.contains('basil') || query.contains('ocimum')) {
       return getSpeciesByName('Tulsi') ?? _cachedSpecies.first;
     }
-    if (query.contains('money') || query.contains('pothos') || query.contains('vine')) {
+    if (query.contains('money') || query.contains('pothos') || query.contains('epipremnum') || query.contains('vine')) {
       return getSpeciesByName('Money Plant') ?? _cachedSpecies.first;
     }
     if (query.contains('aloe') || query.contains('succulent')) {
@@ -195,16 +195,16 @@ class ExcelService {
     if (query.contains('snake') || query.contains('sansevieria')) {
       return getSpeciesByName('Snake Plant') ?? _cachedSpecies.first;
     }
-    if (query.contains('peace') || query.contains('lily')) {
+    if (query.contains('peace') || query.contains('lily') || query.contains('spathiphyllum')) {
       return getSpeciesByName('Peace Lily') ?? _cachedSpecies.first;
     }
-    if (query.contains('spider')) {
+    if (query.contains('spider') || query.contains('chlorophytum')) {
       return getSpeciesByName('Spider Plant') ?? _cachedSpecies.first;
     }
-    if (query.contains('jade')) {
+    if (query.contains('jade') || query.contains('crassula')) {
       return getSpeciesByName('Jade Plant') ?? _cachedSpecies.first;
     }
-    if (query.contains('rose')) {
+    if (query.contains('rose') || query.contains('rosa')) {
       return getSpeciesByName('Rose') ?? _cachedSpecies.first;
     }
     if (query.contains('zz') || query.contains('zamioculcas')) {
@@ -227,6 +227,18 @@ class ExcelService {
         idealTemp: '18°C - 30°C',
       );
     }
+    if (query.contains('hibiscus') || query.contains('shoe flower')) {
+      return getSpeciesByName('Hibiscus') ?? _cachedSpecies.first;
+    }
+    if (query.contains('orchid')) {
+      return getSpeciesByName('Orchid') ?? _cachedSpecies.first;
+    }
+    if (query.contains('fern')) {
+      return getSpeciesByName('Fern') ?? _cachedSpecies.first;
+    }
+    if (query.contains('bamboo')) {
+      return getSpeciesByName('Bamboo Palm') ?? _cachedSpecies.first;
+    }
 
     // 4. Substring matching against cached species
     for (final s in _cachedSpecies) {
@@ -235,24 +247,31 @@ class ExcelService {
       }
     }
 
-    // Preserve AI identified species instead of arbitrarily defaulting to Neem Tree
+    // 5. Clean AI labels — avoid generic placeholders like "Botanical Plant" or "Plant"
     final cleanLabel = rawAiLabel.trim();
-    if (cleanLabel.isNotEmpty &&
-        cleanLabel.toLowerCase() != 'unknown' &&
-        cleanLabel.toLowerCase() != 'plant' &&
-        cleanLabel.toLowerCase() != 'unknown species') {
-      return PlantSpecies(
-        commonName: cleanLabel,
-        lifespanDays: 365,
-        wateringIntervalDays: 4,
-        sunlight: 'Bright Indirect Light',
-        description: 'Identified by SpryFlora Botanical AI Vision.',
-        idealTemp: '18°C - 28°C',
-      );
+    final lower = cleanLabel.toLowerCase();
+    if (lower == 'botanical plant' ||
+        lower == 'plant' ||
+        lower == 'unknown' ||
+        lower == 'green plant' ||
+        lower == 'indoor plant' ||
+        lower == 'unknown species' ||
+        cleanLabel.isEmpty) {
+      // Pick common favorite indoor species
+      return getSpeciesByName('Money Plant') ??
+          (getSpeciesByName('Tulsi') ??
+              (_cachedSpecies.isNotEmpty
+                  ? _cachedSpecies.first
+                  : PlantSpecies(commonName: 'Money Plant', lifespanDays: 365, wateringIntervalDays: 4)));
     }
 
-    return _cachedSpecies.isNotEmpty
-        ? _cachedSpecies.first
-        : PlantSpecies(commonName: rawAiLabel, lifespanDays: 180, wateringIntervalDays: 3);
+    return PlantSpecies(
+      commonName: cleanLabel,
+      lifespanDays: 365,
+      wateringIntervalDays: 4,
+      sunlight: 'Bright Indirect Light',
+      description: 'Identified by SpryFlora Botanical AI Vision.',
+      idealTemp: '18°C - 28°C',
+    );
   }
 }

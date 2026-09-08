@@ -15,7 +15,7 @@ import '../widgets/skeuo_card.dart';
 import '../widgets/petal_completion_dialog.dart';
 import '../widgets/skeuo_status_badge.dart';
 import 'ai_analysis_screen.dart';
-import 'daily_checkin_screen.dart';
+import 'realtime_watering_scanner_screen.dart';
 import 'certificate_screen.dart';
 import '../widgets/app_background.dart';
 
@@ -79,21 +79,18 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
   }
 
   Future<void> _openDailyCheckin() async {
-    final result = await Navigator.of(context).push<PlantModel>(
+    await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => DailyCheckinScreen(plant: _plant),
+        builder: (context) => RealtimeWateringScannerScreen(plant: _plant),
       ),
     );
 
-    if (result != null && mounted) {
+    _fetchPlant();
+    if (mounted) {
       setState(() {
-        _plant = result;
         _checkins = _plantRepository.getCheckinsForPlant(widget.plantId);
       });
       _loadAIGuidance();
-    } else {
-      _fetchPlant();
-      if (mounted) setState(() {});
     }
   }
 
@@ -266,7 +263,7 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                               ),
                               child: Center(
                                 child: Text(
-                                  'Upload Today',
+                                  '💧 Water Plant',
                                   style: GoogleFonts.nunito(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w800,

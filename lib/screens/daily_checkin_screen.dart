@@ -9,19 +9,22 @@ import '../theme/skeuo_theme.dart';
 import '../widgets/app_photo_view.dart';
 import '../widgets/fun_bouncy_button.dart';
 import '../widgets/fun_confetti_overlay.dart';
-import '../widgets/skeuo_live_camera_screen.dart';
 import '../widgets/app_background.dart';
 import '../widgets/cloud_transition.dart';
+
+import 'realtime_watering_scanner_screen.dart';
 
 /// Screen 12: Daily Check-in (from 255.jpg)
 class DailyCheckinScreen extends StatefulWidget {
   final PlantModel plant;
   final String? initialPhotoPath;
+  final bool preVerified;
 
   const DailyCheckinScreen({
     super.key,
     required this.plant,
     this.initialPhotoPath,
+    this.preVerified = false,
   });
 
   @override
@@ -37,14 +40,16 @@ class _DailyCheckinScreenState extends State<DailyCheckinScreen> {
   final String _environmentCondition = 'Bright Indirect';
   bool _isSubmitting = false;
   bool _showSuccessSplash = false;
+  late bool _preVerified;
 
   @override
   void initState() {
     super.initState();
     _sunlightHours = widget.plant.targetSunlightHours;
     _capturedPhotoPath = widget.initialPhotoPath;
+    _preVerified = widget.preVerified;
 
-    // Like plant adding flow, automatically open camera if no photo has been captured yet
+    // Like plant adding flow, automatically open live watering scanner if no photo has been captured yet
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_capturedPhotoPath == null && mounted) {
         _capturePhoto();
@@ -53,18 +58,14 @@ class _DailyCheckinScreenState extends State<DailyCheckinScreen> {
   }
 
   Future<void> _capturePhoto() async {
-    // Live camera flow matching plant adding capture in RealtimePlantScanner / SkeuoLiveCameraScreen.
-    final livePhoto = await Navigator.of(context).push<String?>(
+    // Real-time live camera scanner with plant + water mug auto-detection
+    await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => SkeuoLiveCameraScreen(
-          title: '💧 Watering Proof: ${widget.plant.plantName}',
-          prefix: 'checkin_${widget.plant.id}',
+        builder: (_) => RealtimeWateringScannerScreen(
+          plant: widget.plant,
         ),
       ),
     );
-    if (livePhoto != null && mounted) {
-      setState(() => _capturedPhotoPath = livePhoto);
-    }
   }
 
   Future<void> _submitCheckin() async {
@@ -82,7 +83,7 @@ class _DailyCheckinScreenState extends State<DailyCheckinScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      if (_wateredToday && _capturedPhotoPath != null) {
+      if (_wateredToday && _capturedPhotoPath != null && !_preVerified) {
         final verification = await CloudTransitionOverlay.run(
           context,
           message: '💧 Verifying Hydration Proof...',
@@ -447,15 +448,21 @@ class _DailyCheckinScreenState extends State<DailyCheckinScreen> {
                                 color: SkeuoTheme.primaryGreen,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.check_circle_rounded,
-                                      color: Colors.white, size: 14),
-                                  SizedBox(width: 4),
+                                  Icon(
+                                      _preVerified
+                                          ? Icons.verified_rounded
+                                          : Icons.check_circle_rounded,
+                                      color: Colors.white,
+                                      size: 14),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    'Photo Captured',
-                                    style: TextStyle(
+                                    _preVerified
+                                        ? 'Auto-Verified Watering Proof ✓'
+                                        : 'Photo Captured',
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w800,

@@ -23,13 +23,15 @@ class RealtimePlantScannerScreen extends StatefulWidget {
 }
 
 class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   CameraController? _cameraController;
   final CameraWebBridge _webBridge = CameraWebBridge();
   final ExcelService _excelService = ExcelService();
 
   late AnimationController _scannerAnimCtrl;
   late Animation<double> _laserPosition;
+  late AnimationController _sparkleCtrl;
+  late AnimationController _tenSecondCtrl;
 
   bool _isCameraReady = false;
   bool _isAnalyzingFrame = false;
@@ -38,6 +40,8 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
   String _hudDetail = 'Automated AI Plant Recognition Active';
   int _scanTicks = 0;
   Timer? _analysisLoopTimer;
+  double _elapsedSeconds = 0.0;
+  Timer? _stopwatchTicker;
 
   List<PlantSpecies> _cachedSpecies = [];
 
@@ -52,6 +56,24 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
     _laserPosition = Tween<double>(begin: 0.08, end: 0.92).animate(
       CurvedAnimation(parent: _scannerAnimCtrl, curve: Curves.easeInOut),
     );
+
+    _sparkleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+
+    _tenSecondCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    )..repeat();
+
+    _stopwatchTicker = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (!mounted || _isLockedOn) return;
+      setState(() {
+        _elapsedSeconds = (_elapsedSeconds + 0.1);
+        if (_elapsedSeconds > 10.0) _elapsedSeconds = 0.0;
+      });
+    });
 
     _initScanner();
   }
@@ -174,13 +196,11 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
             );
             return;
           }
-        } else if (!result.isPlantDetected &&
-            (result.detectedObjectType.contains('SpryFlora') ||
-             (result.rejectionReason?.contains('SpryFlora') ?? false))) {
+        } else if (!result.isPlantDetected) {
           if (mounted) {
             setState(() {
-              _hudStatus = '⚠️ Problem on SpryFlora plant feature';
-              _hudDetail = result.rejectionReason ?? 'Retrying scanner...';
+              _hudStatus = '🔍 Aim directly at plant leaves or stem...';
+              _hudDetail = result.rejectionReason ?? 'Searching for botanical foliage';
             });
           }
         }
@@ -189,8 +209,8 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
       debugPrint('Real-time frame recognition error: $e');
       if (mounted) {
         setState(() {
-          _hudStatus = '⚠️ Problem on SpryFlora feature';
-          _hudDetail = 'Error processing frame: $e';
+          _hudStatus = '🔍 Point camera at plant foliage...';
+          _hudDetail = 'Adjust camera angle and lighting';
         });
       }
     } finally {
@@ -201,7 +221,10 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
   @override
   void dispose() {
     _analysisLoopTimer?.cancel();
+    _stopwatchTicker?.cancel();
     _scannerAnimCtrl.dispose();
+    _sparkleCtrl.dispose();
+    _tenSecondCtrl.dispose();
     _cameraController?.dispose();
     _webBridge.dispose();
     super.dispose();
@@ -223,66 +246,8 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
             child: SafeArea(
               child: Column(
                 children: [
-                  // Top HUD Bar
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () => Navigator.of(context).pop(),
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.5),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white24),
-                            ),
-                            child: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFF2ECC71).withValues(alpha: 0.4)),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                    color: _isLockedOn ? const Color(0xFF00E676) : const Color(0xFF2ECC71),
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFF00E676).withValues(alpha: 0.8),
-                                        blurRadius: 8,
-                                        spreadRadius: 2,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  _isLockedOn ? 'TARGET LOCKED' : 'AI REAL-TIME SCANNER',
-                                  style: GoogleFonts.fredoka(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // Top Sparkling 10-Second Loader & HUD Bar
+                  _buildTopSparklingLoader(),
 
                   const Spacer(),
 
@@ -433,6 +398,32 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                             _isLockedOn ? const Color(0xFF00E676) : const Color(0xFF2ECC71),
                           ),
                         ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2ECC71),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 2,
+                            ),
+                            onPressed: (_isAnalyzingFrame || _isLockedOn)
+                                ? null
+                                : () => _performFrameAnalysis(),
+                            icon: const Icon(Icons.flash_on_rounded, size: 20),
+                            label: Text(
+                              _isAnalyzingFrame ? 'Analyzing Plant...' : 'Instant Capture & Identify ⚡',
+                              style: GoogleFonts.fredoka(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -447,7 +438,15 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
 
   Widget _buildCameraFeed() {
     if (kIsWeb) {
-      return const HtmlElementView(viewType: 'camera-web-view');
+      if (_webBridge.viewId != null && _isCameraReady) {
+        return HtmlElementView(viewType: _webBridge.viewId!);
+      }
+      return Container(
+        color: const Color(0xFF1B2E1E),
+        child: const Center(
+          child: CircularProgressIndicator(color: Color(0xFF4CAF50)),
+        ),
+      );
     }
 
     if (_isCameraReady && _cameraController != null && _cameraController!.value.isInitialized) {
@@ -541,6 +540,257 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTopSparklingLoader() {
+    final progress = (_elapsedSeconds / 10.0).clamp(0.0, 1.0);
+
+    String phaseText;
+    if (_isLockedOn) {
+      phaseText = '✨ Plant Identified & Locked!';
+    } else if (progress < 0.35) {
+      phaseText = '🌿 Aligning Foliage & Leaf Veins...';
+    } else if (progress < 0.70) {
+      phaseText = '🔬 AI Vision Identifying Species...';
+    } else {
+      phaseText = '✨ Taxonomy & Health Diagnostics...';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Row 1: Close Button + Scanner Title + Live Stopwatch Badge
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _isLockedOn
+                          ? const Color(0xFF00E676)
+                          : const Color(0xFF2ECC71).withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: _isLockedOn ? const Color(0xFF00E676) : const Color(0xFF2ECC71),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00E676).withValues(alpha: 0.9),
+                              blurRadius: 6,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _isLockedOn ? 'TARGET CONFIRMED' : 'AI REAL-TIME SCANNER',
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.fredoka(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Live Stopwatch / Countdown Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: _isLockedOn
+                        ? [const Color(0xFF00E676), const Color(0xFF1B5E20)]
+                        : [const Color(0xFF1E8449), const Color(0xFF114B27)],
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: _isLockedOn
+                        ? const Color(0xFF69F0AE)
+                        : const Color(0xFF2ECC71).withValues(alpha: 0.7),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2ECC71).withValues(alpha: 0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.timer_outlined, color: Colors.white, size: 15),
+                    const SizedBox(width: 5),
+                    Text(
+                      _isLockedOn
+                          ? 'LOCK'
+                          : '${_elapsedSeconds.toStringAsFixed(1)}s / 10s',
+                      style: GoogleFonts.fredoka(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          // Row 2: Sparkling 10-Second Shimmer Progress Bar
+          AnimatedBuilder(
+            animation: Listenable.merge([_sparkleCtrl, _tenSecondCtrl]),
+            builder: (context, child) {
+              final sparkleOffset = _sparkleCtrl.value;
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.75),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _isLockedOn
+                        ? const Color(0xFF00E676)
+                        : const Color(0xFF2ECC71).withValues(alpha: 0.35),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Dynamic phase text with animated sparkle icon
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Transform.rotate(
+                                angle: sparkleOffset * 6.28,
+                                child: Text(
+                                  sparkleOffset > 0.5 ? '✨' : '⭐',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  phaseText,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.nunito(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '${(progress * 100).toInt()}%',
+                          style: GoogleFonts.fredoka(
+                            color: const Color(0xFF69F0AE),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    // Sparkling Progress Track
+                    Stack(
+                      children: [
+                        // Background track
+                        Container(
+                          height: 7,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        // Fill bar with gradient
+                        FractionallySizedBox(
+                          widthFactor: progress > 0 ? progress : 0.05,
+                          child: Container(
+                            height: 7,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: _isLockedOn
+                                    ? [const Color(0xFF00E676), const Color(0xFF69F0AE)]
+                                    : [
+                                        const Color(0xFF00E5FF),
+                                        const Color(0xFF00E676),
+                                        const Color(0xFFFFD54F),
+                                      ],
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF00E676).withValues(alpha: 0.8),
+                                  blurRadius: 6,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }

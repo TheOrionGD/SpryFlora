@@ -9,14 +9,16 @@ class CameraWebBridge {
   html.VideoElement? _webVideoElement;
   html.MediaStream? _webStream;
   bool _isReady = false;
+  bool _isDisposed = false;
 
   String? get viewId => _viewId;
-  bool get isReady => _isReady;
+  bool get isReady => _isReady && !_isDisposed;
 
   void initCamera({
     required void Function(bool ready, String? error) onStatus,
     required void Function(String viewId) onViewCreated,
   }) {
+    _isDisposed = false;
     try {
       _viewId = 'live-webcam-${DateTime.now().millisecondsSinceEpoch}';
       _webVideoElement = html.VideoElement()
@@ -36,20 +38,32 @@ class CameraWebBridge {
 
       html.window.navigator.mediaDevices
           ?.getUserMedia({'video': true, 'audio': false}).then((stream) {
+        if (_isDisposed) {
+          for (final track in stream.getTracks()) {
+            try {
+              track.stop();
+            } catch (_) {}
+          }
+          return;
+        }
         _webStream = stream;
-        _webVideoElement!.srcObject = stream;
+        _webVideoElement?.srcObject = stream;
         _isReady = true;
         onStatus(true, null);
       }).catchError((err) {
-        onStatus(false, 'Camera access denied: $err');
+        if (!_isDisposed) {
+          onStatus(false, 'Camera access denied: $err');
+        }
       });
     } catch (e) {
-      onStatus(false, e.toString());
+      if (!_isDisposed) {
+        onStatus(false, e.toString());
+      }
     }
   }
 
   Future<String?> captureFrame() async {
-    if (!_isReady || _webVideoElement == null) return null;
+    if (!_isReady || _isDisposed || _webVideoElement == null) return null;
     try {
       final video = _webVideoElement!;
       final int w = video.videoWidth > 0 ? video.videoWidth : 640;
@@ -68,10 +82,23 @@ class CameraWebBridge {
   }
 
   void dispose() {
+    _isDisposed = true;
+    _isReady = false;
     if (_webStream != null) {
       for (final track in _webStream!.getTracks()) {
-        track.stop();
+        try {
+          track.stop();
+        } catch (_) {}
       }
+      _webStream = null;
+    }
+    if (_webVideoElement != null) {
+      try {
+        _webVideoElement!.srcObject = null;
+        _webVideoElement!.pause();
+        _webVideoElement!.remove();
+      } catch (_) {}
+      _webVideoElement = null;
     }
   }
 }

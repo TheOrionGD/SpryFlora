@@ -36,7 +36,7 @@ class AuthUser {
         name: json['name'] as String,
         sessionExpiresAt: json['sessionExpiresAt'] != null
             ? DateTime.parse(json['sessionExpiresAt'] as String)
-            : DateTime.now().add(const Duration(days: 14)),
+            : DateTime.now().add(const Duration(days: 3650)),
       );
 }
 
@@ -47,6 +47,7 @@ class AuthService extends ChangeNotifier {
 
   static const String _sessionKey = 'spryflora_auth_session';
   static const String _usersKey = 'spryflora_registered_users';
+  static const String _explicitLogoutKey = 'spryflora_explicit_logout';
 
   AuthUser? _currentUser;
   String? _authToken;
@@ -70,23 +71,109 @@ class AuthService extends ChangeNotifier {
     return sha256.convert(bytes).toString();
   }
 
-  /// Restores session from secure local storage
+  /// Restores session from secure local storage or auto-logs in existing user
   Future<void> restoreSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final isExplicitLogout = prefs.getBool(_explicitLogoutKey) ?? false;
       final sessionJsonStr = prefs.getString(_sessionKey);
+
       if (sessionJsonStr != null && sessionJsonStr.isNotEmpty) {
         final map = jsonDecode(sessionJsonStr) as Map<String, dynamic>;
         final user = AuthUser.fromJson(map['user'] as Map<String, dynamic>);
-        if (!user.isSessionExpired) {
-          _currentUser = user;
-          _authToken = map['token'] as String?;
-          await UserService().setCurrentUser(user.id);
-          await PlantRepository().setCurrentUser(user.id);
-          notifyListeners();
-          return;
-        } else {
-          await logout();
+        
+        // Refresh session expiration perpetually (10 years)
+        final renewedUser = AuthUser(
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          sessionExpiresAt: DateTime.now().add(const Duration(days: 3650)),
+        );
+        _currentUser = renewedUser;
+        _authToken = (map['token'] as String?) ?? 'token_${user.id}';
+        
+        await prefs.setString(
+          _sessionKey,
+          jsonEncode({'user': renewedUser.toJson(), 'token': _authToken}),
+        );
+        await prefs.setBool(_explicitLogoutKey, false);
+
+        await UserService().setCurrentUser(user.id);
+        await PlantRepository().setCurrentUser(user.id);
+        notifyListeners();
+        return;
+      }
+
+      // If no active session string, but not explicitly logged out, check existing registered users
+      if (!isExplicitLogout) {
+        final usersJsonStr = prefs.getString(_usersKey);
+        if (usersJsonStr != null && usersJsonStr.isNotEmpty) {
+          final List<dynamic> users = jsonDecode(usersJsonStr);
+          if (users.isNotEmpty) {
+            final lastUser = Map<String, dynamic>.from(users.last as Map);
+            final userId = lastUser['id'] as String? ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
+            final email = lastUser['email'] as String? ?? '';
+            final name = lastUser['name'] as String? ?? (lastUser['username'] as String? ?? 'Gardener');
+            final token = 'token_${userId}_${DateTime.now().millisecondsSinceEpoch}';
+
+            final authUser = AuthUser(
+              id: userId,
+              email: email,
+              name: name,
+              sessionExpiresAt: DateTime.now().add(const Duration(days: 3650)),
+            );
+            _currentUser = authUser;
+            _authToken = token;
+
+            await prefs.setString(
+              _sessionKey,
+              jsonEncode({'user': authUser.toJson(), 'token': token}),
+            );
+            await UserService().setCurrentUser(userId);
+            await PlantRepository().setCurrentUser(userId);
+            notifyListeners();
+            return;
+          }
+        }
+
+        // Check if any user profile is stored in local storage
+        final allKeys = prefs.getKeys();
+        for (final key in allKeys) {
+          if (key.startsWith('spryflora_user')) {
+            final rawVal = prefs.getString(key);
+            if (rawVal != null && rawVal.isNotEmpty) {
+              try {
+                final json = jsonDecode(rawVal);
+                if (json is Map && json['user'] != null) {
+                  final u = json['user'] as Map<String, dynamic>;
+                  final childName = (u['childName'] as String?)?.trim();
+                  final effectiveName = (childName != null && childName.isNotEmpty) ? childName : 'Gardener';
+                  final userId = key.replaceFirst('spryflora_user_', '').isNotEmpty && key != 'spryflora_user'
+                      ? key.replaceFirst('spryflora_user_', '')
+                      : 'usr_${DateTime.now().millisecondsSinceEpoch}';
+                  final token = 'token_${userId}_${DateTime.now().millisecondsSinceEpoch}';
+
+                  final authUser = AuthUser(
+                    id: userId,
+                    email: '$effectiveName@spryflora.local'.toLowerCase(),
+                    name: effectiveName,
+                    sessionExpiresAt: DateTime.now().add(const Duration(days: 3650)),
+                  );
+                  _currentUser = authUser;
+                  _authToken = token;
+
+                  await prefs.setString(
+                    _sessionKey,
+                    jsonEncode({'user': authUser.toJson(), 'token': token}),
+                  );
+                  await UserService().setCurrentUser(userId);
+                  await PlantRepository().setCurrentUser(userId);
+                  notifyListeners();
+                  return;
+                }
+              } catch (_) {}
+            }
+          }
         }
       }
     } catch (e) {
@@ -96,18 +183,27 @@ class AuthService extends ChangeNotifier {
 
   /// Registers a new user account with backend API or local hashed credentials
   Future<AuthUser> register({
-    required String email,
+    String? email,
     required String password,
-    required String name,
+    String? name,
     String? username,
     String? dob,
     String? favoritePlant,
   }) async {
-    final cleanEmail = email.trim().toLowerCase();
     final cleanUsername = (username ?? '').trim().toLowerCase();
     final effectiveUsername = cleanUsername.isNotEmpty
         ? cleanUsername
-        : (name.trim().isNotEmpty ? name.trim().toLowerCase().replaceAll(' ', '_') : cleanEmail.split('@').first);
+        : (email != null && email.trim().isNotEmpty
+            ? email.trim().toLowerCase().split('@').first
+            : (name != null && name.trim().isNotEmpty
+                ? name.trim().toLowerCase().replaceAll(' ', '_')
+                : 'user_${DateTime.now().millisecondsSinceEpoch}'));
+    final effectiveName = (name != null && name.trim().isNotEmpty)
+        ? name.trim()
+        : effectiveUsername;
+    final cleanEmail = (email != null && email.trim().isNotEmpty)
+        ? email.trim().toLowerCase()
+        : '$effectiveUsername@spryflora.local';
 
     if (ApiConfig.usesBackendAuth) {
       try {
@@ -118,7 +214,7 @@ class AuthService extends ChangeNotifier {
           body: jsonEncode({
             'email': cleanEmail,
             'password': password,
-            'name': name,
+            'name': effectiveName,
             'username': effectiveUsername,
             'dob': dob ?? '',
             'favoritePlant': favoritePlant ?? 'Sunflower',
@@ -131,8 +227,8 @@ class AuthService extends ChangeNotifier {
           final userJson = data['user'] as Map<String, dynamic>? ?? {
             'id': data['id'] ?? 'usr_${DateTime.now().millisecondsSinceEpoch}',
             'email': cleanEmail,
-            'name': name,
-            'sessionExpiresAt': DateTime.now().add(const Duration(days: 14)).toIso8601String(),
+            'name': effectiveName,
+            'sessionExpiresAt': DateTime.now().add(const Duration(days: 3650)).toIso8601String(),
           };
           final authUser = AuthUser.fromJson(userJson);
 
@@ -141,6 +237,7 @@ class AuthService extends ChangeNotifier {
 
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(_sessionKey, jsonEncode({'user': authUser.toJson(), 'token': token}));
+          await prefs.setBool(_explicitLogoutKey, false);
 
           // Synchronously cache credentials and record in local database
           final usersJsonStr = prefs.getString(_usersKey);
@@ -150,7 +247,7 @@ class AuthService extends ChangeNotifier {
           final userRecord = {
             'id': authUser.id,
             'email': cleanEmail,
-            'name': name,
+            'name': effectiveName,
             'username': effectiveUsername,
             'dob': dob ?? '',
             'favoritePlant': favoritePlant ?? 'Sunflower',
@@ -174,7 +271,7 @@ class AuthService extends ChangeNotifier {
           if (UserService().currentUser == null) {
             await UserService().saveUserProfile(
               UserProfile(
-                childName: name,
+                childName: effectiveName,
                 age: 10,
                 school: '',
                 favoritePlant: favoritePlant ?? 'Sunflower',
@@ -223,7 +320,7 @@ class AuthService extends ChangeNotifier {
     final newUserRecord = {
       'id': userId,
       'email': cleanEmail,
-      'name': name,
+      'name': effectiveName,
       'username': effectiveUsername,
       'dob': dob ?? '',
       'favoritePlant': favoritePlant ?? 'Sunflower',
@@ -234,12 +331,13 @@ class AuthService extends ChangeNotifier {
 
     users.add(newUserRecord);
     await prefs.setString(_usersKey, jsonEncode(users));
+    await prefs.setBool(_explicitLogoutKey, false);
 
     final authUser = await login(email: cleanEmail, password: password);
     if (UserService().currentUser == null) {
       await UserService().saveUserProfile(
         UserProfile(
-          childName: name,
+          childName: effectiveName,
           age: 10,
           school: '',
           favoritePlant: favoritePlant ?? 'Sunflower',
@@ -285,6 +383,7 @@ class AuthService extends ChangeNotifier {
 
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(_sessionKey, jsonEncode({'user': authUser.toJson(), 'token': token}));
+          await prefs.setBool(_explicitLogoutKey, false);
 
           // Cache / update user in local database so offline login always works seamlessly
           final usersJsonStr = prefs.getString(_usersKey);
@@ -348,7 +447,7 @@ class AuthService extends ChangeNotifier {
       throw Exception('Invalid email/username or password.');
     }
 
-    final sessionExpires = DateTime.now().add(const Duration(days: 14));
+    final sessionExpires = DateTime.now().add(const Duration(days: 3650));
     final token = 'token_${userRecord['id']}_${DateTime.now().millisecondsSinceEpoch}';
 
     final authUser = AuthUser(
@@ -366,6 +465,7 @@ class AuthService extends ChangeNotifier {
       'token': token,
     };
     await prefs.setString(_sessionKey, jsonEncode(sessionData));
+    await prefs.setBool(_explicitLogoutKey, false);
 
     await UserService().setCurrentUser(authUser.id);
     await PlantRepository().setCurrentUser(authUser.id);
@@ -539,6 +639,7 @@ class AuthService extends ChangeNotifier {
     PlantRepository().clearInMemoryData();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_sessionKey);
+    await prefs.setBool(_explicitLogoutKey, true);
     notifyListeners();
   }
 }

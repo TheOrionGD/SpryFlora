@@ -20,8 +20,10 @@ import 'plant_details_screen.dart';
 import 'profile_settings_screen.dart';
 import 'ai_eco_buddy_screen.dart';
 import 'garden_screen.dart';
+import 'mascot_journey_screen.dart';
 import 'notification_center_screen.dart';
 import 'realtime_plant_scanner_screen.dart';
+import 'realtime_watering_scanner_screen.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -231,8 +233,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const SizedBox(height: 18),
 
             // ── Your Plant Section Card (Screen 08) ──────────────────────
-            _buildYourPlantSection(),
-            const SizedBox(height: 18),
+            if (_plantRepo.plants.isNotEmpty) ...[
+              _buildYourPlantSection(),
+              const SizedBox(height: 18),
+            ],
 
             // ── Interactive Virtual Companion Card ───────────────────────
             if (_plantRepo.plants.isNotEmpty) ...[
@@ -254,7 +258,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             }),
             const SizedBox(height: 12),
             _buildPlantsList(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
+
+            // ── Watering Plant Section (Container below Plants list) ──────
+            if (_plantRepo.plants.isNotEmpty) ...[
+              _buildWateringPlantSection(),
+              const SizedBox(height: 20),
+            ],
 
             // ── Add First Plant CTA if empty ─────────────────────────────
             if (_plantRepo.plants.isEmpty) ...[
@@ -408,8 +418,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const GardenScreen()),
-        );
+          MaterialPageRoute(builder: (_) => const MascotJourneyScreen()),
+        ).then((_) => _loadData());
       },
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -538,88 +548,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ── Your Plant Section (matching Screen 08) ───────────────────────────
   Widget _buildYourPlantSection() {
-    if (_plantRepo.plants.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFE5EBD8), width: 1.2),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF2E7D32).withValues(alpha: 0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                SizedBox(
-                  width: 72,
-                  height: 72,
-                  child: Image.asset(
-                    'assets/sprites/mascot_pot_happy.png',
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.yard_rounded,
-                      size: 48,
-                      color: SkeuoTheme.primaryGreen,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'No Plant Buddy Yet 🌱',
-                        style: GoogleFonts.nunito(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: SkeuoTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Adopt or scan your first plant to track real health and level!',
-                        style: GoogleFonts.nunito(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: SkeuoTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: FunBouncyButton(
-                text: 'Adopt a Plant Buddy 🌱',
-                icon: Icons.camera_alt_rounded,
-                height: 44,
-                fontSize: 14,
-                onPressed: () async {
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const RealtimePlantScannerScreen(),
-                    ),
-                  );
-                  _loadData();
-                },
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+    if (_plantRepo.plants.isEmpty) return const SizedBox.shrink();
 
     final activePlant = _plantRepo.plants.first;
     final health = activePlant.health;
@@ -1071,6 +1000,313 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _quickWaterSinglePlant(PlantModel plant) async {
+    setState(() {
+      _showWaterDroplets = true;
+      _showWaterConfetti = false;
+    });
+
+    final now = DateTime.now();
+    final updated = plant.copyWith(
+      health: (plant.health + 15).clamp(0, 100),
+      hydrationScore: (plant.hydrationScore + 25).clamp(0, 100),
+      lastWateredDate: now,
+      nextWateringDate: now.add(Duration(days: plant.wateringIntervalDays)),
+    );
+    await _plantRepo.updatePlant(updated);
+    await _userService.addXp(25);
+
+    if (mounted) {
+      setState(() {
+        _showWaterDroplets = false;
+        _showWaterConfetti = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('💧 Watered ${plant.plantName}! +25 XP 🌱'),
+          backgroundColor: SkeuoTheme.primaryGreen,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      await Future.delayed(const Duration(milliseconds: 2000));
+      if (mounted) setState(() => _showWaterConfetti = false);
+    }
+  }
+
+  // ── Watering Plant Section (Container below Plants list) ────────────────────
+  Widget _buildWateringPlantSection() {
+    if (_plantRepo.plants.isEmpty) return const SizedBox.shrink();
+
+    final targetPlant =
+        _duePlants.isNotEmpty ? _duePlants.first : _allPlantsSorted.first;
+    final isDue = targetPlant.isWateringDue;
+    final hydration = targetPlant.hydrationScore;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader('💧 Plant Watering & Hydration'),
+        const SizedBox(height: 12),
+        _AnimatedCard(
+          delay: 350,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDue
+                    ? [const Color(0xFFFFF3E0), const Color(0xFFFFEBEE)]
+                    : [const Color(0xFFE3F2FD), const Color(0xFFF1FAF1)],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: isDue
+                    ? const Color(0xFFFFB74D)
+                    : const Color(0xFF90CAF9),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isDue
+                      ? const Color(0xFFE65100).withValues(alpha: 0.10)
+                      : const Color(0xFF1976D2).withValues(alpha: 0.10),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Row: Plant Info & Status Badge
+                Row(
+                  children: [
+                    // Plant Photo Thumbnail
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDue
+                              ? const Color(0xFFFF9800)
+                              : SkeuoTheme.primaryGreen,
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 6,
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: AppPhotoView(
+                          imagePath: targetPlant.initialPhotoPath,
+                          fit: BoxFit.cover,
+                          fallback: const Icon(
+                            Icons.local_florist_rounded,
+                            color: SkeuoTheme.primaryGreen,
+                            size: 30,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  targetPlant.plantName,
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                    color: SkeuoTheme.textPrimary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: isDue
+                                      ? const Color(0xFFFFEBEE)
+                                      : const Color(0xFFE8F5E9),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isDue
+                                        ? const Color(0xFFEF5350)
+                                        : const Color(0xFF4CAF50),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isDue
+                                          ? Icons.warning_rounded
+                                          : Icons.check_circle_rounded,
+                                      size: 12,
+                                      color: isDue
+                                          ? const Color(0xFFEF5350)
+                                          : const Color(0xFF2E7D32),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isDue ? 'Needs Water' : 'Hydrated',
+                                      style: GoogleFonts.nunito(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: isDue
+                                            ? const Color(0xFFEF5350)
+                                            : const Color(0xFF2E7D32),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            targetPlant.speciesName.isNotEmpty
+                                ? targetPlant.speciesName
+                                : 'Indoor Plant',
+                            style: GoogleFonts.nunito(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: SkeuoTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+
+                // Hydration Progress Bar & Status Text
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Hydration Score',
+                      style: GoogleFonts.nunito(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: SkeuoTheme.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      '$hydration%',
+                      style: GoogleFonts.nunito(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF1976D2),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: (hydration / 100.0).clamp(0.0, 1.0),
+                    minHeight: 8,
+                    backgroundColor: Colors.white,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      isDue ? const Color(0xFFFF9800) : const Color(0xFF29B6F6),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                // Action Buttons Row: AI Camera Scan & Quick Water
+                Row(
+                  children: [
+                    // AI Camera Watering Scanner Button
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => RealtimeWateringScannerScreen(
+                                plant: targetPlant,
+                              ),
+                            ),
+                          ).then((_) => _loadData());
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFF00B0FF),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF00B0FF)
+                                    .withValues(alpha: 0.15),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.camera_alt_rounded,
+                                  color: Color(0xFF0288D1), size: 18),
+                              const SizedBox(width: 6),
+                              Text(
+                                'AI Water Scan',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF0288D1),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // Quick Water Button
+                    Expanded(
+                      child: FunBouncyButton(
+                        text: 'Quick Water 💧',
+                        onPressed: () => _quickWaterSinglePlant(targetPlant),
+                        color: SkeuoTheme.primaryGreen,
+                        textColor: Colors.white,
+                        height: 46,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

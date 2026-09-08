@@ -18,10 +18,16 @@ import forgotPasswordRoutes from './routes/forgot_password.routes.js';
 const app = express();
 
 // Security Middlewares
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginOpenerPolicy: false,
+  })
+);
 app.use(
   cors({
-    origin: env.corsOrigins,
+    origin: (origin, callback) => callback(null, true),
     credentials: true,
   })
 );

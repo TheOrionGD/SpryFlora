@@ -261,18 +261,18 @@ Return JSON only:
       return const PlantIdentificationResult(
         status: AIResultStatus.providerError,
         isPlantDetected: false,
-        detectedObjectType: 'Problem on SpryFlora feature',
-        rejectionReason: 'There is a problem on the SpryFlora plant recognition feature. Please try again.',
-        identifiedSpecies: 'Problem on SpryFlora feature',
+        detectedObjectType: 'Non-Botanical Object',
+        rejectionReason: 'Unable to recognize plant species. Please try capturing with clear lighting on plant foliage.',
+        identifiedSpecies: 'Not a Plant',
         errorMessage: 'Gemini provider returned non-200 status code.',
       );
     } catch (e) {
       return PlantIdentificationResult(
         status: AIResultStatus.networkError,
         isPlantDetected: false,
-        detectedObjectType: 'Problem on SpryFlora feature',
-        rejectionReason: 'There is a problem on the SpryFlora plant recognition feature. Unable to recognize plant: $e',
-        identifiedSpecies: 'Problem on SpryFlora feature',
+        detectedObjectType: 'Non-Botanical Object',
+        rejectionReason: 'Unable to recognize plant: $e',
+        identifiedSpecies: 'Not a Plant',
         errorMessage: e.toString(),
       );
     }

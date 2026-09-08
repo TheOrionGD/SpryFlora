@@ -148,5 +148,50 @@ void main() {
       );
       expect(loggedIn.email, 'persisted@spryflora.com');
     });
+
+    test('Auto-login automatically restores existing user on app restart without re-login', () async {
+      final authService = AuthService();
+      await authService.logout();
+
+      // User creates an account and uses the app
+      await authService.register(
+        username: 'autologin_user',
+        password: 'AutoPassword123',
+        name: 'Auto Login Hero',
+        favoritePlant: 'Rose',
+      );
+
+      expect(authService.isAuthenticated, isTrue);
+
+      // Simulate app closure (creating a fresh auth session instance and restoring)
+      final restoredService = AuthService();
+      await restoredService.restoreSession();
+
+      expect(restoredService.isAuthenticated, isTrue);
+      expect(restoredService.currentUser?.name, 'Auto Login Hero');
+    });
+
+    test('Auto-login recovers existing user profile when session key was empty', () async {
+      final authService = AuthService();
+      await authService.logout();
+
+      // Register user
+      await authService.register(
+        username: 'recovered_user',
+        password: 'Password999',
+        name: 'Recovered Explorer',
+      );
+
+      // Simulate session string cleared but user data preserved in SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('spryflora_auth_session');
+      await prefs.setBool('spryflora_explicit_logout', false);
+
+      final freshService = AuthService();
+      await freshService.restoreSession();
+
+      expect(freshService.isAuthenticated, isTrue);
+      expect(freshService.currentUser?.name, 'Recovered Explorer');
+    });
   });
 }

@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spryflora_app/models/plant_model.dart';
 import 'package:spryflora_app/services/plant_repository.dart';
 import 'package:spryflora_app/screens/garden_screen.dart';
-import 'package:spryflora_app/widgets/isometric_garden_island.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -14,7 +13,7 @@ void main() {
   });
 
   group('GardenScreen Widget Tests', () {
-    testWidgets('Renders Garden title, stats cards and Add Plant button', (tester) async {
+    testWidgets('Renders Garden title, stats cards, Botanical Sanctuary portal and Add Plant button', (tester) async {
       final repo = PlantRepository();
       await repo.loadLocalData();
 
@@ -29,10 +28,12 @@ void main() {
       expect(find.text('My Garden'), findsOneWidget);
       expect(find.text('My Plants'), findsOneWidget);
       expect(find.text('Garden Health'), findsOneWidget);
+      expect(find.text('Botanical Sanctuary'), findsOneWidget);
+      expect(find.text('Virtual View 🏝️'), findsOneWidget);
       expect(find.text('Add New Plant'), findsOneWidget);
     });
 
-    testWidgets('Displays plant count accurately when repository contains plants', (tester) async {
+    testWidgets('Displays plant item and state accurately when repository contains plants', (tester) async {
       final now = DateTime.now();
       final plant = PlantModel(
         id: 'garden_p_1',
@@ -57,9 +58,10 @@ void main() {
       // Stats row should show "1"
       expect(find.text('1'), findsWidgets);
 
-      // Default view is the 3D Isometric Island (not the plot cards grid),
-      // so the IsometricGardenIsland widget should be present.
-      expect(find.byType(IsometricGardenIsland), findsOneWidget);
+      // Garden screen lists the plants in their current state
+      expect(find.text('Orchid Flower'), findsOneWidget);
+      expect(find.text('Orchid'), findsOneWidget);
+      expect(find.text('Botanical Sanctuary'), findsOneWidget);
     });
   });
 }

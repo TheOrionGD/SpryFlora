@@ -21,6 +21,7 @@ class PlantModel {
   final double initialHeightCm;
   final double matureHeightCm;
   final bool isCompletedManually;
+  final List<String>? stageImagePaths;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -47,6 +48,7 @@ class PlantModel {
     this.initialHeightCm = 2.0,
     this.matureHeightCm = 50.0,
     this.isCompletedManually = false,
+    this.stageImagePaths,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : lastWateredDate = lastWateredDate ?? plantingDate,
@@ -193,6 +195,7 @@ class PlantModel {
       'initialHeightCm': initialHeightCm,
       'matureHeightCm': matureHeightCm,
       'isCompletedManually': isCompletedManually,
+      'stageImagePaths': stageImagePaths,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -228,6 +231,9 @@ class PlantModel {
       initialHeightCm: (json['initialHeightCm'] as num?)?.toDouble() ?? 2.0,
       matureHeightCm: (json['matureHeightCm'] as num?)?.toDouble() ?? 50.0,
       isCompletedManually: json['isCompletedManually'] as bool? ?? false,
+      stageImagePaths: (json['stageImagePaths'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : null,
@@ -259,6 +265,7 @@ class PlantModel {
     double? initialHeightCm,
     double? matureHeightCm,
     bool? isCompletedManually,
+    List<String>? stageImagePaths,
     DateTime? updatedAt,
   }) {
     return PlantModel(
@@ -284,6 +291,7 @@ class PlantModel {
       initialHeightCm: initialHeightCm ?? this.initialHeightCm,
       matureHeightCm: matureHeightCm ?? this.matureHeightCm,
       isCompletedManually: isCompletedManually ?? this.isCompletedManually,
+      stageImagePaths: stageImagePaths ?? this.stageImagePaths,
       createdAt: createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
     );

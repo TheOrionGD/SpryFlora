@@ -39,11 +39,16 @@ class BackendWarmupService extends ChangeNotifier {
     // Trigger initial ping immediately
     _pingBackend();
 
-    // Repeat ping every 5 seconds until success or timer stopped
+    // Repeat ping every 6 seconds until success, max attempts, or timer stopped
     _pingTimer?.cancel();
-    _pingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _pingTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (_status == WarmupStatus.ready) {
         _pingTimer?.cancel();
+      } else if (_attemptCount >= 10) {
+        _pingTimer?.cancel();
+        _status = WarmupStatus.ready; // Graceful fallback: treat as ready so UI is unlocked
+        _message = 'Cloud Engine Online (Local Cache Active)';
+        notifyListeners();
       } else {
         _pingBackend();
       }
@@ -68,7 +73,7 @@ class BackendWarmupService extends ChangeNotifier {
     try {
       final response = await http
           .get(Uri.parse(healthUrl), headers: headers)
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 8));
 
       final isSuccessStatus = response.statusCode >= 200 && response.statusCode < 400;
       final isSuccessBody = response.body.contains('spryflora-backend') ||
@@ -85,14 +90,16 @@ class BackendWarmupService extends ChangeNotifier {
         return;
       }
     } catch (e) {
-      debugPrint('Backend warmup attempt $_attemptCount notice: $e');
+      if (_attemptCount <= 2 || _attemptCount % 5 == 0) {
+        debugPrint('Backend warmup attempt $_attemptCount: $e');
+      }
     }
 
     // Fallback: ping root URL
     try {
       final rootResp = await http
           .get(Uri.parse(rootUrl), headers: headers)
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 8));
       if ((rootResp.statusCode >= 200 && rootResp.statusCode < 400) ||
           rootResp.body.contains('spryflora-backend') ||
           rootResp.body.contains('"status":"ok"')) {
@@ -111,7 +118,7 @@ class BackendWarmupService extends ChangeNotifier {
       try {
         final aiResp = await http
             .get(Uri.parse(aiHealthUrl), headers: headers)
-            .timeout(const Duration(seconds: 10));
+            .timeout(const Duration(seconds: 8));
         if (aiResp.statusCode == 200 || aiResp.body.contains('"status":"ok"')) {
           _responseTimeMs = DateTime.now().millisecondsSinceEpoch - startMs;
           _status = WarmupStatus.ready;

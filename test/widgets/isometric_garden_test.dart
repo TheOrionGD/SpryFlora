@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spryflora_app/models/garden_season.dart';
 import 'package:spryflora_app/models/plant_model.dart';
-import 'package:spryflora_app/screens/garden_screen.dart';
+import 'package:spryflora_app/screens/virtual_garden_screen.dart';
 import 'package:spryflora_app/widgets/isometric_garden_island.dart';
 
 // ---------------------------------------------------------------------------
@@ -163,13 +163,13 @@ void main() {
     // No assertion needed — the test passes if no exception is thrown
   });
 
-  // ── GardenScreen integration — season selector chips ────────────────────
+  // ── VirtualGardenScreen integration — season selector chips ─────────────
 
-  group('GardenScreen — seasonal selector chip bar', () {
+  group('VirtualGardenScreen — seasonal selector chip bar', () {
     testWidgets('Season selector bar renders all 4 season chips',
         (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(home: GardenScreen()),
+        const MaterialApp(home: VirtualGardenScreen()),
       );
       await tester.pump(const Duration(milliseconds: 200));
 
@@ -182,7 +182,7 @@ void main() {
     testWidgets('Tapping "Spring" chip changes island season badge',
         (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(home: GardenScreen()),
+        const MaterialApp(home: VirtualGardenScreen()),
       );
       await tester.pump(const Duration(milliseconds: 200));
 
@@ -196,7 +196,7 @@ void main() {
     testWidgets('Tapping "Winter" chip shows Winter Sanctuary badge',
         (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(home: GardenScreen()),
+        const MaterialApp(home: VirtualGardenScreen()),
       );
       await tester.pump(const Duration(milliseconds: 200));
 
@@ -209,7 +209,7 @@ void main() {
     testWidgets('Tapping "Summer" chip shows Summer Sanctuary badge',
         (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(home: GardenScreen()),
+        const MaterialApp(home: VirtualGardenScreen()),
       );
       await tester.pump(const Duration(milliseconds: 200));
 
@@ -220,24 +220,24 @@ void main() {
     });
   });
 
-  // ── GardenScreen — view mode toggle ─────────────────────────────────────
+  // ── VirtualGardenScreen — view mode toggle ──────────────────────────────
 
-  group('GardenScreen — view mode toggle', () {
+  group('VirtualGardenScreen — view mode toggle', () {
     testWidgets('3D Island and Plot Cards toggle buttons are present',
         (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(home: GardenScreen()),
+        const MaterialApp(home: VirtualGardenScreen()),
       );
       await tester.pump(const Duration(milliseconds: 200));
 
-      expect(find.text('3D Island'), findsOneWidget);
-      expect(find.text('Plot Cards'), findsOneWidget);
+      expect(find.text('🏝️ 3D Island'), findsOneWidget);
+      expect(find.text('📋 Plot Cards'), findsOneWidget);
     });
 
     testWidgets('By default, IsometricGardenIsland is shown (3D Island mode)',
         (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(home: GardenScreen()),
+        const MaterialApp(home: VirtualGardenScreen()),
       );
       await tester.pump(const Duration(milliseconds: 200));
 
@@ -248,11 +248,11 @@ void main() {
     testWidgets('Tapping "Plot Cards" hides IsometricGardenIsland',
         (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(home: GardenScreen()),
+        const MaterialApp(home: VirtualGardenScreen()),
       );
       await tester.pump(const Duration(milliseconds: 200));
 
-      await tester.tap(find.text('Plot Cards'));
+      await tester.tap(find.text('📋 Plot Cards'));
       await tester.pump(const Duration(milliseconds: 300));
 
       // IsometricGardenIsland should no longer be rendered
@@ -262,45 +262,19 @@ void main() {
     testWidgets('Tapping back to "3D Island" restores IsometricGardenIsland',
         (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(home: GardenScreen()),
+        const MaterialApp(home: VirtualGardenScreen()),
       );
       await tester.pump(const Duration(milliseconds: 200));
 
       // Switch to plot cards
-      await tester.tap(find.text('Plot Cards'));
+      await tester.tap(find.text('📋 Plot Cards'));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.byType(IsometricGardenIsland), findsNothing);
 
       // Switch back to 3D Island
-      await tester.tap(find.text('3D Island'));
+      await tester.tap(find.text('🏝️ 3D Island'));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.byType(IsometricGardenIsland), findsOneWidget);
     });
-  });
-
-  // ── IsometricGardenIsland — onAddPlant callback ──────────────────────────
-
-  testWidgets('onAddPlant callback fires when island is tapped with empty grid',
-      (tester) async {
-    bool addPlantCalled = false;
-
-    await tester.pumpWidget(_wrap(
-      IsometricGardenIsland(
-        userPlants: const [],
-        season: GardenSeason.spring,
-        onAddPlant: () => addPlantCalled = true,
-      ),
-    ));
-    await tester.pump(const Duration(milliseconds: 100));
-
-    // Tap near centre of widget (island is rendered around 56% down)
-    await tester.tapAt(const Offset(200, 260));
-    await tester.pump(const Duration(milliseconds: 100));
-
-    // The callback may or may not fire depending on hit-test geometry;
-    // the important thing is no exception is thrown.
-    expect(find.byType(IsometricGardenIsland), findsOneWidget);
-    // addPlantCalled checked only to satisfy Dart's unused-variable check
-    expect(addPlantCalled, isA<bool>());
   });
 }

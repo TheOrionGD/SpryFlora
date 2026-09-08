@@ -303,22 +303,22 @@ class _LoginScreenState extends State<LoginScreen> {
                                               ),
                                             ),
                                           );
-                                           if (updatedEmail != null && updatedEmail.isNotEmpty && context.mounted) {
-                                             setState(() {
-                                               _identifierCtrl.text = updatedEmail;
-                                               _passCtrl.clear();
-                                             });
-                                             ScaffoldMessenger.of(context).showSnackBar(
-                                               SnackBar(
-                                                 content: Text(
-                                                   'Password updated! Please log in with your new password.',
-                                                   style: GoogleFonts.nunito(fontWeight: FontWeight.bold),
-                                                 ),
-                                                 backgroundColor: const Color(0xFF27AE60),
-                                                 behavior: SnackBarBehavior.floating,
-                                               ),
-                                             );
-                                           }
+                                          if (updatedEmail != null && updatedEmail.isNotEmpty && context.mounted) {
+                                            setState(() {
+                                              _identifierCtrl.text = updatedEmail;
+                                              _passCtrl.clear();
+                                            });
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Password updated! Please log in with your new password.',
+                                                  style: GoogleFonts.nunito(fontWeight: FontWeight.bold),
+                                                ),
+                                                backgroundColor: const Color(0xFF27AE60),
+                                                behavior: SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                          }
                                         },
                                         child: Text(
                                           'Forgot password?',
@@ -326,7 +326,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                             fontSize: 13,
                                             fontWeight: FontWeight.w800,
                                             color: const Color(0xFFF9E79F),
-                                            decoration: TextDecoration.underline,
                                           ),
                                         ),
                                       ),
@@ -343,10 +342,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                           ),
                                         )
                                       : FunBouncyButton(
-                                          text: 'SIGN IN 🌿',
+                                          text: 'Sign In',
+                                          icon: Icons.arrow_forward_rounded,
                                           onPressed: _handleLogin,
-                                          color: const Color(0xFF1E8449),
-                                          textColor: Colors.white,
                                           height: 52,
                                           fontSize: 18,
                                         ),
@@ -379,7 +377,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                             fontSize: 15,
                                             fontWeight: FontWeight.w900,
                                             color: const Color(0xFFF1C40F),
-                                            decoration: TextDecoration.underline,
                                           ),
                                         ),
                                       ),

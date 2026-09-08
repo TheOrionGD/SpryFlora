@@ -32,11 +32,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _ageController = TextEditingController();
   final _schoolController = TextEditingController();
   final ImageService _imageService = ImageService();
-  String _selectedPlant = 'Tulsi';
+  String _selectedPlant = '';
   String? _profilePhotoPath;
   bool _isLoading = false;
   bool _showConfetti = false;
-  List<String> _plantOptions = ['Tulsi', 'Rose', 'Aloe Vera', 'Money Plant'];
+  List<String> _plantOptions = [];
 
   @override
   void initState() {
@@ -51,7 +51,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       if (speciesList.isNotEmpty && mounted) {
         setState(() {
           _plantOptions = speciesList.map((s) => s.name).toList();
-          if (!_plantOptions.contains(_selectedPlant)) {
+          if (_selectedPlant.isEmpty || !_plantOptions.contains(_selectedPlant)) {
             _selectedPlant = _plantOptions.first;
           }
         });

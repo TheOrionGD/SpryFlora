@@ -13,6 +13,7 @@ import '../widgets/app_photo_view.dart';
 import '../widgets/fun_bouncy_button.dart';
 import '../widgets/app_background.dart';
 import '../widgets/cloud_transition.dart';
+import 'plant_creation_tutorial_screen.dart';
 import 'realtime_plant_scanner_screen.dart';
 
 /// Screen 09 / Confirmation Screen: AI-Identified Plant Confirmation
@@ -87,20 +88,14 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
     _rejectionReason = widget.rejectionReason;
     _detectedObjectType = widget.detectedObjectType ?? 'Plant / Leaf';
 
-    final isProblemOnFeature = !_isPlantDetected ||
-        (widget.identifiedSpeciesName?.contains('Problem on SpryFlora') ?? false) ||
-        (widget.detectedObjectType?.contains('Problem on SpryFlora') ?? false) ||
-        (widget.rejectionReason?.contains('Problem on SpryFlora') ?? false);
-
-    if (isProblemOnFeature) {
-      _isPlantDetected = false;
+    if (!_isPlantDetected) {
       _selectedSpecies = null;
       _identifiedSpeciesName = '';
       _nameController.text = '';
       _aiConfidence = 0;
-      _detectedObjectType = widget.detectedObjectType ?? 'Problem on SpryFlora feature';
+      _detectedObjectType = widget.detectedObjectType ?? 'Non-Botanical Object';
       _rejectionReason = widget.rejectionReason ??
-          'There is a problem on the SpryFlora plant recognition feature. Please select your plant species manually below.';
+          'Please select your plant species manually below or capture a new plant photo.';
     } else if (widget.autoCapturedPhotoPath != null) {
       _initialPhotoPath = widget.autoCapturedPhotoPath;
       _selectedSpecies = widget.initialSpecies;
@@ -419,14 +414,9 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
       );
 
       if (!mounted) return;
-      final messenger = ScaffoldMessenger.of(context);
-      Navigator.of(context).pop(true);
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-              '🌱 "${newPlant.plantName}" added to your My Plants collection!'),
-          backgroundColor: SkeuoTheme.primaryGreen,
-          behavior: SnackBarBehavior.floating,
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => PlantCreationTutorialScreen(plant: newPlant),
         ),
       );
     } catch (_) {
@@ -731,16 +721,13 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
 
   Widget _buildAIAnalysisBanner() {
     if (!_isPlantDetected) {
-      final isFeatureIssue = _detectedObjectType.contains('SpryFlora') ||
-          (_rejectionReason?.contains('SpryFlora') ?? false);
-
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isFeatureIssue ? const Color(0xFFFFF3E0) : const Color(0xFFFFEBEE),
+          color: const Color(0xFFFFEBEE),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isFeatureIssue ? const Color(0xFFFFB74D) : const Color(0xFFEF5350),
+            color: const Color(0xFFEF5350),
             width: 1.5,
           ),
         ),
@@ -748,21 +735,19 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
           children: [
             Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.warning_amber_rounded,
-                  color: isFeatureIssue ? const Color(0xFFE65100) : const Color(0xFFC62828),
+                  color: Color(0xFFC62828),
                   size: 24,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    isFeatureIssue
-                        ? 'Problem on SpryFlora Feature'
-                        : 'Non-Plant Image Detected',
+                    'Non-Plant Image Detected',
                     style: GoogleFonts.nunito(
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
-                      color: isFeatureIssue ? const Color(0xFFE65100) : const Color(0xFFC62828),
+                      color: const Color(0xFFC62828),
                     ),
                   ),
                 ),
@@ -771,9 +756,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
             const SizedBox(height: 8),
             Text(
               _rejectionReason ??
-                  (isFeatureIssue
-                      ? 'There is a problem on the SpryFlora plant recognition feature. Please choose your plant species from the botanical catalog below or scan again.'
-                      : 'The AI scanner detected a $_detectedObjectType instead of a plant. Please capture a clear image of plant leaves.'),
+                  'The AI scanner detected a $_detectedObjectType instead of a plant. Please capture a clear image of plant leaves.',
               style: GoogleFonts.nunito(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -784,9 +767,9 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
             ElevatedButton.icon(
               onPressed: _openLiveCamera,
               icon: const Icon(Icons.camera_alt_rounded, size: 18),
-              label: Text(isFeatureIssue ? 'Re-Scan with SpryFlora Camera' : 'Re-Scan Plant Photo'),
+              label: const Text('Re-Scan Plant Photo'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isFeatureIssue ? const Color(0xFFEF6C00) : const Color(0xFFD32F2F),
+                backgroundColor: const Color(0xFFD32F2F),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),

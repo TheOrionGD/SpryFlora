@@ -52,11 +52,12 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 600));
 
-      // Should display empty state prompt
-      expect(find.text('No Plant Buddy Yet 🌱'), findsOneWidget);
-      expect(find.text('Adopt a Plant Buddy 🌱'), findsOneWidget);
+      // Should display bottom empty state CTA
+      expect(find.text('No Plants Yet!'), findsOneWidget);
+      expect(find.text('+ Add My First Plant 🌱'), findsOneWidget);
 
-      // Must NOT find hardcoded 86% or Level 2 fake data
+      // Must NOT find plant buddy prompt or hardcoded 86% or Level 2 fake data
+      expect(find.text('No Plant Buddy Yet 🌱'), findsNothing);
       expect(find.text('86%'), findsNothing);
       expect(find.text('Level 2'), findsNothing);
     });

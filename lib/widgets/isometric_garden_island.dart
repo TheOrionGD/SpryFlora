@@ -8,12 +8,15 @@ import '../theme/skeuo_theme.dart';
 import 'app_photo_view.dart';
 import '../screens/plant_details_screen.dart';
 
+import '../services/weather_service.dart';
+
 /// Whimsical Isometric 3D Floating Botanical Garden Island
 /// Modeled after the hand-drawn isometric garden artwork with dynamic seasonal backgrounds,
 /// animated floating hearts, musical notes, birds, clouds, moon/sun, and interactive plants.
 class IsometricGardenIsland extends StatefulWidget {
   final List<PlantModel> userPlants;
   final GardenSeason season;
+  final WeatherData? weather;
   final Function(PlantModel plant)? onWaterPlant;
   final VoidCallback? onAddPlant;
 
@@ -21,6 +24,7 @@ class IsometricGardenIsland extends StatefulWidget {
     super.key,
     required this.userPlants,
     this.season = GardenSeason.autumn,
+    this.weather,
     this.onWaterPlant,
     this.onAddPlant,
   });
@@ -35,6 +39,8 @@ class _IsometricGardenIslandState extends State<IsometricGardenIsland>
   late AnimationController _birdsCtrl;
   late AnimationController _notesCtrl;
   late AnimationController _cloudsCtrl;
+  late AnimationController _weatherAnimCtrl;
+  final TransformationController _transformCtrl = TransformationController();
 
   int? _selectedTileIndex;
 
@@ -61,6 +67,11 @@ class _IsometricGardenIslandState extends State<IsometricGardenIsland>
       vsync: this,
       duration: const Duration(seconds: 30),
     )..repeat();
+
+    _weatherAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat();
   }
 
   @override
@@ -69,7 +80,25 @@ class _IsometricGardenIslandState extends State<IsometricGardenIsland>
     _birdsCtrl.dispose();
     _notesCtrl.dispose();
     _cloudsCtrl.dispose();
+    _weatherAnimCtrl.dispose();
+    _transformCtrl.dispose();
     super.dispose();
+  }
+
+  void _zoomIn() {
+    final matrix = _transformCtrl.value.clone();
+    matrix.multiply(Matrix4.diagonal3Values(1.3, 1.3, 1.0));
+    _transformCtrl.value = matrix;
+  }
+
+  void _zoomOut() {
+    final matrix = _transformCtrl.value.clone();
+    matrix.multiply(Matrix4.diagonal3Values(0.77, 0.77, 1.0));
+    _transformCtrl.value = matrix;
+  }
+
+  void _resetZoom() {
+    _transformCtrl.value = Matrix4.identity();
   }
 
   void _handleTileTap(int index, PlantModel? plant) {
@@ -296,13 +325,18 @@ class _IsometricGardenIslandState extends State<IsometricGardenIsland>
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_floatCtrl, _birdsCtrl, _notesCtrl, _cloudsCtrl]),
+      animation: Listenable.merge([_floatCtrl, _birdsCtrl, _notesCtrl, _cloudsCtrl, _weatherAnimCtrl]),
       builder: (context, _) {
+        final weather = widget.weather;
+        final isRainy = weather != null && ((weather.weatherCode >= 51 && weather.weatherCode <= 67) || (weather.weatherCode >= 80 && weather.weatherCode <= 99));
+        final isSnowy = weather != null && ((weather.weatherCode >= 71 && weather.weatherCode <= 77) || (weather.weatherCode >= 85 && weather.weatherCode <= 86));
+        final isSunny = weather == null || weather.weatherCode == 0 || weather.weatherCode <= 2;
+
         return ClipRRect(
           borderRadius: BorderRadius.circular(28),
           child: Container(
             width: double.infinity,
-            height: 440,
+            height: 480,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
@@ -341,41 +375,87 @@ class _IsometricGardenIslandState extends State<IsometricGardenIsland>
                   child: _buildCornerDewdropFoliage(widget.season),
                 ),
 
-                // 5. Floating Isometric Garden Island Painter & Gesture Layer
+                // 5. Interactive Zoomable 3D Floating Garden Island
                 Positioned.fill(
-                  child: GestureDetector(
-                    onTapUp: (details) {
-                      final box = context.findRenderObject() as RenderBox?;
-                      if (box != null) {
-                        final localPos = details.localPosition;
-                        _detectIslandTap(localPos, box.size);
-                      }
-                    },
-                    child: CustomPaint(
-                      painter: _IsometricIslandPainter(
-                        season: widget.season,
-                        userPlants: widget.userPlants,
-                        floatProgress: _floatCtrl.value,
-                        notesProgress: _notesCtrl.value,
-                        selectedTileIndex: _selectedTileIndex,
+                  child: InteractiveViewer(
+                    transformationController: _transformCtrl,
+                    minScale: 0.75,
+                    maxScale: 3.5,
+                    boundaryMargin: const EdgeInsets.all(80),
+                    child: GestureDetector(
+                      onTapUp: (details) {
+                        final box = context.findRenderObject() as RenderBox?;
+                        if (box != null) {
+                          final localPos = details.localPosition;
+                          _detectIslandTap(localPos, box.size);
+                        }
+                      },
+                      child: CustomPaint(
+                        size: Size.infinite,
+                        painter: _IsometricIslandPainter(
+                          season: widget.season,
+                          userPlants: widget.userPlants,
+                          floatProgress: _floatCtrl.value,
+                          notesProgress: _notesCtrl.value,
+                          selectedTileIndex: _selectedTileIndex,
+                        ),
                       ),
                     ),
                   ),
                 ),
 
-                // 6. Floating Season Badge (Top Right Pill)
+                // 6. Dynamic Climate Weather Effects Layer
+                if (isRainy)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: CustomPaint(
+                        painter: _RainWeatherPainter(animProgress: _weatherAnimCtrl.value),
+                      ),
+                    ),
+                  )
+                else if (isSnowy)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: CustomPaint(
+                        painter: _SnowWeatherPainter(animProgress: _weatherAnimCtrl.value),
+                      ),
+                    ),
+                  )
+                else if (isSunny)
+                  Positioned(
+                    top: 10,
+                    right: 20,
+                    child: IgnorePointer(
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              Colors.amber.withValues(alpha: 0.35),
+                              Colors.amber.withValues(alpha: 0.0),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // 7. Auto Climate / Season Pill (Top Left)
                 Positioned(
                   top: 14,
                   left: 16,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.75),
-                      borderRadius: BorderRadius.circular(16),
+                      color: Colors.white.withValues(alpha: 0.88),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFC8E6C9), width: 1.2),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 6,
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
                       ],
@@ -383,15 +463,63 @@ class _IsometricGardenIslandState extends State<IsometricGardenIsland>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(widget.season.emoji, style: const TextStyle(fontSize: 14)),
-                        const SizedBox(width: 5),
                         Text(
-                          '${widget.season.displayName} Sanctuary',
+                          weather != null ? weather.weatherEmoji : widget.season.emoji,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          weather != null
+                              ? 'Auto Climate: ${weather.weatherDescription} • ${weather.temperature.round()}°C'
+                              : '${widget.season.displayName} Sanctuary',
                           style: GoogleFonts.fredoka(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: const Color(0xFF2E4032),
+                            color: const Color(0xFF1B5E20),
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // 8. Glassmorphic 3D Island Zoom Controls (+ / - / Reset)
+                Positioned(
+                  bottom: 14,
+                  right: 14,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFC8E6C9), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildZoomBtn(
+                          icon: Icons.zoom_in_rounded,
+                          tooltip: 'Zoom In 3D Island',
+                          onTap: _zoomIn,
+                        ),
+                        const SizedBox(width: 4),
+                        _buildZoomBtn(
+                          icon: Icons.zoom_out_rounded,
+                          tooltip: 'Zoom Out 3D Island',
+                          onTap: _zoomOut,
+                        ),
+                        const SizedBox(width: 4),
+                        _buildZoomBtn(
+                          icon: Icons.restart_alt_rounded,
+                          tooltip: 'Reset Zoom & Center',
+                          onTap: _resetZoom,
                         ),
                       ],
                     ),
@@ -405,15 +533,45 @@ class _IsometricGardenIslandState extends State<IsometricGardenIsland>
     );
   }
 
+  Widget _buildZoomBtn({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Tooltip(
+          message: tooltip,
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F5E9),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: const Color(0xFF1B5E20),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _detectIslandTap(Offset localPos, Size size) {
-    // 5x5 isometric grid mapping
+    // 5x5 isometric grid mapping with enlarged scale
     const int gridSize = 5;
-    final center = Offset(size.width / 2, size.height * 0.58);
-    const tileW = 44.0;
-    const tileH = 22.0;
+    final center = Offset(size.width / 2, size.height * 0.56);
+    const tileW = 52.0;
+    const tileH = 26.0;
 
     int? hitIndex;
-    double minDistance = 28.0;
+    double minDistance = 34.0;
 
     for (int gy = 0; gy < gridSize; gy++) {
       for (int gx = 0; gx < gridSize; gx++) {
@@ -643,21 +801,21 @@ class _IsometricIslandPainter extends CustomPainter {
     // Floating breathing bounce (up to 6 pixels vertical bob)
     final floatY = math.sin(floatProgress * math.pi) * 6.0;
 
-    final center = Offset(size.width / 2, (size.height * 0.56) + floatY);
+    final center = Offset(size.width / 2, (size.height * 0.54) + floatY);
     const int gridSize = 5;
-    const double tileW = 44.0;
-    const double tileH = 22.0;
+    const double tileW = 52.0;
+    const double tileH = 26.0;
 
     // 1. Island Floating Soft Shadow
     final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.12)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
+      ..color = Colors.black.withValues(alpha: 0.14)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
 
     final shadowPath = Path();
-    shadowPath.moveTo(center.dx, center.dy + 72);
-    shadowPath.lineTo(center.dx + (gridSize * tileW * 0.55), center.dy + 72 + (gridSize * tileH * 0.5));
-    shadowPath.lineTo(center.dx, center.dy + 72 + (gridSize * tileH * 1.05));
-    shadowPath.lineTo(center.dx - (gridSize * tileW * 0.55), center.dy + 72 + (gridSize * tileH * 0.5));
+    shadowPath.moveTo(center.dx, center.dy + 80);
+    shadowPath.lineTo(center.dx + (gridSize * tileW * 0.55), center.dy + 80 + (gridSize * tileH * 0.5));
+    shadowPath.lineTo(center.dx, center.dy + 80 + (gridSize * tileH * 1.05));
+    shadowPath.lineTo(center.dx - (gridSize * tileW * 0.55), center.dy + 80 + (gridSize * tileH * 0.5));
     shadowPath.close();
     canvas.drawPath(shadowPath, shadowPaint);
 
@@ -1364,4 +1522,66 @@ class _IsometricIslandPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _IsometricIslandPainter oldDelegate) => true;
+}
+
+/// Dynamic Animated Raindrop Effect Painter
+class _RainWeatherPainter extends CustomPainter {
+  final double animProgress;
+  _RainWeatherPainter({required this.animProgress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rainPaint = Paint()
+      ..color = const Color(0xFF81D4FA).withValues(alpha: 0.6)
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.round;
+
+    final random = math.Random(42);
+    const dropCount = 35;
+
+    for (int i = 0; i < dropCount; i++) {
+      final startX = (random.nextDouble() * size.width + (animProgress * 30)) % size.width;
+      final speed = 0.8 + random.nextDouble() * 0.6;
+      final startY = ((random.nextDouble() + animProgress * speed) % 1.0) * size.height;
+      const length = 14.0;
+
+      canvas.drawLine(
+        Offset(startX, startY),
+        Offset(startX - 3.5, startY + length),
+        rainPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RainWeatherPainter oldDelegate) => true;
+}
+
+/// Dynamic Animated Snowflake Effect Painter
+class _SnowWeatherPainter extends CustomPainter {
+  final double animProgress;
+  _SnowWeatherPainter({required this.animProgress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final snowPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.75)
+      ..style = PaintingStyle.fill;
+
+    final random = math.Random(1337);
+    const flakeCount = 28;
+
+    for (int i = 0; i < flakeCount; i++) {
+      final baseX = random.nextDouble() * size.width;
+      final speed = 0.4 + random.nextDouble() * 0.4;
+      final y = ((random.nextDouble() + animProgress * speed) % 1.0) * size.height;
+      final x = baseX + math.sin((animProgress * math.pi * 2) + i) * 12;
+      final radius = 2.0 + random.nextDouble() * 2.5;
+
+      canvas.drawCircle(Offset(x, y), radius, snowPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SnowWeatherPainter oldDelegate) => true;
 }

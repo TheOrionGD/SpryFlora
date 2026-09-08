@@ -8,6 +8,7 @@ import 'home_screen.dart';
 import 'onboarding_screen.dart';
 import '../services/auth_service.dart';
 import '../services/backend_warmup_service.dart';
+import '../services/user_service.dart';
 import '../widgets/leaves_particle_overlay.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -82,9 +83,18 @@ class _SplashScreenState extends State<SplashScreen>
       final authService = AuthService();
       await authService.restoreSession();
 
+      final userService = UserService();
+      await userService.loadUserData();
+
       if (!mounted) return;
 
-      final targetScreen = authService.isAuthenticated
+      final hasExistingUser = authService.isAuthenticated ||
+          (userService.currentUser != null) ||
+          await userService.hasUserData();
+
+      if (!mounted) return;
+
+      final targetScreen = hasExistingUser
           ? const HomeScreen()
           : const OnboardingScreen();
 
@@ -182,9 +192,9 @@ class _SplashScreenState extends State<SplashScreen>
                                         ),
                                       ),
 
-                                      // Center Mascot (mascot_transparent.png)
+                                      // Center App Logo
                                       Image.asset(
-                                        'assets/logo/mascot_transparent.png',
+                                        'assets/logo/logo.png',
                                         fit: BoxFit.contain,
                                       ),
                                     ],

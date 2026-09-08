@@ -546,7 +546,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                           fontSize: 15,
                                           fontWeight: FontWeight.w900,
                                           color: const Color(0xFFF1C40F),
-                                          decoration: TextDecoration.underline,
                                         ),
                                       ),
                                     ),

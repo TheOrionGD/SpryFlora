@@ -41,7 +41,7 @@ void main() {
 
       expect(find.text('Royal Jasmine'), findsWidgets);
       expect(find.text('Jasmine'), findsWidgets);
-      expect(find.text('Upload Today'), findsOneWidget);
+      expect(find.text('💧 Water Plant'), findsOneWidget);
       expect(find.text('AI Analysis'), findsOneWidget);
     });
 

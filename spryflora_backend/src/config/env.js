@@ -16,7 +16,7 @@ export const env = {
   huggingFaceModel: process.env.HUGGINGFACE_MODEL || 'foduucom/plant-leaf-detection-and-classification',
   groqApiKey: process.env.GROQ_API_KEY || '',
   aiBackendEnabled: process.env.AI_BACKEND_ENABLED !== 'false',
-  corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : '*',
+  corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : true,
 };
 
 if (!env.jwtSecret && env.nodeEnv === 'production') {
