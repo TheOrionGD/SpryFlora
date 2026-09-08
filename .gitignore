@@ -175,3 +175,9 @@ credentials.json
 google-services.json
 GoogleService-Info.plist
 lib/config/api_config.dart
+
+# Python & AI Engine Caches
+__pycache__/
+*.py[cod]
+*$py.class
+spryflora_backend/ai_engine/static/plants/
