@@ -1,40 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:home_widget/home_widget.dart';
-
 import 'screens/splash_screen.dart';
-import 'screens/widget_configuration_screen.dart';
 import 'services/excel_service.dart';
 import 'services/notification_service.dart';
 import 'services/plant_repository.dart';
 import 'services/user_service.dart';
 import 'theme/skeuo_theme.dart';
-import 'services/widget_sync_service.dart';
-
-@pragma('vm:entry-point')
-Future<void> configureMain() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  final configuredWidgetId = await HomeWidget.initiallyLaunchedFromHomeWidgetConfigure();
-  if (configuredWidgetId != null) {
-    return runApp(MaterialApp(
-      title: 'SpryFlora Widget Config',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: SkeuoTheme.primaryGreen,
-          primary: SkeuoTheme.primaryGreen,
-          secondary: SkeuoTheme.funYellow,
-        ),
-        scaffoldBackgroundColor: SkeuoTheme.background,
-        textTheme: GoogleFonts.nunitoTextTheme(),
-        useMaterial3: true,
-      ),
-      home: WidgetConfigurationScreen(widgetId: configuredWidgetId),
-    ));
-  }
-  return main();
-}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,8 +34,7 @@ void main() async {
   final plantRepo = PlantRepository();
   await plantRepo.loadLocalData();
 
-  // Trigger home widget sync and check due plant notifications
-  await WidgetSyncService().updateWidgetData();
+  // Check due plant notifications
   await NotificationService().checkAndNotifyDuePlants(plantRepo.plants);
   
   runApp(const MyApp());

@@ -769,8 +769,10 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
         q.contains('dry') ||
         q.contains('தண்ணீர்') ||
         q.contains('thanneer') ||
-        q.contains('ஊற்ற')) {
-      return '💧 உங்கள் $species செடிக்கு ${plant.wateringIntervalDays} நாட்களுக்கு ஒருமுறை தண்ணீர் ஊற்ற வேண்டும். ($species needs watering every ${plant.wateringIntervalDays} days). Always make sure soil has good drainage!';
+        q.contains('thanni') ||
+        q.contains('ஊற்ற') ||
+        q.contains('oothanum')) {
+      return '💧 உங்கள் $species செடிக்கு ${plant.wateringIntervalDays} நாட்களுக்கு ஒருமுறை தண்ணீர் ஊற்ற வேண்டும். ($species needs watering every ${plant.wateringIntervalDays} days). Soil dry-ஆனதும் தண்ணீர் ஊற்றுங்கள்! Always ensure good drainage!';
     }
     // Check for sunlight queries
     else if (q.contains('sun') ||
@@ -778,8 +780,12 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
         q.contains('dark') ||
         q.contains('window') ||
         q.contains('சூரிய') ||
-        q.contains('வெளிச்சம்')) {
-      return '☀️ $species செடிக்கு தினமும் ${plant.targetSunlightHours} மணிநேரம் மிதமான சூரிய வெளிச்சம் தேவை. ($species prefers ${plant.targetSunlightHours}h of daily bright light near window).';
+        q.contains('வெளிச்சம்') ||
+        q.contains('வெயில்') ||
+        q.contains('velicham') ||
+        q.contains('veyil') ||
+        q.contains('sunlight')) {
+      return '☀️ $species செடிக்கு தினமும் ${plant.targetSunlightHours} மணிநேரம் மிதமான சூரிய வெளிச்சம் தேவை. ($species prefers ${plant.targetSunlightHours}h of daily bright indirect light near a window). Direct scorching sun தவிர்க்கவும்!';
     }
     // Check for yellow leaf queries
     else if (q.contains('yellow') ||
@@ -787,8 +793,19 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
         q.contains('leaf') ||
         q.contains('leaves') ||
         q.contains('மஞ்சள்') ||
-        q.contains('இலை')) {
+        q.contains('இலை') ||
+        q.contains('manjal') ||
+        q.contains('manjala') ||
+        q.contains('ilai')) {
       return '🍃 இலை மஞ்சள் நிறமாக மாறினால் அதிக தண்ணீர் அல்லது நேரடி வெயில் காரணமாக இருக்கலாம். (Yellow leaves are caused by over-watering or scorching sun). Move pot to bright indirect light!';
+    }
+    // Check for bugs / insect / pest queries
+    else if (q.contains('bug') ||
+        q.contains('pest') ||
+        q.contains('insect') ||
+        q.contains('பூச்சி') ||
+        q.contains('poochi')) {
+      return '🐛 பூச்சிகள் வராமல் தடுக்க வேப்ப எண்ணெய் தெளிக்கலாம் அல்லது சோப்பு நீரால் இலைகளைத் துடைக்கலாம். (Spray diluted neem oil or wipe leaves with mild soapy water to deter insects naturally).';
     }
     // Growth stage queries
     else if (q.contains('grow') ||
@@ -796,15 +813,20 @@ If the question is in Tamil (தமிழ்) or Tanglish, reply in kid-friendly
         q.contains('fast') ||
         q.contains('tall') ||
         q.contains('வளர') ||
-        q.contains('செடி')) {
+        q.contains('செடி') ||
+        q.contains('valarudhu') ||
+        q.contains('valara')) {
       return '📈 உங்கள் ${plant.plantName} தற்போது ${(plant.growthProgress * 100).toInt()}% வளர்ந்துள்ளது! (${plant.growthStageName} stage). Daily check-in செய்து தொடர்ந்து பராமரியுங்கள்! 🌱';
     }
     // Health report queries
     else if (q.contains('health') ||
         q.contains('how is') ||
         q.contains('status') ||
-        q.contains('சுகாதாரம்')) {
-      return '🩺 Health Report: Overall ${health.overallHealth}% (${health.status}). Hydration is at ${health.hydrationScore}% and Sunlight is at ${health.sunlightScore}%. Keep up the fantastic care!';
+        q.contains('சுகாதாரம்') ||
+        q.contains('aarokkiyam') ||
+        q.contains('aarokkiyama') ||
+        q.contains('nalla')) {
+      return '🩺 Health Report: Overall ${health.overallHealth}% (${health.status}). Hydration is at ${health.hydrationScore}% and Sunlight is at ${health.sunlightScore}%. செடி நல்ல ஆரோக்கியமாக இருக்கிறது! Keep up the fantastic care! ✨';
     } else {
       return '🌿 Eco Buddy Advice for ${plant.plantName} ($species): ${plant.targetSunlightHours} மணிநேரம் சூரிய ஒளி, ${plant.wateringIntervalDays} நாட்களுக்கு ஒருமுறை தண்ணீர் வழங்கி நன்றாக வளருங்கள்! 🎉';
     }

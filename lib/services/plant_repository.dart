@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/plant_model.dart';
 import '../models/daily_checkin_model.dart';
 import 'auth_service.dart';
-import 'widget_sync_service.dart';
 import 'notification_service.dart';
 import 'sync_service.dart';
 
@@ -111,7 +110,6 @@ class PlantRepository extends ChangeNotifier {
     _plants.insert(0, taggedPlant);
     await _savePlantsToStorage();
     notifyListeners();
-    WidgetSyncService().updateWidgetData(plantsList: _plants);
     NotificationService().notifyPlantAdded(taggedPlant);
     SyncService().syncPlants(_plants);
     return taggedPlant;
@@ -124,7 +122,6 @@ class PlantRepository extends ChangeNotifier {
       _plants[index] = updatedPlant;
       await _savePlantsToStorage();
       notifyListeners();
-      WidgetSyncService().updateWidgetData(plantsList: _plants);
       SyncService().syncPlants(_plants);
     }
   }
@@ -139,7 +136,6 @@ class PlantRepository extends ChangeNotifier {
       );
       await _savePlantsToStorage();
       notifyListeners();
-      WidgetSyncService().updateWidgetData(plantsList: _plants);
       SyncService().syncPlants(_plants);
     }
   }
@@ -151,7 +147,6 @@ class PlantRepository extends ChangeNotifier {
     await _savePlantsToStorage();
     await _saveCheckinsToStorage();
     notifyListeners();
-    WidgetSyncService().updateWidgetData(plantsList: _plants);
     SyncService().syncPlants(_plants);
   }
 

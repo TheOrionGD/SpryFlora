@@ -16,11 +16,8 @@ import 'profile_settings_screen.dart';
 
 /// Screen 15: AI Eco Buddy Chat (from 255.jpg)
 /// - Top Bar: Back button + "AI Eco Buddy"
-/// - Mascot Avatar & Natural Conversation Flow
-/// - Preloaded with sample conversation:
-///   * Buddy: "Hello! I'm your Eco Buddy 🌱 Ask me anything about plants."
-///   * User: "Why are my leaves yellow?"
-///   * Buddy: "Yellow leaves can be caused by overwatering, underwatering, or lack of sunlight."
+/// - Mascot Avatar & Natural Dynamic Conversation Flow
+/// - Friendly initial welcome greeting from Buddy
 /// - Text Field: "Type a message..." with green send button
 class AIEcoBuddyScreen extends StatefulWidget {
   final PlantModel? initialPlant;
@@ -43,18 +40,7 @@ class _AIEcoBuddyScreenState extends State<AIEcoBuddyScreen> {
   final List<Map<String, dynamic>> _messages = [
     {
       'sender': 'buddy',
-      'text': "Hello! I'm your Eco Buddy 🌱\nAsk me anything about plants.",
-      'time': 'Just now',
-    },
-    {
-      'sender': 'user',
-      'text': "Why are my leaves yellow?",
-      'time': 'Just now',
-    },
-    {
-      'sender': 'buddy',
-      'text':
-          "Yellow leaves can be caused by overwatering, underwatering, or lack of sunlight.",
+      'text': "Hello! I'm your Eco Buddy 🌱\nAsk me anything about caring for your plants.",
       'time': 'Just now',
     },
   ];

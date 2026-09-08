@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -14,13 +15,13 @@ import '../widgets/bottom_nav_bar.dart';
 import '../widgets/fun_animated_plant.dart';
 import '../widgets/fun_bouncy_button.dart';
 import '../widgets/fun_confetti_overlay.dart';
-import 'add_plant_screen.dart';
 import 'my_plants_screen.dart';
 import 'plant_details_screen.dart';
 import 'profile_settings_screen.dart';
 import 'ai_eco_buddy_screen.dart';
 import 'garden_screen.dart';
 import 'notification_center_screen.dart';
+import 'realtime_plant_scanner_screen.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -234,8 +235,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const SizedBox(height: 18),
 
             // ── Interactive Virtual Companion Card ───────────────────────
-            _buildVirtualCompanion(),
-            const SizedBox(height: 18),
+            if (_plantRepo.plants.isNotEmpty) ...[
+              _buildVirtualCompanion(),
+              const SizedBox(height: 18),
+            ],
 
             // ── Today's Checklist Tasks ─────────────────────────────────
             _buildTodaysChecklist(),
@@ -535,8 +538,93 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ── Your Plant Section (matching Screen 08) ───────────────────────────
   Widget _buildYourPlantSection() {
-    final health = _virtualPlant?.health ?? 86;
-    final level = _virtualPlant?.level ?? 2;
+    if (_plantRepo.plants.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFE5EBD8), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2E7D32).withValues(alpha: 0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: Image.asset(
+                    'assets/sprites/mascot_pot_happy.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.yard_rounded,
+                      size: 48,
+                      color: SkeuoTheme.primaryGreen,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'No Plant Buddy Yet 🌱',
+                        style: GoogleFonts.nunito(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: SkeuoTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Adopt or scan your first plant to track real health and level!',
+                        style: GoogleFonts.nunito(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: SkeuoTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FunBouncyButton(
+                text: 'Adopt a Plant Buddy 🌱',
+                icon: Icons.camera_alt_rounded,
+                height: 44,
+                fontSize: 14,
+                onPressed: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const RealtimePlantScannerScreen(),
+                    ),
+                  );
+                  _loadData();
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final activePlant = _plantRepo.plants.first;
+    final health = activePlant.health;
+    final level = (activePlant.growthProgress * 5).toInt() + 1;
+    final photo = activePlant.initialPhotoPath;
 
     return Container(
       width: double.infinity,
@@ -556,29 +644,64 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Your Plant',
-            style: GoogleFonts.nunito(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: SkeuoTheme.textPrimary,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Your Plant: ${activePlant.plantName}',
+                  style: GoogleFonts.nunito(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: SkeuoTheme.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  activePlant.speciesName,
+                  style: GoogleFonts.nunito(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: SkeuoTheme.primaryGreen,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              // Mascot Image
+              // Plant Image or Mascot
               Expanded(
                 flex: 5,
                 child: SizedBox(
                   height: 120,
-                  child: Image.asset(
-                    'assets/sprites/mascot_pot_happy.png',
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Image.asset(
-                      'assets/logo/mascot_transparent.png',
-                      fit: BoxFit.contain,
-                    ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: photo != null && photo.isNotEmpty
+                        ? AppPhotoView(
+                            imagePath: photo,
+                            fit: BoxFit.cover,
+                            fallback: Image.asset(
+                              'assets/sprites/mascot_pot_happy.png',
+                              fit: BoxFit.contain,
+                            ),
+                          )
+                        : Image.asset(
+                            'assets/sprites/mascot_pot_happy.png',
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Image.asset(
+                              'assets/logo/mascot_transparent.png',
+                              fit: BoxFit.contain,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -689,9 +812,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ── Virtual Companion ────────────────────────────────────────────────────────
   Widget _buildVirtualCompanion() {
-    final health = _virtualPlant?.health.toDouble() ?? 70;
-    final level = _virtualPlant?.level ?? 1;
-    final waterings = _virtualPlant?.wateringsCount ?? 0;
+    if (_plantRepo.plants.isEmpty) return const SizedBox.shrink();
+
+    final activePlant = _plantRepo.plants.first;
+    final health = activePlant.health.toDouble();
+    final level = (activePlant.growthProgress * 5).toInt() + 1;
+    final waterings = _virtualPlant?.wateringsCount ?? _plantRepo.plants.length;
 
     return _AnimatedCard(
       delay: 200,
@@ -909,7 +1035,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: () async {
         final added = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(builder: (_) => const AddPlantScreen()),
+          MaterialPageRoute(builder: (_) => const RealtimePlantScannerScreen()),
         );
         if (added == true) _loadData();
       },
@@ -1010,7 +1136,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 text: '+ Add My First Plant 🌱',
                 onPressed: () async {
                   final added = await Navigator.of(context).push<bool>(
-                    MaterialPageRoute(builder: (_) => const AddPlantScreen()),
+                    MaterialPageRoute(builder: (_) => const RealtimePlantScannerScreen()),
                   );
                   if (added == true) _loadData();
                 },
@@ -1187,6 +1313,8 @@ class _AnimatedCardState extends State<_AnimatedCard>
   late Animation<Offset> _slide;
   late Animation<double> _fade;
 
+  Timer? _delayTimer;
+
   @override
   void initState() {
     super.initState();
@@ -1199,13 +1327,14 @@ class _AnimatedCardState extends State<_AnimatedCard>
     _fade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
     );
-    Future.delayed(Duration(milliseconds: widget.delay), () {
+    _delayTimer = Timer(Duration(milliseconds: widget.delay), () {
       if (mounted) _ctrl.forward();
     });
   }
 
   @override
   void dispose() {
+    _delayTimer?.cancel();
     _ctrl.dispose();
     super.dispose();
   }

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
+import '../models/user_model.dart';
 import 'user_service.dart';
 import 'plant_repository.dart';
 
@@ -141,6 +142,20 @@ class AuthService extends ChangeNotifier {
           await UserService().setCurrentUser(authUser.id);
           await PlantRepository().setCurrentUser(authUser.id);
 
+          if (UserService().currentUser == null) {
+            await UserService().saveUserProfile(
+              UserProfile(
+                childName: name,
+                age: 10,
+                school: '',
+                favoritePlant: favoritePlant ?? 'Sunflower',
+                xp: 0,
+                careStreakDays: 0,
+                completedPlantsCount: 0,
+              ),
+            );
+          }
+
           notifyListeners();
           return authUser;
         } else {
@@ -187,7 +202,21 @@ class AuthService extends ChangeNotifier {
     users.add(newUserRecord);
     await prefs.setString(_usersKey, jsonEncode(users));
 
-    return await login(email: cleanEmail, password: password);
+    final authUser = await login(email: cleanEmail, password: password);
+    if (UserService().currentUser == null) {
+      await UserService().saveUserProfile(
+        UserProfile(
+          childName: name,
+          age: 10,
+          school: '',
+          favoritePlant: favoritePlant ?? 'Sunflower',
+          xp: 0,
+          careStreakDays: 0,
+          completedPlantsCount: 0,
+        ),
+      );
+    }
+    return authUser;
   }
 
   /// Authenticates user credentials using server API or local verification

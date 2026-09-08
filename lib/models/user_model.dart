@@ -15,8 +15,8 @@ class UserProfile {
     required this.school,
     required this.favoritePlant,
     this.profilePhotoPath,
-    this.xp = 120,
-    this.careStreakDays = 1,
+    this.xp = 0,
+    this.careStreakDays = 0,
     this.completedPlantsCount = 0,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -55,8 +55,8 @@ class UserProfile {
       school: json['school'] as String,
       favoritePlant: json['favoritePlant'] as String,
       profilePhotoPath: json['profilePhotoPath'] as String?,
-      xp: (json['xp'] as num?)?.toInt() ?? 120,
-      careStreakDays: (json['careStreakDays'] as num?)?.toInt() ?? 1,
+      xp: (json['xp'] as num?)?.toInt() ?? 0,
+      careStreakDays: (json['careStreakDays'] as num?)?.toInt() ?? 0,
       completedPlantsCount: (json['completedPlantsCount'] as num?)?.toInt() ?? 0,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)

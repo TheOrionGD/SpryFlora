@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spryflora_app/models/plant_model.dart';
 import 'package:spryflora_app/services/plant_repository.dart';
 import 'package:spryflora_app/screens/garden_screen.dart';
+import 'package:spryflora_app/widgets/isometric_garden_island.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -55,6 +56,10 @@ void main() {
 
       // Stats row should show "1"
       expect(find.text('1'), findsWidgets);
+
+      // Default view is the 3D Isometric Island (not the plot cards grid),
+      // so the IsometricGardenIsland widget should be present.
+      expect(find.byType(IsometricGardenIsland), findsOneWidget);
     });
   });
 }

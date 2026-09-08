@@ -33,6 +33,56 @@ class KidsVoiceService {
     _currentLanguage = lang;
   }
 
+  /// Resolves the optimal platform speech recognition localeId for the selected language.
+  /// Strictly prevents Tamil and Tanglish from being downgraded to en_US.
+  static String resolveLocale({
+    required SpeechLanguage language,
+    List<LocaleName> locales = const [],
+    LocaleName? systemLoc,
+  }) {
+    if (language == SpeechLanguage.tamil) {
+      // 1. Exact match for ta_IN or ta-IN
+      for (final l in locales) {
+        final id = l.localeId.toLowerCase().replaceAll('-', '_');
+        if (id == 'ta_in') return l.localeId;
+      }
+      // 2. Any Tamil locale (ta_LK, ta_SG, etc.)
+      for (final l in locales) {
+        if (l.localeId.toLowerCase().startsWith('ta')) return l.localeId;
+      }
+      // 3. Fallback: Always use standard 'ta_IN' so Google Recognizer triggers Tamil
+      return 'ta_IN';
+    } else if (language == SpeechLanguage.tanglish) {
+      // Tanglish blends Tamil and English vocabulary.
+      // Prioritize Indian Tamil (ta_IN) or Indian English (en_IN) which handles Indian accents
+      for (final l in locales) {
+        final id = l.localeId.toLowerCase().replaceAll('-', '_');
+        if (id == 'ta_in') return l.localeId;
+      }
+      for (final l in locales) {
+        final id = l.localeId.toLowerCase().replaceAll('-', '_');
+        if (id == 'en_in') return l.localeId;
+      }
+      for (final l in locales) {
+        if (l.localeId.toLowerCase().startsWith('ta')) return l.localeId;
+      }
+      return 'ta_IN';
+    } else {
+      // English
+      for (final l in locales) {
+        final id = l.localeId.toLowerCase().replaceAll('-', '_');
+        if (id == 'en_in' || id == 'en_us' || id == 'en_gb') return l.localeId;
+      }
+      for (final l in locales) {
+        if (l.localeId.toLowerCase().startsWith('en')) return l.localeId;
+      }
+      if (systemLoc != null && systemLoc.localeId.toLowerCase().startsWith('en')) {
+        return systemLoc.localeId;
+      }
+      return 'en_US';
+    }
+  }
+
   Timer? _animTimer;
 
   /// Initializes underlying SpeechToText engine if supported
@@ -121,29 +171,14 @@ class KidsVoiceService {
     try {
       final locales = await _speechToText.locales();
       final systemLoc = await _speechToText.systemLocale();
-      final targetPrefix =
-          _currentLanguage == SpeechLanguage.english ? 'en' : 'ta';
-
-      LocaleName? matched;
-      for (final l in locales) {
-        if (l.localeId.toLowerCase().startsWith(targetPrefix)) {
-          matched = l;
-          break;
-        }
-      }
-      if (matched == null) {
-        for (final l in locales) {
-          if (l.localeId.toLowerCase().startsWith('en')) {
-            matched = l;
-            break;
-          }
-        }
-      }
-      matched ??= systemLoc ?? (locales.isNotEmpty ? locales.first : null);
-      if (matched != null) {
-        localeId = matched.localeId;
-      }
-    } catch (_) {}
+      localeId = resolveLocale(
+        language: _currentLanguage,
+        locales: locales,
+        systemLoc: systemLoc,
+      );
+    } catch (_) {
+      localeId = _currentLanguage == SpeechLanguage.english ? 'en_US' : 'ta_IN';
+    }
 
     final Completer<String?> completer = Completer<String?>();
     String recognizedText = '';

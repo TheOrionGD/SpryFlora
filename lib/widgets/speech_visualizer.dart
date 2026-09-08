@@ -47,13 +47,34 @@ class _SpeechVisualizerWidgetState extends State<SpeechVisualizerWidget>
   late AnimationController _pulseCtrl;
   final TextEditingController _textController = TextEditingController();
 
-  final List<String> _quickPrompts = const [
-    '💧 How often should I water my plant?',
-    '☀️ How much sunlight does it need?',
-    '🍂 Why are the leaves turning yellow?',
-    '🌱 Is my plant healthy and growing well?',
-    '🐛 How do I protect it from bugs or pests?',
-  ];
+  List<String> get _quickPrompts {
+    switch (_selectedLanguage) {
+      case SpeechLanguage.tamil:
+        return const [
+          '💧 என் செடிக்கு எப்போது தண்ணீர் ஊற்ற வேண்டும்?',
+          '☀️ இதற்கு எவ்வளவு சூரிய வெளிச்சம் தேவை?',
+          '🍂 இலைகள் ஏன் மஞ்சள் நிறமாக மாறுகின்றன?',
+          '🌱 என் செடி ஆரோக்கியமாக வளர்கிறதா?',
+          '🐛 பூச்சிகளிலிருந்து செடியை எப்படி பாதுகாப்பது?',
+        ];
+      case SpeechLanguage.tanglish:
+        return const [
+          '💧 Plant-ku eppo thanneer oothanum?',
+          '☀️ Ivlo sunlight pothuma?',
+          '🍂 Leaves yen manjala maaruthu?',
+          '🌱 Plant nalla aarokkiyama irukka?',
+          '🐛 Insects varama eppadi paathukardhu?',
+        ];
+      case SpeechLanguage.english:
+        return const [
+          '💧 How often should I water my plant?',
+          '☀️ How much sunlight does it need?',
+          '🍂 Why are the leaves turning yellow?',
+          '🌱 Is my plant healthy and growing well?',
+          '🐛 How do I protect it from bugs or pests?',
+        ];
+    }
+  }
 
   @override
   void initState() {
@@ -135,7 +156,7 @@ class _SpeechVisualizerWidgetState extends State<SpeechVisualizerWidget>
   }
 
   void _selectQuickPrompt(String prompt) {
-    final cleanPrompt = prompt.replaceFirst(RegExp(r'^[^\w\s]+\s*'), '');
+    final cleanPrompt = prompt.replaceFirst(RegExp(r'^[^\w\s\u0B80-\u0BFF]+\s*'), '');
     setState(() {
       _extractedText = cleanPrompt;
       _textController.text = cleanPrompt;

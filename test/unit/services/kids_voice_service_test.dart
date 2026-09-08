@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import 'package:spryflora_app/services/kids_voice_service.dart';
 
 void main() {
@@ -44,6 +45,56 @@ void main() {
 
       voiceService.stopListening();
       expect(voiceService.isListening, isFalse);
+    });
+
+    test('resolveLocale correctly preserves Tamil and Tanglish without falling back to en_US', () {
+      final availableLocales = [
+        LocaleName('en_US', 'English (United States)'),
+        LocaleName('en_GB', 'English (United Kingdom)'),
+        LocaleName('ta_IN', 'Tamil (India)'),
+      ];
+
+      // Tamil matches ta_IN
+      final tamilRes = KidsVoiceService.resolveLocale(
+        language: SpeechLanguage.tamil,
+        locales: availableLocales,
+      );
+      expect(tamilRes, equals('ta_IN'));
+
+      // Tanglish matches ta_IN when available
+      final tanglishRes = KidsVoiceService.resolveLocale(
+        language: SpeechLanguage.tanglish,
+        locales: availableLocales,
+      );
+      expect(tanglishRes, equals('ta_IN'));
+
+      // When only English is available on device, Tamil strictly resolves to ta_IN for network recognition, NEVER en_US
+      final onlyEnglishLocales = [
+        LocaleName('en_US', 'English (United States)'),
+      ];
+      final tamilFallbackRes = KidsVoiceService.resolveLocale(
+        language: SpeechLanguage.tamil,
+        locales: onlyEnglishLocales,
+      );
+      expect(tamilFallbackRes, equals('ta_IN'));
+
+      // Tanglish with en_IN available uses en_IN
+      final indianEnglishLocales = [
+        LocaleName('en_IN', 'English (India)'),
+        LocaleName('en_US', 'English (United States)'),
+      ];
+      final tanglishIndianRes = KidsVoiceService.resolveLocale(
+        language: SpeechLanguage.tanglish,
+        locales: indianEnglishLocales,
+      );
+      expect(tanglishIndianRes, equals('en_IN'));
+
+      // English resolves to en_US
+      final englishRes = KidsVoiceService.resolveLocale(
+        language: SpeechLanguage.english,
+        locales: availableLocales,
+      );
+      expect(englishRes, equals('en_US'));
     });
   });
 }

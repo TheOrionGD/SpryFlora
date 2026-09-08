@@ -5,12 +5,9 @@ import '../models/plant_model.dart';
 import '../services/plant_repository.dart';
 import '../services/user_service.dart';
 import '../theme/skeuo_theme.dart';
-import '../widgets/app_background.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/fun_bouncy_button.dart';
 import '../widgets/leaves_particle_overlay.dart';
-import '../widgets/plant_growth_animation.dart';
-import 'add_plant_screen.dart';
 import 'home_screen.dart';
 import 'my_plants_screen.dart';
 import 'plant_details_screen.dart';
@@ -19,6 +16,8 @@ import 'ai_eco_buddy_screen.dart';
 import 'notification_center_screen.dart';
 import 'realtime_plant_scanner_screen.dart';
 import 'virtual_garden_screen.dart';
+import '../models/garden_season.dart';
+import '../widgets/isometric_garden_island.dart';
 
 /// Redesigned Kid-Friendly Magical Garden Screen
 /// Vibrant, skeuomorphic, highly interactive garden world with Eco-Buddy mascot guidance,
@@ -38,9 +37,14 @@ class _GardenScreenState extends State<GardenScreen>
   late AnimationController _ambientCtrl;
   late AnimationController _windCtrl;
 
+  late GardenSeason _currentSeason;
+  bool _isAutoSeason = true;
+  bool _isIsometricView = true;
+
   @override
   void initState() {
     super.initState();
+    _currentSeason = GardenSeason.currentForDate(DateTime.now());
     _plantRepo.loadLocalData();
     _userService.loadUserData();
 
@@ -120,9 +124,17 @@ class _GardenScreenState extends State<GardenScreen>
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: LeavesParticleOverlay(
-        maxThroughput: true,
-        child: AppBackground(
+      body: AnimatedContainer(
+        duration: const Duration(milliseconds: 600),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: _currentSeason.skyGradient,
+          ),
+        ),
+        child: LeavesParticleOverlay(
+          maxThroughput: true,
           child: SafeArea(
             child: AnimatedBuilder(
               animation: Listenable.merge([_plantRepo, _ambientCtrl, _windCtrl]),
@@ -141,9 +153,9 @@ class _GardenScreenState extends State<GardenScreen>
                 final int dueCount = plants.where((p) => p.isWateringDue).length;
                 final int totalPlants = plants.length;
                 final int gardenHealth = plants.isEmpty
-                    ? 100
+                    ? 0
                     : (plants.fold<int>(0, (sum, p) => sum + p.health) / totalPlants).round();
-                final int streakDays = _userService.currentUser?.careStreakDays ?? 1;
+                final int streakDays = _userService.currentUser?.careStreakDays ?? 0;
 
                 return Column(
                   children: [
@@ -171,22 +183,50 @@ class _GardenScreenState extends State<GardenScreen>
 
                             // Magical Garden World Section Header
                             _buildSectionHeader(
-                              title: '🌿 My Botanical Plots',
+                              title: '🌿 Botanical Sanctuary',
                               subtitle: totalPlants > 0
-                                  ? '$totalPlants active plant${totalPlants > 1 ? 's' : ''} in your sanctuary'
-                                  : 'Start your garden adventure today!',
+                                  ? '$totalPlants active plant${totalPlants > 1 ? 's' : ''} in your seasonal sanctuary'
+                                  : 'Explore your seasonal garden island today!',
                             ),
+                            const SizedBox(height: 10),
+
+                            // Seasonal Background & Atmosphere Selector Bar
+                            _buildSeasonalSelectorBar(),
                             const SizedBox(height: 12),
 
-                            // Floating Interactive Virtual Garden Banner Button
-                            _buildVirtualGardenBanner(),
+                            // View Mode Toggle (3D Island vs Plot Cards) & Virtual Garden Shortcut
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _buildViewModeToggle(),
+                                _buildVirtualGardenShortcutButton(),
+                              ],
+                            ),
                             const SizedBox(height: 14),
 
-                            // Main Interactive Garden Plots Grid
-                            if (totalPlants == 0)
-                              _buildEmptyGardenHeroCard()
-                            else
-                              _buildGardenPlotsGrid(plants),
+                            // Main Garden Display: 3D Floating Isometric Island or 2D Plot Cards
+                            if (_isIsometricView) ...[
+                              IsometricGardenIsland(
+                                userPlants: plants,
+                                season: _currentSeason,
+                                onWaterPlant: _quickWaterPlant,
+                                onAddPlant: () async {
+                                  final added = await Navigator.of(context).push<bool>(
+                                    MaterialPageRoute(builder: (_) => const RealtimePlantScannerScreen()),
+                                  );
+                                  if (added == true) _plantRepo.loadLocalData();
+                                },
+                              ),
+                              if (totalPlants == 0) ...[
+                                const SizedBox(height: 12),
+                                _buildEmptyGardenHeroCard(),
+                              ],
+                            ] else ...[
+                              if (totalPlants == 0)
+                                _buildEmptyGardenHeroCard()
+                              else
+                                _buildGardenPlotsGrid(plants),
+                            ],
 
                             const SizedBox(height: 24),
 
@@ -335,8 +375,148 @@ class _GardenScreenState extends State<GardenScreen>
     );
   }
 
-  /// Floating Interactive Virtual Garden Banner Button
-  Widget _buildVirtualGardenBanner() {
+  /// Dynamic Seasonal Background & Atmosphere Selector Bar
+  Widget _buildSeasonalSelectorBar() {
+    final autoSeason = GardenSeason.currentForDate(DateTime.now());
+    return SizedBox(
+      height: 38,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        children: [
+          // Auto (Current Calendar Season) Chip
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              avatar: Text(_isAutoSeason ? '✨' : '📅', style: const TextStyle(fontSize: 12)),
+              label: Text(
+                'Auto (${autoSeason.emoji} ${autoSeason.displayName})',
+                style: GoogleFonts.nunito(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: _isAutoSeason ? Colors.white : const Color(0xFF2E4032),
+                ),
+              ),
+              selected: _isAutoSeason,
+              selectedColor: const Color(0xFF2E7D32),
+              backgroundColor: Colors.white.withValues(alpha: 0.85),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() {
+                    _isAutoSeason = true;
+                    _currentSeason = autoSeason;
+                  });
+                }
+              },
+            ),
+          ),
+          // 4 Seasons: Spring, Summer, Autumn, Winter
+          ...GardenSeason.values.map((season) {
+            final isSelected = !_isAutoSeason && _currentSeason == season;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                avatar: Text(season.emoji, style: const TextStyle(fontSize: 12)),
+                label: Text(
+                  season.displayName,
+                  style: GoogleFonts.nunito(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: isSelected ? Colors.white : const Color(0xFF2E4032),
+                  ),
+                ),
+                selected: isSelected,
+                selectedColor: const Color(0xFF2E7D32),
+                backgroundColor: Colors.white.withValues(alpha: 0.85),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                onSelected: (selected) {
+                  setState(() {
+                    _isAutoSeason = false;
+                    _currentSeason = season;
+                  });
+                },
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  /// View Mode Switcher: 3D Floating Island vs Botanical Plot Cards
+  Widget _buildViewModeToggle() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: () => setState(() => _isIsometricView = true),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: _isIsometricView ? const Color(0xFF2E7D32) : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  const Text('🏝️', style: TextStyle(fontSize: 13)),
+                  const SizedBox(width: 5),
+                  Text(
+                    '3D Island',
+                    style: GoogleFonts.fredoka(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _isIsometricView ? Colors.white : const Color(0xFF424242),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => setState(() => _isIsometricView = false),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: !_isIsometricView ? const Color(0xFF2E7D32) : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  const Text('📋', style: TextStyle(fontSize: 13)),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Plot Cards',
+                    style: GoogleFonts.fredoka(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: !_isIsometricView ? Colors.white : const Color(0xFF424242),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Compact shortcut button to open Virtual Garden Screen
+  Widget _buildVirtualGardenShortcutButton() {
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
@@ -344,79 +524,31 @@ class _GardenScreenState extends State<GardenScreen>
         );
       },
       child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
+          color: const Color(0xFF1B5E20),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF1B5E20).withValues(alpha: 0.35),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Text('🏡', style: TextStyle(fontSize: 24)),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Virtual Garden World',
-                        style: GoogleFonts.fredoka(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFD54F),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'INTERACTIVE',
-                          style: GoogleFonts.nunito(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                            color: const Color(0xFF5D4037),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Explore your plants arranged by age in a 3D landscape',
-                    style: GoogleFonts.nunito(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: 0.85),
-                    ),
-                  ),
-                ],
+            const Text('🏡', style: TextStyle(fontSize: 13)),
+            const SizedBox(width: 5),
+            Text(
+              'Virtual View',
+              style: GoogleFonts.fredoka(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
           ],
         ),
       ),
@@ -782,18 +914,15 @@ class _GardenScreenState extends State<GardenScreen>
                 ),
               ),
 
-              // Plant Procedural Growth Animation Artwork
+              // Plant Mascot Preview Artwork
               Positioned(
                 top: 12,
                 left: 12,
                 right: 12,
                 bottom: 82,
-                child: CustomPaint(
-                  painter: ProceduralPlantGrowthPainter(
-                    progress: plant.growthProgress,
-                    speciesName: plant.speciesName,
-                    showPot: false,
-                  ),
+                child: Image.asset(
+                  'assets/sprites/mascot_pot_winking.png',
+                  fit: BoxFit.contain,
                 ),
               ),
 
@@ -907,7 +1036,7 @@ class _GardenScreenState extends State<GardenScreen>
     return GestureDetector(
       onTap: () async {
         final added = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(builder: (_) => const AddPlantScreen()),
+          MaterialPageRoute(builder: (_) => const RealtimePlantScannerScreen()),
         );
         if (added == true) _plantRepo.loadLocalData();
       },
@@ -1019,7 +1148,7 @@ class _GardenScreenState extends State<GardenScreen>
             text: 'Plant Your First Seed 🌿',
             onPressed: () async {
               final added = await Navigator.of(context).push<bool>(
-                MaterialPageRoute(builder: (_) => const AddPlantScreen()),
+                MaterialPageRoute(builder: (_) => const RealtimePlantScannerScreen()),
               );
               if (added == true) _plantRepo.loadLocalData();
             },

@@ -21,10 +21,8 @@ import '../widgets/leaves_particle_overlay.dart';
 import 'my_certifications_screen.dart';
 import 'profile_setup_screen.dart';
 import 'garden_screen.dart';
-import 'mascot_journey_screen.dart';
 import 'notification_center_screen.dart';
 import 'reminders_screen.dart';
-import 'widget_guide_screen.dart';
 import 'help_faq_screen.dart';
 
 
@@ -218,10 +216,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                       ),
                       const SizedBox(height: 20),
 
-                      // Mascot Journey Card
-                      _buildMascotJourneyCard(userXp),
-
-                    // Settings Group Card (Screen 16)
+                    // Settings Group Card
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -256,15 +251,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                           ),
                           const Divider(height: 1, color: Color(0xFFF1F8EE)),
                           _buildSettingsTile(
-                            icon: Icons.map_rounded,
-                            title: 'Mascot Journey Map',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) => const MascotJourneyScreen()),
-                            ),
-                          ),
-                          const Divider(height: 1, color: Color(0xFFF1F8EE)),
-                          _buildSettingsTile(
                             icon: Icons.workspace_premium_rounded,
                             title: 'My Certifications',
                             onTap: () => Navigator.of(context).push(
@@ -289,15 +275,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(
                                   builder: (_) => const RemindersScreen()),
-                            ),
-                          ),
-                          const Divider(height: 1, color: Color(0xFFF1F8EE)),
-                          _buildSettingsTile(
-                            icon: Icons.widgets_rounded,
-                            title: 'Home Screen Widget',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) => const WidgetGuideScreen()),
                             ),
                           ),
                           const Divider(height: 1, color: Color(0xFFF1F8EE)),
@@ -457,176 +434,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
     );
   }
 
-  Widget _buildMascotJourneyCard(int userXp) {
-    final currentStage = ((userXp / 100).floor() + 1).clamp(1, 16);
-    final stageProgress = ((userXp % 100) / 100.0).clamp(0.0, 1.0);
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => MascotJourneyScreen(
-              initialActiveIndex: currentStage - 1,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1B5E20),
-              Color(0xFF2E7D32),
-              Color(0xFF43A047),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF2E7D32).withValues(alpha: 0.28),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                // Mascot Avatar container with glow
-                Container(
-                  width: 60,
-                  height: 60,
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Image.asset(
-                    'assets/sprites/mascot_pot_happy.png',
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.eco_rounded,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                // Title and Stage Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF39C12),
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 4,
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          '🌱 16-STAGE MASCOT JOURNEY',
-                          style: GoogleFonts.fredoka(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            letterSpacing: 0.6,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Stage $currentStage of 16',
-                        style: GoogleFonts.fredoka(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.2),
-                              offset: const Offset(0, 1.5),
-                              blurRadius: 2,
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        'Explore botanical milestones & unlock lands!',
-                        style: GoogleFonts.nunito(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.92),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            // XP / Stage Progress Bar
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      height: 10,
-                      color: Colors.black.withValues(alpha: 0.25),
-                      child: FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: stageProgress.clamp(0.08, 1.0),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFF1C40F), Color(0xFFF39C12)],
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  '${(stageProgress * 100).toInt()}%',
-                  style: GoogleFonts.fredoka(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFFFFF9C4),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildProfileHero(String displayName, String levelName, int userXp, int gardenScore) {
     return Column(

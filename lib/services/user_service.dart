@@ -11,7 +11,6 @@ class UserService {
 
   String? _currentUserId;
   UserProfile? _currentUser;
-  VirtualPlant? _virtualPlant;
   bool _isInitialized = false;
 
   static const String _legacyStorageKey = 'spryflora_user';
@@ -43,10 +42,10 @@ class UserService {
         lastWatered: p.lastWateredDate,
       );
     }
-    if (_currentUser != null) {
+    if (_currentUser != null && _currentUser!.favoritePlant.isNotEmpty) {
       return VirtualPlant(name: _currentUser!.favoritePlant);
     }
-    return _virtualPlant;
+    return null;
   }
   bool get isInitialized => _isInitialized;
 
@@ -59,7 +58,6 @@ class UserService {
   /// Clears in-memory cache upon user logout
   void clearInMemoryData() {
     _currentUser = null;
-    _virtualPlant = null;
     _isInitialized = false;
   }
 
@@ -275,13 +273,11 @@ class UserService {
       debugPrint('✓ Cleared user preferences for $activeUserId');
 
       _currentUser = null;
-      _virtualPlant = null;
       _isInitialized = false;
       debugPrint('User data cleared');
     } catch (e) {
       debugPrint('✗ Error clearing user data: $e');
       _currentUser = null;
-      _virtualPlant = null;
       _isInitialized = false;
     }
   }

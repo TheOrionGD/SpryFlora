@@ -9,11 +9,11 @@ import '../widgets/app_photo_view.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/fun_bouncy_button.dart';
 import '../widgets/fun_confetti_overlay.dart';
-import 'add_plant_screen.dart';
 import 'ai_eco_buddy_screen.dart';
 import 'plant_details_screen.dart';
 import 'profile_settings_screen.dart';
 import 'garden_screen.dart';
+import 'realtime_plant_scanner_screen.dart';
 
 /// Screen 10: My Plants (from 255.jpg)
 class MyPlantsScreen extends StatefulWidget {
@@ -94,7 +94,7 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
                   onPressed: () async {
                     final res = await Navigator.of(context).push<bool>(
                       MaterialPageRoute(
-                          builder: (_) => const AddPlantScreen()),
+                          builder: (_) => const RealtimePlantScannerScreen()),
                     );
                     if (res == true) {
                       _loadPlants();
@@ -217,7 +217,7 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
                   imagePath: plant.initialPhotoPath,
                   fit: BoxFit.cover,
                   fallback: Image.asset(
-                    'assets/sprites/plant_potted.png',
+                    'assets/sprites/mascot_pot_winking.png',
                     fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => const Icon(
                       Icons.spa_rounded,

@@ -174,6 +174,156 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
     }
   }
 
+  void _showSpeciesPickerBottomSheet() async {
+    List<PlantSpecies> speciesList = _excelService.speciesList;
+    if (speciesList.isEmpty) {
+      try {
+        speciesList = await _excelService.loadSpeciesDatabase();
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        String filter = '';
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final filtered = filter.isEmpty
+                ? speciesList
+                : speciesList.where((s) {
+                    final q = filter.toLowerCase();
+                    return s.name.toLowerCase().contains(q) ||
+                        s.description.toLowerCase().contains(q);
+                  }).toList();
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.75,
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Select Botanical Species 🌿',
+                        style: GoogleFonts.nunito(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: SkeuoTheme.textPrimary,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F8EE),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFC8E6C9)),
+                    ),
+                    child: TextField(
+                      autofocus: false,
+                      decoration: const InputDecoration(
+                        icon: Icon(Icons.search_rounded, color: SkeuoTheme.primaryGreen),
+                        hintText: 'Search plant species (e.g. Tulsi, Rose, Aloe)...',
+                        border: InputBorder.none,
+                        hintStyle: TextStyle(fontSize: 13),
+                      ),
+                      onChanged: (val) {
+                        setSheetState(() => filter = val.trim());
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No matching species found.\nTry a different search term!',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.nunito(color: SkeuoTheme.textSecondary),
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: filtered.length,
+                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            itemBuilder: (_, idx) {
+                              final sp = filtered[idx];
+                              final isSelected = _selectedSpecies?.name.toLowerCase() == sp.name.toLowerCase();
+                              return ListTile(
+                                leading: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? const Color(0xFFC8E6C9) : const Color(0xFFF1F8EE),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Text('🌿', style: TextStyle(fontSize: 18)),
+                                ),
+                                title: Text(
+                                  sp.name,
+                                  style: GoogleFonts.nunito(
+                                    fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                                    color: isSelected ? SkeuoTheme.primaryGreen : SkeuoTheme.textPrimary,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '💧 Water every ${sp.wateringIntervalDays}d • ☀️ ${sp.sunlight}',
+                                  style: GoogleFonts.nunito(fontSize: 12, color: SkeuoTheme.textSecondary),
+                                ),
+                                trailing: isSelected
+                                    ? const Icon(Icons.check_circle_rounded, color: SkeuoTheme.primaryGreen)
+                                    : const Icon(Icons.chevron_right_rounded, color: Colors.black26),
+                                onTap: () {
+                                  Navigator.of(ctx).pop();
+                                  setState(() {
+                                    _selectedSpecies = sp;
+                                    _identifiedSpeciesName = sp.name;
+                                    _isPlantDetected = true;
+                                    if (_nameController.text.trim().isEmpty ||
+                                        _nameController.text.startsWith('My ')) {
+                                      _nameController.text = 'My ${sp.name}';
+                                    }
+                                    _plantEnvironment = _detectPlantType(sp);
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -702,7 +852,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                 Text(
                   _identifiedSpeciesName.isNotEmpty
                       ? _identifiedSpeciesName
-                      : (_selectedSpecies?.name ?? 'Tulsi'),
+                      : (_selectedSpecies?.name ?? 'Botanical Specimen'),
                   style: GoogleFonts.nunito(
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
@@ -786,12 +936,69 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
   }
 
   Widget _buildDataDrivenSpeciesCard() {
-    final speciesName = _selectedSpecies?.name ??
-        (_identifiedSpeciesName.isNotEmpty
-            ? _identifiedSpeciesName
-            : 'Neem Tree');
-    final description = _selectedSpecies?.description ??
-        'Identified botanical species from SpryFlora database.';
+    if (_selectedSpecies == null) {
+      return GestureDetector(
+        onTap: _showSpeciesPickerBottomSheet,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F8EE),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFA5D6A7), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF2E7D32).withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFC8E6C9),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.eco_rounded,
+                    color: Color(0xFF2E7D32), size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Select Botanical Species 🌿',
+                      style: GoogleFonts.nunito(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: SkeuoTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tap to choose species from SpryFlora database or scan a plant above.',
+                      style: GoogleFonts.nunito(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: SkeuoTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.keyboard_arrow_down_rounded,
+                  color: SkeuoTheme.primaryGreen, size: 28),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final speciesName = _selectedSpecies!.name;
+    final description = _selectedSpecies!.description;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -835,19 +1042,29 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                         ),
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2E7D32),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        'DATA-DRIVEN',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold),
+                    GestureDetector(
+                      onTap: _showSpeciesPickerBottomSheet,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2E7D32),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'CHANGE',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(width: 3),
+                            Icon(Icons.edit_rounded, color: Colors.white, size: 10),
+                          ],
+                        ),
                       ),
                     ),
                   ],
