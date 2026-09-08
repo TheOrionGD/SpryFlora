@@ -5,7 +5,7 @@ import { isValidEmail } from '../utils/validation.js';
 import { ERROR_CODES } from '../constants/index.js';
 
 export class AuthService {
-  static async register({ email, password, name }) {
+  static async register({ email, password, name, username, childName, dob, favoritePlant }) {
     if (!isValidEmail(email)) {
       const err = new Error('Invalid email format.');
       err.statusCode = 400;
@@ -21,9 +21,22 @@ export class AuthService {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const existing = await User.findOne({ email: cleanEmail });
+    const cleanUsername = (username || '').trim().toLowerCase() || cleanEmail.split('@')[0];
+
+    const existing = await User.findOne({
+      $or: [
+        { email: cleanEmail },
+        ...(cleanUsername ? [{ username: cleanUsername }] : []),
+      ],
+    });
+
     if (existing) {
-      const err = new Error('An account with this email already exists.');
+      const isEmailMatch = existing.email === cleanEmail;
+      const err = new Error(
+        isEmailMatch
+          ? 'An account with this email already exists.'
+          : 'This username is already taken. Try another!'
+      );
       err.statusCode = 409;
       err.code = ERROR_CODES.CONFLICT;
       throw err;
@@ -34,7 +47,10 @@ export class AuthService {
       email: cleanEmail,
       passwordHash,
       name: name || cleanEmail.split('@')[0],
-      childName: name || cleanEmail.split('@')[0],
+      childName: childName || name || cleanEmail.split('@')[0],
+      username: cleanUsername,
+      dob: dob || '',
+      favoritePlant: favoritePlant || 'Tulsi',
     });
 
     const token = signToken({ userId: user._id.toString(), email: user.email });
@@ -44,18 +60,27 @@ export class AuthService {
     };
   }
 
-  static async login({ email, password }) {
-    if (!email || !password) {
-      const err = new Error('Email and password are required.');
+  static async login({ email, username, identifier, password }) {
+    const rawIdentifier = email || username || identifier || '';
+    if (!rawIdentifier || !password) {
+      const err = new Error('Email/username and password are required.');
       err.statusCode = 400;
       err.code = ERROR_CODES.BAD_REQUEST;
       throw err;
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const user = await User.findOne({ email: cleanEmail }).select('+passwordHash');
+    const cleanIdentifier = rawIdentifier.trim().toLowerCase();
+    const user = await User.findOne({
+      $or: [
+        { email: cleanIdentifier },
+        { username: cleanIdentifier },
+        { childName: new RegExp(`^${cleanIdentifier}$`, 'i') },
+        { name: new RegExp(`^${cleanIdentifier}$`, 'i') },
+      ],
+    }).select('+passwordHash');
+
     if (!user) {
-      const err = new Error('Invalid email or password.');
+      const err = new Error('Invalid email/username or password.');
       err.statusCode = 401;
       err.code = ERROR_CODES.UNAUTHORIZED;
       throw err;
@@ -63,7 +88,7 @@ export class AuthService {
 
     const valid = await verifyPassword(user.passwordHash, password);
     if (!valid) {
-      const err = new Error('Invalid email or password.');
+      const err = new Error('Invalid email/username or password.');
       err.statusCode = 401;
       err.code = ERROR_CODES.UNAUTHORIZED;
       throw err;

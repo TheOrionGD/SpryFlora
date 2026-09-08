@@ -314,7 +314,7 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                     FunBouncyButton(
                       text: _plant.isCompleted
                           ? 'View Official Certificate 📜'
-                          : '🌸 Final Petal Challenge!',
+                          : '🌸 Petal Harvest Challenge!',
                       onPressed: () {
                         if (_plant.isCompleted) {
                           Navigator.of(context).push(
@@ -330,9 +330,10 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                               onComplete: () {
                                 _fetchPlant();
                                 if (mounted) setState(() {});
+                                final updatedPlant = _plantRepository.getPlantById(widget.plantId) ?? _plant;
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
-                                    builder: (_) => CertificateScreen(plant: _plant),
+                                    builder: (_) => CertificateScreen(plant: updatedPlant),
                                   ),
                                 );
                               },

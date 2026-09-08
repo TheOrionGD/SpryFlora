@@ -113,13 +113,18 @@ class _FunBouncyButtonState extends State<FunBouncyButton>
                     color: widget.textColor ?? Colors.white, size: 22),
                 const SizedBox(width: 8),
               ],
-              Text(
-                widget.text,
-                style: GoogleFonts.nunito(
-                  fontSize: widget.fontSize,
-                  fontWeight: FontWeight.w900,
-                  color: widget.textColor ?? Colors.white,
-                  letterSpacing: 0.5,
+              Flexible(
+                child: Text(
+                  widget.text,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.nunito(
+                    fontSize: widget.fontSize,
+                    fontWeight: FontWeight.w900,
+                    color: widget.textColor ?? Colors.white,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
             ],

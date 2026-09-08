@@ -105,6 +105,9 @@ class AuthService extends ChangeNotifier {
   }) async {
     final cleanEmail = email.trim().toLowerCase();
     final cleanUsername = (username ?? '').trim().toLowerCase();
+    final effectiveUsername = cleanUsername.isNotEmpty
+        ? cleanUsername
+        : (name.trim().isNotEmpty ? name.trim().toLowerCase().replaceAll(' ', '_') : cleanEmail.split('@').first);
 
     if (ApiConfig.usesBackendAuth) {
       try {
@@ -116,11 +119,11 @@ class AuthService extends ChangeNotifier {
             'email': cleanEmail,
             'password': password,
             'name': name,
-            'username': cleanUsername,
-            'dob': dob,
-            'favoritePlant': favoritePlant,
+            'username': effectiveUsername,
+            'dob': dob ?? '',
+            'favoritePlant': favoritePlant ?? 'Sunflower',
           }),
-        ).timeout(const Duration(seconds: 10));
+        ).timeout(const Duration(seconds: 12));
 
         if (response.statusCode == 200 || response.statusCode == 201) {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -138,6 +141,32 @@ class AuthService extends ChangeNotifier {
 
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(_sessionKey, jsonEncode({'user': authUser.toJson(), 'token': token}));
+
+          // Synchronously cache credentials and record in local database
+          final usersJsonStr = prefs.getString(_usersKey);
+          List<dynamic> users = usersJsonStr != null ? jsonDecode(usersJsonStr) : [];
+          final salt = 'spryflora_salt_${authUser.id}';
+          final hashedPassword = _hashPassword(password, salt);
+          final userRecord = {
+            'id': authUser.id,
+            'email': cleanEmail,
+            'name': name,
+            'username': effectiveUsername,
+            'dob': dob ?? '',
+            'favoritePlant': favoritePlant ?? 'Sunflower',
+            'passwordHash': hashedPassword,
+            'salt': salt,
+            'createdAt': DateTime.now().toIso8601String(),
+          };
+          final existingIdx = users.indexWhere(
+            (u) => u['id'] == authUser.id || u['email'] == cleanEmail || (u['username'] != null && u['username'].toString().toLowerCase() == effectiveUsername),
+          );
+          if (existingIdx >= 0) {
+            users[existingIdx] = userRecord;
+          } else {
+            users.add(userRecord);
+          }
+          await prefs.setString(_usersKey, jsonEncode(users));
 
           await UserService().setCurrentUser(authUser.id);
           await PlantRepository().setCurrentUser(authUser.id);
@@ -161,16 +190,20 @@ class AuthService extends ChangeNotifier {
         } else {
           final errorData = jsonDecode(response.body);
           final errorMsg = errorData['message'] ?? 'Registration failed on backend server.';
-          throw Exception(errorMsg);
+          if (errorMsg.toString().toLowerCase().contains('already exists') ||
+              errorMsg.toString().toLowerCase().contains('taken')) {
+            throw Exception(errorMsg);
+          }
         }
       } catch (e) {
-        if (e is Exception && e.toString().contains('Registration failed')) rethrow;
-        if (e is Exception && e.toString().contains('already exists')) rethrow;
+        if (e is Exception && (e.toString().contains('already exists') || e.toString().contains('taken'))) {
+          rethrow;
+        }
         debugPrint('Backend registration network exception: $e');
       }
     }
 
-    // Local authentication fallback for offline operation
+    // Local authentication fallback for offline or cold-start operation
     final prefs = await SharedPreferences.getInstance();
     final usersJsonStr = prefs.getString(_usersKey);
     List<dynamic> users = usersJsonStr != null ? jsonDecode(usersJsonStr) : [];
@@ -178,8 +211,8 @@ class AuthService extends ChangeNotifier {
     if (users.any((u) => u['email'] == cleanEmail)) {
       throw Exception('An account with this email already exists.');
     }
-    if (cleanUsername.isNotEmpty &&
-        users.any((u) => (u['username'] ?? '').toString().toLowerCase() == cleanUsername)) {
+    if (effectiveUsername.isNotEmpty &&
+        users.any((u) => (u['username'] ?? '').toString().toLowerCase() == effectiveUsername)) {
       throw Exception('This username is already taken. Try another!');
     }
 
@@ -191,7 +224,7 @@ class AuthService extends ChangeNotifier {
       'id': userId,
       'email': cleanEmail,
       'name': name,
-      'username': cleanUsername.isNotEmpty ? cleanUsername : name.toLowerCase(),
+      'username': effectiveUsername,
       'dob': dob ?? '',
       'favoritePlant': favoritePlant ?? 'Sunflower',
       'passwordHash': hashedPassword,
@@ -227,6 +260,7 @@ class AuthService extends ChangeNotifier {
   }) async {
     final cleanIdentifier = email.trim().toLowerCase();
 
+    // 1. Try Backend Authentication if enabled
     if (ApiConfig.usesBackendAuth) {
       try {
         final uri = Uri.parse('${ApiConfig.backendBaseUrl}${ApiConfig.authLoginEndpoint}');
@@ -235,9 +269,10 @@ class AuthService extends ChangeNotifier {
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'email': cleanIdentifier,
+            'username': cleanIdentifier,
             'password': password,
           }),
-        ).timeout(const Duration(seconds: 10));
+        ).timeout(const Duration(seconds: 12));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -251,23 +286,42 @@ class AuthService extends ChangeNotifier {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(_sessionKey, jsonEncode({'user': authUser.toJson(), 'token': token}));
 
+          // Cache / update user in local database so offline login always works seamlessly
+          final usersJsonStr = prefs.getString(_usersKey);
+          List<dynamic> users = usersJsonStr != null ? jsonDecode(usersJsonStr) : [];
+          final salt = 'spryflora_salt_${authUser.id}';
+          final hashedPassword = _hashPassword(password, salt);
+          final userRecord = {
+            'id': authUser.id,
+            'email': authUser.email,
+            'name': authUser.name,
+            'username': (userJson['username'] ?? cleanIdentifier).toString().toLowerCase(),
+            'dob': userJson['dob'] ?? '',
+            'favoritePlant': userJson['favoritePlant'] ?? 'Sunflower',
+            'passwordHash': hashedPassword,
+            'salt': salt,
+            'updatedAt': DateTime.now().toIso8601String(),
+          };
+          final idx = users.indexWhere((u) => u['id'] == authUser.id || u['email'] == authUser.email);
+          if (idx >= 0) {
+            users[idx] = userRecord;
+          } else {
+            users.add(userRecord);
+          }
+          await prefs.setString(_usersKey, jsonEncode(users));
+
           await UserService().setCurrentUser(authUser.id);
           await PlantRepository().setCurrentUser(authUser.id);
 
           notifyListeners();
           return authUser;
-        } else {
-          final errorData = jsonDecode(response.body);
-          final errorMsg = errorData['message'] ?? 'Invalid email/username or password.';
-          throw Exception(errorMsg);
         }
       } catch (e) {
-        if (e is Exception && (e.toString().contains('Invalid') || e.toString().contains('failed'))) rethrow;
         debugPrint('Backend login network exception: $e');
       }
     }
 
-    // Local authentication fallback for offline operation
+    // 2. Local authentication fallback for offline operation or when backend was unreachable
     final prefs = await SharedPreferences.getInstance();
     final usersJsonStr = prefs.getString(_usersKey);
     List<dynamic> users = usersJsonStr != null ? jsonDecode(usersJsonStr) : [];
@@ -276,7 +330,9 @@ class AuthService extends ChangeNotifier {
       (u) =>
           u['email'] == cleanIdentifier ||
           (u['username'] != null &&
-              (u['username'] as String).toLowerCase() == cleanIdentifier),
+              (u['username'] as String).toLowerCase() == cleanIdentifier) ||
+          (u['name'] != null &&
+              (u['name'] as String).toLowerCase() == cleanIdentifier),
       orElse: () => null,
     );
 
@@ -284,7 +340,7 @@ class AuthService extends ChangeNotifier {
       throw Exception('Invalid email/username or password.');
     }
 
-    final salt = userRecord['salt'] as String;
+    final salt = userRecord['salt'] as String? ?? 'spryflora_salt_${userRecord['id']}';
     final expectedHash = userRecord['passwordHash'] as String;
     final computedHash = _hashPassword(password, salt);
 

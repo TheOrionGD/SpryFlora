@@ -4,7 +4,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'home_screen.dart';
 import 'onboarding_screen.dart';
+import '../services/auth_service.dart';
 import '../services/backend_warmup_service.dart';
 import '../widgets/leaves_particle_overlay.dart';
 
@@ -77,9 +79,18 @@ class _SplashScreenState extends State<SplashScreen>
     Timer(const Duration(milliseconds: 3000), () async {
       if (!mounted) return;
 
+      final authService = AuthService();
+      await authService.restoreSession();
+
+      if (!mounted) return;
+
+      final targetScreen = authService.isAuthenticated
+          ? const HomeScreen()
+          : const OnboardingScreen();
+
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (_, a1, a2) => const OnboardingScreen(),
+          pageBuilder: (_, a1, a2) => targetScreen,
           transitionsBuilder: (_, a1, a2, child) =>
               FadeTransition(opacity: a1, child: child),
           transitionDuration: const Duration(milliseconds: 800),

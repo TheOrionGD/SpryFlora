@@ -19,6 +19,15 @@ const userSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    username: {
+      type: String,
+      lowercase: true,
+      trim: true,
+    },
+    dob: {
+      type: String,
+      default: '',
+    },
     childName: {
       type: String,
       trim: true,
@@ -65,6 +74,7 @@ const userSchema = new mongoose.Schema(
         delete ret.__v;
         ret.id = ret._id.toString();
         ret.childName = ret.childName || ret.name;
+        ret.username = ret.username || ret.email.split('@')[0];
         return ret;
       },
     },
@@ -72,3 +82,4 @@ const userSchema = new mongoose.Schema(
 );
 
 export const User = mongoose.model('User', userSchema);
+
