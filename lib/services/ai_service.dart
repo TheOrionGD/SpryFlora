@@ -146,41 +146,62 @@ Analyze this photo carefully.
 
 CRITICAL PLANT & FLOWER VERIFICATION REQUIREMENT:
 You MUST verify if this image contains a real plant, leaf, flower, blossom, seedling, sprout, tree, or botanical foliage.
-If the photo shows non-botanical items such as a wall, pen, notebook, desk, room background, vehicle, human face/body, electronic device, clothing, or plain surface with NO clear botanical subject present, you MUST set "isPlantDetected" to false and describe the non-plant object in "detectedObjectType" (e.g. "Wall", "Pen", "Furniture", "Person", "Room Interior").
+If the photo shows non-botanical items such as a wall, pen, notebook, desk, room background, vehicle, human face/body, electronic device, clothing, or plain surface with NO clear botanical subject present, you MUST set "isPlantDetected" to false, "identifiedSpecies" to "No Plant Found", "confidencePercent" to 0, and describe the non-plant object in "detectedObjectType" (e.g. "Wall", "Pen", "Furniture", "Person", "Room Interior").
 
 PLANT IDENTIFICATION & CARE METRICS REQUIREMENT:
-If a plant, flower, or leaf is present:
-1. Identify the exact common species name (e.g. "Hibiscus", "Rose", "Sunflower", "Marigold", "Jasmine", "Bougainvillea", "Tulsi", "Money Plant", "Aloe Vera", "Snake Plant", "Peace Lily", "Spider Plant", "Jade Plant", "ZZ Plant", "Monstera Deliciosa", "Orchid", "Fern", "Bamboo Palm", "Neem Tree", "Banyan Tree", "Pine Tree", "Tomato", "Mint", "Lavender").
-2. Provide scientific botanical name (e.g. "Hibiscus rosa-sinensis").
-3. Estimate watering interval in days (e.g. 2 for Hibiscus, 7 for Aloe Vera, 14 for ZZ Plant).
-4. Estimate sunlight requirements (e.g. "Full Direct Sun", "Bright Indirect Light", "Partial Shade") and target daily hours (e.g. 6).
-5. State ideal temperature range (e.g. "16°C - 32°C").
+If and ONLY if a real plant, flower, or leaf is present:
+1. Identify the exact common species name (e.g. Rose, Sunflower, Marigold, Jasmine, Bougainvillea, Tulsi, Money Plant, Aloe Vera, Snake Plant, Peace Lily, Spider Plant, Jade Plant, ZZ Plant, Monstera Deliciosa, Orchid, Fern, Bamboo Palm, Neem Tree, Banyan Tree, Pine Tree, Tomato, Mint, Lavender, Hibiscus).
+2. Provide scientific botanical name (e.g. Rosa rubiginosa).
+3. Estimate watering interval in days.
+4. Estimate sunlight requirements and target daily hours.
+5. State ideal temperature range.
 6. Provide brief description and tailored kid-friendly care advice.
 
-Return a JSON object in this exact format:
+If a plant IS detected, return JSON format:
 {
   "isPlantDetected": true,
   "detectedObjectType": "Plant / Leaf",
   "rejectionReason": null,
-  "identifiedSpecies": "Hibiscus",
-  "botanicalName": "Hibiscus rosa-sinensis",
-  "plantType": "Flowering Plant",
-  "wateringIntervalDays": 2,
-  "lifespanDays": 1825,
-  "sunlightRequirements": "Full Direct Sun",
-  "targetSunlightHours": 6,
-  "idealTemp": "16°C - 32°C",
-  "description": "Stunning tropical flowering shrub featuring large colorful trumpet-shaped blossoms.",
-  "careInstructions": "Keep soil moist and provide 6 hours of bright sunlight daily.",
-  "healthPercent": 92,
+  "identifiedSpecies": "<Identified common species name>",
+  "botanicalName": "<Scientific botanical name>",
+  "plantType": "Flowering Plant / Indoor Plant / Tree / Succulent",
+  "wateringIntervalDays": 3,
+  "lifespanDays": 365,
+  "sunlightRequirements": "Bright Indirect Light",
+  "targetSunlightHours": 4,
+  "idealTemp": "18°C - 30°C",
+  "description": "<Brief description>",
+  "careInstructions": "<Care instruction>",
+  "healthPercent": 90,
   "diseaseStatus": "Healthy",
-  "confidencePercent": 95,
+  "confidencePercent": 90,
   "recommendations": [
-    "Provide 6 hours of bright direct sun daily",
-    "Water regularly when topsoil dries",
-    "Keep in a warm frost-free location"
+    "Provide adequate sunlight",
+    "Water when topsoil feels dry"
   ],
-  "detailedAdvice": "Vibrant and healthy botanical specimen detected. Keep up consistent care!"
+  "detailedAdvice": "Healthy botanical specimen observed."
+}
+
+If NO plant is detected in the image, return JSON format:
+{
+  "isPlantDetected": false,
+  "detectedObjectType": "<e.g. Wall, Desk, Person, Pen>",
+  "rejectionReason": "No plant found in image",
+  "identifiedSpecies": "No Plant Found",
+  "botanicalName": "",
+  "plantType": "None",
+  "wateringIntervalDays": 0,
+  "lifespanDays": 0,
+  "sunlightRequirements": "None",
+  "targetSunlightHours": 0,
+  "idealTemp": "",
+  "description": "No plant detected.",
+  "careInstructions": "",
+  "healthPercent": 0,
+  "diseaseStatus": "Invalid Capture",
+  "confidencePercent": 0,
+  "recommendations": ["Point camera directly at a real plant or leaf"],
+  "detailedAdvice": "No plant found."
 }
 Do not wrap in markdown quotes. Return pure JSON only.
 """;
@@ -216,14 +237,21 @@ Do not wrap in markdown quotes. Return pure JSON only.
 
               final speciesStr = map['identifiedSpecies']?.toString().trim() ?? '';
               final lowerSpecies = speciesStr.toLowerCase();
-              if (speciesStr.isNotEmpty &&
+              if (isPlantDetected &&
+                  speciesStr.isNotEmpty &&
                   lowerSpecies != 'unknown' &&
                   lowerSpecies != 'plant' &&
                   lowerSpecies != 'botanical plant' &&
                   lowerSpecies != 'green plant' &&
-                  lowerSpecies != 'not a plant') {
+                  lowerSpecies != 'not a plant' &&
+                  lowerSpecies != 'no plant found' &&
+                  lowerSpecies != 'no plant detected') {
                 detectedSpeciesName = speciesStr;
                 aiIdentified = true;
+              } else if (!isPlantDetected || lowerSpecies == 'no plant found' || lowerSpecies == 'not a plant') {
+                isPlantDetected = false;
+                detectedSpeciesName = 'No Plant Found';
+                confidence = 0;
               }
 
               detectedBotanicalName = map['botanicalName']?.toString();
@@ -249,80 +277,41 @@ Do not wrap in markdown quotes. Return pure JSON only.
               debugPrint('Error parsing Vision response JSON: $e');
             }
           } else {
-            if (rawBytes != null && _isBotanicalImageBytes(rawBytes)) {
-              isPlantDetected = true;
-              final isFloral = _isFloralImageBytes(rawBytes);
-              detectedObjectType = isFloral ? 'Flower / Blossom' : 'Plant / Leaf';
-              detectedSpeciesName = isFloral ? 'Flowering Plant' : (plant.speciesName.isNotEmpty ? plant.speciesName : 'Botanical Plant');
-              health = 90;
-              disease = 'Healthy';
-              confidence = 85;
-              advice = isFloral
-                  ? 'Vibrant flower petals detected! Confirm or edit the species name to welcome it to your garden.'
-                  : 'Your plant foliage is green and healthy! Provide regular watering and indirect sunlight.';
-            } else {
-              isPlantDetected = false;
-              detectedObjectType = 'Non-Botanical Object';
-              rejectionReason = 'No clear plant, flower, or leaf detected in photo. Please aim at botanical foliage.';
-              detectedSpeciesName = 'Not a Plant';
-              confidence = 0;
-            }
+            isPlantDetected = false;
+            detectedObjectType = 'Non-Botanical Object';
+            rejectionReason = 'No plant detected by AI analysis.';
+            detectedSpeciesName = 'No Plant Found';
+            confidence = 0;
           }
 
-          if (!aiIdentified && isPlantDetected && rawBytes != null) {
-            final offlineValid = _isBotanicalImageBytes(rawBytes);
-            if (!offlineValid) {
-              isPlantDetected = false;
-              detectedObjectType = 'Non-Botanical Object';
-              rejectionReason =
-                  'No plant, leaf, or seedling detected in photo. Please scan a clear image of a plant.';
-            }
+          if (!aiIdentified) {
+            isPlantDetected = false;
+            detectedObjectType = 'Non-Botanical Object';
+            rejectionReason = 'No plant detected in photo.';
+            detectedSpeciesName = 'No Plant Found';
+            confidence = 0;
           }
         }
       } catch (e) {
         debugPrint('Multimodal vision analysis exception: $e');
-        if (rawBytes != null && _isBotanicalImageBytes(rawBytes)) {
-          isPlantDetected = true;
-          final isFloral = _isFloralImageBytes(rawBytes);
-          detectedObjectType = isFloral ? 'Flower / Blossom' : 'Plant / Leaf';
-          detectedSpeciesName = isFloral ? 'Flowering Plant' : (plant.speciesName.isNotEmpty ? plant.speciesName : 'Botanical Plant');
-          health = 90;
-          disease = 'Healthy';
-          confidence = 82;
-          advice = 'Foliage analyzed successfully. Keep up consistent care!';
-        } else {
-          isPlantDetected = false;
-          detectedObjectType = 'Non-Botanical Object';
-          rejectionReason = 'Unable to recognize plant. Please ensure good lighting and aim directly at the plant leaves.';
-          detectedSpeciesName = 'Not a Plant';
-          confidence = 0;
-        }
+        isPlantDetected = false;
+        detectedObjectType = 'Non-Botanical Object';
+        rejectionReason = 'Unable to recognize plant. Please ensure good lighting and aim directly at the plant leaves.';
+        detectedSpeciesName = 'No Plant Found';
+        confidence = 0;
       }
-    } else if (photoPath != null && photoPath.isNotEmpty && !kIsWeb && File(photoPath).existsSync()) {
-      try {
-        final rawBytes = await File(photoPath).readAsBytes();
-        final offlineValid = _isBotanicalImageBytes(rawBytes);
-        if (!offlineValid) {
-          isPlantDetected = false;
-          detectedObjectType = 'Non-Botanical Object';
-          rejectionReason =
-              'No plant, leaf, or seedling detected in photo. Scanner detected a non-botanical object.';
-        } else {
-          isPlantDetected = true;
-          final isFloral = _isFloralImageBytes(rawBytes);
-          detectedObjectType = isFloral ? 'Flower / Blossom' : 'Plant / Leaf';
-          detectedSpeciesName = isFloral ? 'Flowering Plant' : (plant.speciesName.isNotEmpty ? plant.speciesName : 'Botanical Plant');
-          health = 90;
-          disease = 'Healthy';
-          confidence = 85;
-        }
-      } catch (_) {}
+    } else {
+      isPlantDetected = false;
+      detectedObjectType = 'Non-Botanical Object';
+      rejectionReason = 'No photo provided for AI plant recognition.';
+      detectedSpeciesName = 'No Plant Found';
+      confidence = 0;
     }
 
     if (!isPlantDetected) {
       return PlantAIAnalysisResult(
         healthPercent: 0,
-        diseaseStatus: 'Invalid Capture',
+        diseaseStatus: 'No Plant Found',
         confidencePercent: 0,
         recommendations: const [
           'Please capture a photo showing actual plant leaves, flowers, seedlings, or stem',
@@ -331,10 +320,11 @@ Do not wrap in markdown quotes. Return pure JSON only.
         ],
         detailedAdvice: rejectionReason ??
             'No plant, seedling, or leaf detected in photo. Scanner detected $detectedObjectType.',
-        identifiedSpecies: 'Not a Plant ($detectedObjectType)',
+        identifiedSpecies: 'No Plant Found',
         isNewDiscovery: false,
         discoveryBadgeName: null,
         discoveryRewardMessage: null,
+        matchedSpecies: null,
         isPlantDetected: false,
         rejectionReason: rejectionReason ??
             'No plant, seedling, or leaf detected in photo. Detected: $detectedObjectType',
@@ -514,26 +504,10 @@ Return JSON only:
         }
       }
 
-      if (rawBytes != null) {
-        final hasBotanical = _isBotanicalImageBytes(rawBytes);
-        if (!hasBotanical) {
-          return {
-            'isVerified': false,
-            'confidence': 0,
-            'rejectionReason': 'No plant foliage or water cup detected in photo. Please aim directly at the plant.',
-          };
-        }
-        return {
-          'isVerified': true,
-          'confidence': 90,
-          'rejectionReason': null,
-        };
-      }
-
       return {
         'isVerified': false,
         'confidence': 0,
-        'rejectionReason': 'Unable to process photo. Please try again.',
+        'rejectionReason': 'Unable to verify watering evidence with AI.',
       };
     } catch (_) {
       return {
@@ -555,7 +529,8 @@ Return JSON only:
         isWaterMugPresent: false,
         isWateringReady: false,
         confidencePercent: 0,
-        statusMessage: 'Point camera at plant...',
+        statusMessage: 'No plant found',
+        rejectionReason: 'No camera frame available',
       );
     }
 
@@ -623,15 +598,13 @@ Do not wrap in markdown. Return pure JSON only.
             final isPlant = map['isPlantPresent'] == true;
             final isMug = map['isWaterMugPresent'] == true;
             final isReady = map['isWateringReady'] == true || (isPlant && isMug);
-            final conf = (map['confidencePercent'] as num?)?.toInt() ?? (isReady ? 92 : 60);
-            final msg = map['statusMessage']?.toString() ??
-                (isReady
-                    ? '🌿 Plant & Water Mug in frame!'
-                    : isPlant
-                        ? '🌿 Plant spotted! Bring water mug into view 💧'
-                        : isMug
-                            ? '💧 Water mug spotted! Aim at plant leaves 🌿'
-                            : '🔍 Point camera at plant and water container...');
+            final conf = (map['confidencePercent'] as num?)?.toInt() ?? (isReady ? 92 : (isPlant ? 75 : 0));
+            final msg = !isPlant
+                ? 'No plant found'
+                : (map['statusMessage']?.toString() ??
+                    (isReady
+                        ? '🌿 Plant & Water Mug in frame!'
+                        : '🌿 Plant spotted! Bring water mug into view 💧'));
             final objs = map['detectedObjects']?.toString() ?? '';
 
             return WateringFrameDetectionResult(
@@ -648,48 +621,13 @@ Do not wrap in markdown. Return pure JSON only.
         }
       }
 
-      // Offline byte fallback
-      if (rawBytes != null) {
-        final hasBotanical = _isBotanicalImageBytes(rawBytes);
-        final hasContainer = _isWaterContainerImageBytes(rawBytes);
-
-        if (hasBotanical && hasContainer) {
-          return const WateringFrameDetectionResult(
-            isPlantPresent: true,
-            isWaterMugPresent: true,
-            isWateringReady: true,
-            confidencePercent: 88,
-            statusMessage: '✨ Plant + Water Mug detected! Ready to hydrate!',
-            detectedObjects: 'Botanical Foliage & Water Mug',
-          );
-        } else if (hasBotanical) {
-          return const WateringFrameDetectionResult(
-            isPlantPresent: true,
-            isWaterMugPresent: false,
-            isWateringReady: false,
-            confidencePercent: 75,
-            statusMessage: '🌿 Plant spotted! Bring water mug into frame 💧',
-            detectedObjects: 'Plant Foliage',
-          );
-        } else if (hasContainer) {
-          return const WateringFrameDetectionResult(
-            isPlantPresent: false,
-            isWaterMugPresent: true,
-            isWateringReady: false,
-            confidencePercent: 70,
-            statusMessage: '💧 Water container spotted! Aim at plant leaves 🌿',
-            detectedObjects: 'Water Container',
-          );
-        }
-      }
-
       return const WateringFrameDetectionResult(
         isPlantPresent: false,
         isWaterMugPresent: false,
         isWateringReady: false,
-        confidencePercent: 20,
-        statusMessage: 'Point camera at plant and water container...',
-        detectedObjects: 'Searching...',
+        confidencePercent: 0,
+        statusMessage: 'No plant found',
+        detectedObjects: '',
       );
     } catch (_) {
       return const WateringFrameDetectionResult(
@@ -697,7 +635,7 @@ Do not wrap in markdown. Return pure JSON only.
         isWaterMugPresent: false,
         isWateringReady: false,
         confidencePercent: 0,
-        statusMessage: 'Point camera at plant and water mug...',
+        statusMessage: 'No plant found',
       );
     }
   }
@@ -889,98 +827,6 @@ Do not wrap in markdown. Return pure JSON only.
       debugPrint('Hugging Face Vision error: $e');
     }
     return null;
-  }
-
-  /// Fast offline byte analyzer to detect natural plant pigmentation (green foliage or floral petals)
-  bool _isBotanicalImageBytes(List<int> bytes) {
-    if (bytes.length < 500) return false;
-    int botanicalPixelHits = 0;
-    int inspectedSamples = 0;
-    final step = (bytes.length / 400).clamp(3, 50).toInt();
-
-    for (int i = 0; i < bytes.length - 3; i += step) {
-      final r = bytes[i];
-      final g = bytes[i + 1];
-      final b = bytes[i + 2];
-      inspectedSamples++;
-
-      // Green foliage
-      if (g > 45 && g > (r * 1.05) && g > (b * 1.15)) {
-        botanicalPixelHits++;
-      } else if (g > 50 && r > 40 && b > 40 && g > r && g > b) {
-        botanicalPixelHits++;
-      } else if (r > 65 && g > 45 && b < (r * 0.75)) {
-        botanicalPixelHits++;
-      }
-      // Floral petals (Red, Pink, Magenta, Yellow, Orange, Purple)
-      else if (r > 110 && r > (g * 1.15) && r > (b * 1.1)) {
-        botanicalPixelHits++;
-      } else if (r > 130 && g > 90 && b < (g * 0.75)) {
-        botanicalPixelHits++;
-      } else if (r > 100 && b > 80 && g < (r * 0.8)) {
-        botanicalPixelHits++;
-      }
-    }
-
-    if (inspectedSamples == 0) return true;
-    final ratio = botanicalPixelHits / inspectedSamples;
-    return ratio >= 0.07;
-  }
-
-  /// Detects whether the photo primarily contains vibrant flower petals
-  bool _isFloralImageBytes(List<int> bytes) {
-    if (bytes.length < 500) return false;
-    int floralPixelHits = 0;
-    int inspectedSamples = 0;
-    final step = (bytes.length / 400).clamp(3, 50).toInt();
-
-    for (int i = 0; i < bytes.length - 3; i += step) {
-      final r = bytes[i];
-      final g = bytes[i + 1];
-      final b = bytes[i + 2];
-      inspectedSamples++;
-
-      // Red, Pink, Magenta, Yellow, Orange flower petals
-      if (r > 120 && r > (g * 1.2) && r > (b * 1.15)) {
-        floralPixelHits++;
-      } else if (r > 140 && g > 100 && b < (g * 0.7)) {
-        floralPixelHits++;
-      } else if (r > 110 && b > 90 && g < (r * 0.75)) {
-        floralPixelHits++;
-      }
-    }
-
-    if (inspectedSamples == 0) return false;
-    final ratio = floralPixelHits / inspectedSamples;
-    return ratio >= 0.08;
-  }
-
-  /// Detects whether the photo contains water mug / watering container pigmentation or contrast
-  bool _isWaterContainerImageBytes(List<int> bytes) {
-    if (bytes.length < 500) return false;
-    int containerPixelHits = 0;
-    int inspectedSamples = 0;
-    final step = (bytes.length / 400).clamp(3, 50).toInt();
-
-    for (int i = 0; i < bytes.length - 3; i += step) {
-      final r = bytes[i];
-      final g = bytes[i + 1];
-      final b = bytes[i + 2];
-      inspectedSamples++;
-
-      // Blue, Cyan, Translucent Water Cup, Metallic, or Clean White/Grey Mug tones
-      if (b > 60 && b > (r * 1.1) && b > (g * 0.95)) {
-        containerPixelHits++; // Blue / Cyan cup
-      } else if (r > 150 && g > 150 && b > 150 && (r - g).abs() < 25 && (g - b).abs() < 25) {
-        containerPixelHits++; // White / metallic container
-      } else if (r < 70 && g > 70 && b > 90) {
-        containerPixelHits++; // Teal / watering can
-      }
-    }
-
-    if (inspectedSamples == 0) return false;
-    final ratio = containerPixelHits / inspectedSamples;
-    return ratio >= 0.08;
   }
 
   /// Interactive Q&A Chat with Flora AI / Eco-Buddy
@@ -1328,5 +1174,181 @@ Reply in 2-4 friendly, encouraging sentences with emojis.
     }
 
     return '🌿 ${plant.plantName} ($species) is currently in the ${plant.growthStageName} stage (Day ${plant.ageInDays}). Health is ${plant.health}%. Feel free to ask me about watering or sunlight!';
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Upgraded 4-Stage AI Botanical Prompt Builder & Generation Engine
+  // ─────────────────────────────────────────────────────────────────────────
+
+  static const String stageStyleAnchor =
+      "Masterpiece 3D isometric botanical game asset, Unreal Engine 5 octane render style, "
+      "ultra-high detail 8k textures, smooth velvety claymorphism and botanical realism, "
+      "centered camera perspective at a gentle 15-degree isometric top-down angle, "
+      "consistent round warm terracotta ceramic pot (#D97443) filled with rich dark organic loam potting soil at 60% pot height, "
+      "cinematic soft studio three-point lighting with translucent leaf subsurface scattering and vibrant colors, "
+      "pure solid bright green #00FF00 chroma key background, strictly zero background clutter, strictly zero ground drop-shadows, perfectly isolated subject.";
+
+  static const Map<String, Map<String, String>> botanicalSpeciesDictionary = {
+    'tulsi': {
+      'foliage': 'aromatic ovate serrated green leaves with subtle purple veining and velvety texture',
+      'flower': 'delicate upright purple-tinged blossom racemes with tiny fragrant florets',
+      'stem': 'slender purplish-green square branching stems',
+    },
+    'holy basil': {
+      'foliage': 'aromatic ovate serrated green leaves with subtle purple veining and velvety texture',
+      'flower': 'delicate upright purple-tinged blossom racemes with tiny fragrant florets',
+      'stem': 'slender purplish-green square branching stems',
+    },
+    'rose': {
+      'foliage': 'glossy dark green pinnate compound leaves with fine serrated edges',
+      'flower': 'luxurious velvety layered rose petals in radiant vibrant crimson and soft blush',
+      'stem': 'sturdy woody green canes with characteristic miniature botanical thorns',
+    },
+    'sunflower': {
+      'foliage': 'broad heart-shaped textured rough green leaves with deep prominent veins',
+      'flower': 'magnificent golden-yellow ray petals surrounding a dense spiraling dark amber seed disk',
+      'stem': 'thick robust fibrous hairy green stem standing upright',
+    },
+    'monstera': {
+      'foliage': 'iconic glossy deep forest green swiss-cheese split leaves with distinct fenestrations',
+      'flower': 'rare tropical pale cream spathe and spadix bloom',
+      'stem': 'chunky tropical climbing aerial roots and thick emerald petioles',
+    },
+    'aloe vera': {
+      'foliage': 'plump succulent rosette of thick fleshy lance-shaped leaves with soft white serrated teeth and translucent gel core',
+      'flower': 'tall central flower spike with tubular coral-orange blossoms',
+      'stem': 'stemless compact succulent rosette base',
+    },
+    'snake plant': {
+      'foliage': 'tall architectural sword-like upright leaves with yellow-gold margins and dark green horizontal tiger stripes',
+      'flower': 'slender spike of tiny greenish-white fragrant tubular flowers',
+      'stem': 'dense cluster of rigid upright foliage emerging directly from soil',
+    },
+    'lavender': {
+      'foliage': 'slender linear silvery-green needle-like aromatic foliage',
+      'flower': 'vibrant fragrant violet-purple flower spikes waving gracefully',
+      'stem': 'semi-woody compact branching base with slender flowering stalks',
+    },
+    'money plant': {
+      'foliage': 'glossy heart-shaped cascading leaves with golden-yellow marble variegation splashes',
+      'flower': 'rare tropical foliage vine',
+      'stem': 'graceful trailing climbing vine with aerial root nodes',
+    },
+    'pothos': {
+      'foliage': 'glossy heart-shaped cascading leaves with golden-yellow marble variegation splashes',
+      'flower': 'rare tropical foliage vine',
+      'stem': 'graceful trailing climbing vine with aerial root nodes',
+    },
+    'peace lily': {
+      'foliage': 'lush arching dark green glossy lanceolate leaves with deep parallel venation',
+      'flower': 'elegant pristine white petal-like spathe curving around a textured creamy spadix',
+      'stem': 'slender arching petioles arising in a clumping habit',
+    },
+    'marigold': {
+      'foliage': 'feathery deeply divided aromatic fern-like dark green leaflets',
+      'flower': 'dense ruffled spherical pom-pom blossoms in dazzling golden amber and tangerine orange',
+      'stem': 'bushy branching herbaceous green stems',
+    },
+    'jade plant': {
+      'foliage': 'plump oval jade-green succulent leaves with subtle ruby-red sun-kissed margins',
+      'flower': 'clusters of starry soft pink-white miniature blossoms',
+      'stem': 'thick miniature bonsai-like tree trunk with smooth fleshy branches',
+    },
+    'orchid': {
+      'foliage': 'thick leathery dark green oblong leaves arranged alternating at the base',
+      'flower': 'exquisite cascading butterfly-shaped moth orchid blooms with striking magenta lip and pristine petals',
+      'stem': 'gracefully arching slender flower spike with silvery aerial roots',
+    },
+    'jasmine': {
+      'foliage': 'lustrous bright green ovate leaflets arranged in neat pairs',
+      'flower': 'star-shaped intensely fragrant pure white blossoms with velvety petals',
+      'stem': 'twining woody green vine with graceful sprawling branches',
+    },
+    'tomato': {
+      'foliage': 'pungent aromatic deeply lobed serrated green leaves with fine glandular hairs',
+      'flower': 'bright yellow star-shaped flowers and miniature glossy ripening cherry tomatoes',
+      'stem': 'thick hairy green vine supported on a miniature garden stake',
+    },
+    'mint': {
+      'foliage': 'bright emerald crinkled aromatic ovate leaves with serrated margins',
+      'flower': 'tiny lilac-purple flower whorls on terminal spikes',
+      'stem': 'square green branching stems forming a lush dense aromatic cluster',
+    },
+    'hibiscus': {
+      'foliage': 'glossy dark green ovate leaves with coarsely serrated edges',
+      'flower': 'giant dramatic tropical flared 5-petal flower with prominent long protruding red pistil and yellow pollen',
+      'stem': 'woody upright branching shrub stem',
+    },
+  };
+
+  /// Returns species-specific botanical profile dictionary
+  Map<String, String> getSpeciesBotanicalProfile(String speciesName) {
+    final clean = speciesName.toLowerCase().trim();
+    for (final entry in botanicalSpeciesDictionary.entries) {
+      if (clean.contains(entry.key) || entry.key.contains(clean)) {
+        return entry.value;
+      }
+    }
+    return {
+      'foliage': 'healthy vibrant foliage with species-accurate shape, intricate venation, and vivid chlorophyll green tones for $speciesName',
+      'flower': 'characteristic authentic blossoms and flower buds specific to $speciesName',
+      'stem': 'sturdy natural stem and branch structure for $speciesName',
+    };
+  }
+
+  /// Builds the state-of-the-art upgraded AI prompt for a given species and stage index
+  String getEnhancedPlantStagePrompt({
+    required String speciesName,
+    required int stageIndex,
+    PlantModel? plant,
+  }) {
+    final profile = getSpeciesBotanicalProfile(speciesName);
+    final foliage = profile['foliage']!;
+    final flower = profile['flower']!;
+    final stem = profile['stem']!;
+    final plantLabel = speciesName.isNotEmpty ? speciesName : (plant?.plantName ?? 'Botanical Plant');
+
+    String stageDescription;
+    switch (stageIndex) {
+      case 0:
+        stageDescription =
+            "Stage 0 (Germination & Seed): Micro-detail close-up of a fertile $plantLabel seed bursting open "
+            "in moist dark organic potting soil inside the round terracotta pot. A tiny translucent emerald-green radicle "
+            "root anchors into the soil while the first tender sprout shoot tip ($stem) arches upward with glistening morning micro-dewdrops.";
+        break;
+      case 1:
+        stageDescription =
+            "Stage 1 (Baby Sprout & Cotyledon): Adorable healthy young $plantLabel seedling sprout rising 3cm above the soil "
+            "in the identical round terracotta pot. Two tender baby cotyledon leaves unfurl with delicate translucent cellular glow, "
+            "and the very first miniature true leaf bud ($foliage) emerges from the apical center on a tender lime-green stem.";
+        break;
+      case 2:
+        stageDescription =
+            "Stage 2 (Vegetative Juvenile): Thriving energetic juvenile $plantLabel plant at 50% maturity in the identical round terracotta pot. "
+            "Lush vigorous branching ($stem) with 6 to 10 distinct, fully formed signature species leaves ($foliage) showing authentic venation, "
+            "healthy chlorophyll gradients, strong central stalk, and developing early flower buds.";
+        break;
+      case 3:
+      default:
+        stageDescription =
+            "Stage 3 (Full Maturity & Blooming): Glorious fully grown adult $plantLabel in magnificent peak bloom and supreme vitality "
+            "in the identical round terracotta pot. Dense flourishing canopy of mature signature foliage ($foliage), "
+            "crowned with pristine authentic species flowers ($flower), rich botanical textures, and award-winning showcase brilliance.";
+        break;
+    }
+
+    return "$stageStyleAnchor $stageDescription";
+  }
+
+  /// Generates a live Pollinations / Web AI URL for real-time preview of the stage image
+  String generateStageImageUrl({
+    required String speciesName,
+    required int stageIndex,
+    int? seed,
+  }) {
+    final prompt = getEnhancedPlantStagePrompt(speciesName: speciesName, stageIndex: stageIndex);
+    final encodedPrompt = Uri.encodeComponent(prompt);
+    final seedVal = seed ?? (speciesName.hashCode.abs() + (stageIndex * 1337));
+    return "https://image.pollinations.ai/prompt/$encodedPrompt?width=512&height=512&seed=$seedVal&nologo=true";
   }
 }

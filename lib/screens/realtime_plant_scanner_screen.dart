@@ -36,6 +36,7 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
   bool _isCameraReady = false;
   bool _isAnalyzingFrame = false;
   bool _isLockedOn = false;
+  bool _hasNoPlantDetected = false;
   String _hudStatus = 'Point camera at any plant or leaf...';
   String _hudDetail = 'Automated AI Plant Recognition Active';
   int _scanTicks = 0;
@@ -134,7 +135,7 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
     _isAnalyzingFrame = true;
     _scanTicks++;
 
-    if (mounted) {
+    if (mounted && !_hasNoPlantDetected) {
       setState(() {
         if (_scanTicks % 3 == 1) {
           _hudStatus = '🌿 Scanning foliage & leaf vein structures...';
@@ -167,6 +168,7 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
         if (result.isPlantDetected && result.confidencePercent >= 75) {
           // Positive recognition lock!
           _isLockedOn = true;
+          _hasNoPlantDetected = false;
           _analysisLoopTimer?.cancel();
 
           if (mounted) {
@@ -196,11 +198,12 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
             );
             return;
           }
-        } else if (!result.isPlantDetected) {
+        } else if (!result.isPlantDetected || result.confidencePercent < 40) {
           if (mounted) {
             setState(() {
-              _hudStatus = '🔍 Aim directly at plant leaves or stem...';
-              _hudDetail = result.rejectionReason ?? 'Searching for botanical foliage';
+              _hasNoPlantDetected = true;
+              _hudStatus = 'No plant found';
+              _hudDetail = result.rejectionReason ?? 'Aim camera at real plant leaves or flower';
             });
           }
         }
@@ -209,8 +212,9 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
       debugPrint('Real-time frame recognition error: $e');
       if (mounted) {
         setState(() {
-          _hudStatus = '🔍 Point camera at plant foliage...';
-          _hudDetail = 'Adjust camera angle and lighting';
+          _hasNoPlantDetected = true;
+          _hudStatus = 'No plant found';
+          _hudDetail = 'Point camera directly at plant leaves';
         });
       }
     } finally {
@@ -255,19 +259,25 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                   Center(
                     child: Container(
                       width: 280,
-                      height: 320,
+                      height: 260,
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: _isLockedOn
-                              ? const Color(0xFF00E676)
-                              : const Color(0xFF2ECC71).withValues(alpha: 0.6),
-                          width: _isLockedOn ? 3.0 : 2.0,
+                          color: _hasNoPlantDetected
+                              ? const Color(0xFFE53935)
+                              : _isLockedOn
+                                  ? const Color(0xFF00E676)
+                                  : const Color(0xFF2ECC71).withValues(alpha: 0.6),
+                          width: (_isLockedOn || _hasNoPlantDetected) ? 3.0 : 2.0,
                         ),
                         borderRadius: BorderRadius.circular(28),
                         boxShadow: [
                           BoxShadow(
-                            color: (_isLockedOn ? const Color(0xFF00E676) : const Color(0xFF2ECC71))
-                                .withValues(alpha: 0.25),
+                            color: (_hasNoPlantDetected
+                                    ? const Color(0xFFE53935)
+                                    : _isLockedOn
+                                        ? const Color(0xFF00E676)
+                                        : const Color(0xFF2ECC71))
+                                .withValues(alpha: 0.28),
                             blurRadius: 20,
                             spreadRadius: 4,
                           ),
@@ -282,6 +292,11 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                           AnimatedBuilder(
                             animation: _laserPosition,
                             builder: (context, _) {
+                              final laserColor = _hasNoPlantDetected
+                                  ? const Color(0xFFE53935)
+                                  : _isLockedOn
+                                      ? const Color(0xFF00E676)
+                                      : const Color(0xFF2ECC71);
                               return Align(
                                 alignment: Alignment(0, (_laserPosition.value * 2) - 1),
                                 child: Container(
@@ -291,14 +306,13 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                                     gradient: LinearGradient(
                                       colors: [
                                         Colors.transparent,
-                                        _isLockedOn ? const Color(0xFF00E676) : const Color(0xFF2ECC71),
+                                        laserColor,
                                         Colors.transparent,
                                       ],
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: (_isLockedOn ? const Color(0xFF00E676) : const Color(0xFF2ECC71))
-                                            .withValues(alpha: 0.8),
+                                        color: laserColor.withValues(alpha: 0.8),
                                         blurRadius: 10,
                                         spreadRadius: 2,
                                       ),
@@ -312,10 +326,16 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                           // Target Center Reticle
                           Center(
                             child: Icon(
-                              Icons.filter_center_focus_rounded,
+                              _hasNoPlantDetected
+                                  ? Icons.error_outline_rounded
+                                  : Icons.filter_center_focus_rounded,
                               size: 40,
-                              color: (_isLockedOn ? const Color(0xFF00E676) : Colors.white)
-                                  .withValues(alpha: 0.6),
+                              color: (_hasNoPlantDetected
+                                      ? const Color(0xFFE53935)
+                                      : _isLockedOn
+                                          ? const Color(0xFF00E676)
+                                          : Colors.white)
+                                  .withValues(alpha: 0.7),
                             ),
                           ),
                         ],
@@ -327,20 +347,24 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
 
                   // Bottom HUD Information Panel
                   Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.75),
+                      color: Colors.black.withValues(alpha: 0.85),
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: _isLockedOn
-                            ? const Color(0xFF00E676)
-                            : const Color(0xFF2ECC71).withValues(alpha: 0.4),
+                        color: _hasNoPlantDetected
+                            ? const Color(0xFFE53935)
+                            : _isLockedOn
+                                ? const Color(0xFF00E676)
+                                : const Color(0xFF2ECC71).withValues(alpha: 0.4),
                         width: 1.5,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.5),
+                          color: _hasNoPlantDetected
+                              ? const Color(0xFFE53935).withValues(alpha: 0.25)
+                              : Colors.black.withValues(alpha: 0.5),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -354,13 +378,25 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: (_isLockedOn ? const Color(0xFF00E676) : const Color(0xFF2ECC71))
+                                color: (_hasNoPlantDetected
+                                        ? const Color(0xFFE53935)
+                                        : _isLockedOn
+                                            ? const Color(0xFF00E676)
+                                            : const Color(0xFF2ECC71))
                                     .withValues(alpha: 0.2),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
-                                _isLockedOn ? Icons.check_circle_rounded : Icons.camera_alt_rounded,
-                                color: _isLockedOn ? const Color(0xFF00E676) : const Color(0xFF2ECC71),
+                                _hasNoPlantDetected
+                                    ? Icons.cancel_rounded
+                                    : _isLockedOn
+                                        ? Icons.check_circle_rounded
+                                        : Icons.camera_alt_rounded,
+                                color: _hasNoPlantDetected
+                                    ? const Color(0xFFFF5252)
+                                    : _isLockedOn
+                                        ? const Color(0xFF00E676)
+                                        : const Color(0xFF2ECC71),
                                 size: 24,
                               ),
                             ),
@@ -372,16 +408,20 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                                   Text(
                                     _hudStatus,
                                     style: GoogleFonts.fredoka(
-                                      color: Colors.white,
+                                      color: _hasNoPlantDetected
+                                          ? const Color(0xFFFF5252)
+                                          : Colors.white,
                                       fontSize: 15,
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     _hudDetail,
                                     style: GoogleFonts.nunito(
-                                      color: Colors.white70,
+                                      color: _hasNoPlantDetected
+                                          ? const Color(0xFFFFCDD2)
+                                          : Colors.white70,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -395,7 +435,11 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                         LinearProgressIndicator(
                           backgroundColor: Colors.white12,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            _isLockedOn ? const Color(0xFF00E676) : const Color(0xFF2ECC71),
+                            _hasNoPlantDetected
+                                ? const Color(0xFFE53935)
+                                : _isLockedOn
+                                    ? const Color(0xFF00E676)
+                                    : const Color(0xFF2ECC71),
                           ),
                         ),
                         const SizedBox(height: 14),
@@ -403,23 +447,37 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                           width: double.infinity,
                           child: ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2ECC71),
-                              foregroundColor: Colors.white,
+                              backgroundColor: _hasNoPlantDetected
+                                  ? const Color(0xFF2C2C2C)
+                                  : const Color(0xFF2ECC71),
+                              foregroundColor: _hasNoPlantDetected ? Colors.white54 : Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
+                                side: _hasNoPlantDetected
+                                    ? const BorderSide(color: Color(0xFFE53935), width: 1.5)
+                                    : BorderSide.none,
                               ),
-                              elevation: 2,
+                              elevation: _hasNoPlantDetected ? 0 : 2,
                             ),
-                            onPressed: (_isAnalyzingFrame || _isLockedOn)
+                            onPressed: (_isAnalyzingFrame || _isLockedOn || _hasNoPlantDetected)
                                 ? null
                                 : () => _performFrameAnalysis(),
-                            icon: const Icon(Icons.flash_on_rounded, size: 20),
+                            icon: Icon(
+                              _hasNoPlantDetected ? Icons.block_rounded : Icons.flash_on_rounded,
+                              size: 20,
+                              color: _hasNoPlantDetected ? const Color(0xFFFF5252) : Colors.white,
+                            ),
                             label: Text(
-                              _isAnalyzingFrame ? 'Analyzing Plant...' : 'Instant Capture & Identify ⚡',
+                              _isAnalyzingFrame
+                                  ? 'Analyzing Plant...'
+                                  : _hasNoPlantDetected
+                                      ? 'No Plant Found (Adding Closed)'
+                                      : 'Instant Capture & Identify ⚡',
                               style: GoogleFonts.fredoka(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
+                                color: _hasNoPlantDetected ? const Color(0xFFFF5252) : Colors.white,
                               ),
                             ),
                           ),
@@ -475,7 +533,11 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
   Widget _buildReticleCorners() {
     const cornerSize = 22.0;
     const thickness = 4.0;
-    final color = _isLockedOn ? const Color(0xFF00E676) : const Color(0xFF2ECC71);
+    final color = _hasNoPlantDetected
+        ? const Color(0xFFE53935)
+        : _isLockedOn
+            ? const Color(0xFF00E676)
+            : const Color(0xFF2ECC71);
 
     return Stack(
       children: [
@@ -547,7 +609,9 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
     final progress = (_elapsedSeconds / 10.0).clamp(0.0, 1.0);
 
     String phaseText;
-    if (_isLockedOn) {
+    if (_hasNoPlantDetected) {
+      phaseText = '⚠️ No plant found in camera view';
+    } else if (_isLockedOn) {
       phaseText = '✨ Plant Identified & Locked!';
     } else if (progress < 0.35) {
       phaseText = '🌿 Aligning Foliage & Leaf Veins...';
@@ -585,9 +649,11 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                     color: Colors.black.withValues(alpha: 0.65),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: _isLockedOn
-                          ? const Color(0xFF00E676)
-                          : const Color(0xFF2ECC71).withValues(alpha: 0.5),
+                      color: _hasNoPlantDetected
+                          ? const Color(0xFFE53935)
+                          : _isLockedOn
+                              ? const Color(0xFF00E676)
+                              : const Color(0xFF2ECC71).withValues(alpha: 0.5),
                     ),
                   ),
                   child: Row(
@@ -596,11 +662,20 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                         width: 9,
                         height: 9,
                         decoration: BoxDecoration(
-                          color: _isLockedOn ? const Color(0xFF00E676) : const Color(0xFF2ECC71),
+                          color: _hasNoPlantDetected
+                              ? const Color(0xFFE53935)
+                              : _isLockedOn
+                                  ? const Color(0xFF00E676)
+                                  : const Color(0xFF2ECC71),
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF00E676).withValues(alpha: 0.9),
+                              color: (_hasNoPlantDetected
+                                      ? const Color(0xFFE53935)
+                                      : _isLockedOn
+                                          ? const Color(0xFF00E676)
+                                          : const Color(0xFF2ECC71))
+                                  .withValues(alpha: 0.9),
                               blurRadius: 6,
                               spreadRadius: 2,
                             ),
@@ -610,10 +685,14 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          _isLockedOn ? 'TARGET CONFIRMED' : 'AI REAL-TIME SCANNER',
+                          _hasNoPlantDetected
+                              ? 'NO PLANT DETECTED'
+                              : _isLockedOn
+                                  ? 'TARGET CONFIRMED'
+                                  : 'AI REAL-TIME SCANNER',
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.fredoka(
-                            color: Colors.white,
+                            color: _hasNoPlantDetected ? const Color(0xFFFF5252) : Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.0,
@@ -630,20 +709,25 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: _isLockedOn
-                        ? [const Color(0xFF00E676), const Color(0xFF1B5E20)]
-                        : [const Color(0xFF1E8449), const Color(0xFF114B27)],
+                    colors: _hasNoPlantDetected
+                        ? [const Color(0xFFD32F2F), const Color(0xFF5D1010)]
+                        : _isLockedOn
+                            ? [const Color(0xFF00E676), const Color(0xFF1B5E20)]
+                            : [const Color(0xFF1E8449), const Color(0xFF114B27)],
                   ),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                    color: _isLockedOn
-                        ? const Color(0xFF69F0AE)
-                        : const Color(0xFF2ECC71).withValues(alpha: 0.7),
+                    color: _hasNoPlantDetected
+                        ? const Color(0xFFFF5252)
+                        : _isLockedOn
+                            ? const Color(0xFF69F0AE)
+                            : const Color(0xFF2ECC71).withValues(alpha: 0.7),
                     width: 1.2,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF2ECC71).withValues(alpha: 0.4),
+                      color: (_hasNoPlantDetected ? const Color(0xFFE53935) : const Color(0xFF2ECC71))
+                          .withValues(alpha: 0.4),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -655,9 +739,11 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                     const Icon(Icons.timer_outlined, color: Colors.white, size: 15),
                     const SizedBox(width: 5),
                     Text(
-                      _isLockedOn
-                          ? 'LOCK'
-                          : '${_elapsedSeconds.toStringAsFixed(1)}s / 10s',
+                      _hasNoPlantDetected
+                          ? 'ALERT'
+                          : _isLockedOn
+                              ? 'LOCK'
+                              : '${_elapsedSeconds.toStringAsFixed(1)}s / 10s',
                       style: GoogleFonts.fredoka(
                         color: Colors.white,
                         fontSize: 12,
@@ -685,9 +771,11 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                   color: Colors.black.withValues(alpha: 0.75),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: _isLockedOn
-                        ? const Color(0xFF00E676)
-                        : const Color(0xFF2ECC71).withValues(alpha: 0.35),
+                    color: _hasNoPlantDetected
+                        ? const Color(0xFFE53935)
+                        : _isLockedOn
+                            ? const Color(0xFF00E676)
+                            : const Color(0xFF2ECC71).withValues(alpha: 0.35),
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -711,7 +799,11 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                               Transform.rotate(
                                 angle: sparkleOffset * 6.28,
                                 child: Text(
-                                  sparkleOffset > 0.5 ? '✨' : '⭐',
+                                  _hasNoPlantDetected
+                                      ? '⚠️'
+                                      : sparkleOffset > 0.5
+                                          ? '✨'
+                                          : '⭐',
                                   style: const TextStyle(fontSize: 13),
                                 ),
                               ),
@@ -721,7 +813,7 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                                   phaseText,
                                   overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.nunito(
-                                    color: Colors.white,
+                                    color: _hasNoPlantDetected ? const Color(0xFFFF5252) : Colors.white,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 0.2,
@@ -732,9 +824,11 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                           ),
                         ),
                         Text(
-                          '${(progress * 100).toInt()}%',
+                          _hasNoPlantDetected ? '0%' : '${(progress * 100).toInt()}%',
                           style: GoogleFonts.fredoka(
-                            color: const Color(0xFF69F0AE),
+                            color: _hasNoPlantDetected
+                                ? const Color(0xFFFF5252)
+                                : const Color(0xFF69F0AE),
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
@@ -758,23 +852,28 @@ class _RealtimePlantScannerScreenState extends State<RealtimePlantScannerScreen>
                         ),
                         // Fill bar with gradient
                         FractionallySizedBox(
-                          widthFactor: progress > 0 ? progress : 0.05,
+                          widthFactor: _hasNoPlantDetected ? 1.0 : (progress > 0 ? progress : 0.05),
                           child: Container(
                             height: 7,
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: _isLockedOn
-                                    ? [const Color(0xFF00E676), const Color(0xFF69F0AE)]
-                                    : [
-                                        const Color(0xFF00E5FF),
-                                        const Color(0xFF00E676),
-                                        const Color(0xFFFFD54F),
-                                      ],
+                                colors: _hasNoPlantDetected
+                                    ? [const Color(0xFFE53935), const Color(0xFFFF5252)]
+                                    : _isLockedOn
+                                        ? [const Color(0xFF00E676), const Color(0xFF69F0AE)]
+                                        : [
+                                            const Color(0xFF00E5FF),
+                                            const Color(0xFF00E676),
+                                            const Color(0xFFFFD54F),
+                                          ],
                               ),
                               borderRadius: BorderRadius.circular(4),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF00E676).withValues(alpha: 0.8),
+                                  color: (_hasNoPlantDetected
+                                          ? const Color(0xFFE53935)
+                                          : const Color(0xFF00E676))
+                                      .withValues(alpha: 0.8),
                                   blurRadius: 6,
                                   spreadRadius: 1,
                                 ),

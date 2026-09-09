@@ -42,6 +42,7 @@ class _RealtimeWateringScannerScreenState
   bool _isCameraReady = false;
   bool _isAnalyzingFrame = false;
   bool _isLockedOn = false;
+  bool _hasNoPlantDetected = false;
 
   bool _isPlantInFrame = false;
   bool _isWaterMugInFrame = false;
@@ -137,7 +138,7 @@ class _RealtimeWateringScannerScreenState
     _isAnalyzingFrame = true;
     _scanTicks++;
 
-    if (mounted) {
+    if (mounted && !_hasNoPlantDetected) {
       setState(() {
         if (!_isPlantInFrame && !_isWaterMugInFrame) {
           if (_scanTicks % 2 == 1) {
@@ -171,17 +172,25 @@ class _RealtimeWateringScannerScreenState
           setState(() {
             _isPlantInFrame = result.isPlantPresent;
             _isWaterMugInFrame = result.isWaterMugPresent;
-            _hudStatus = result.statusMessage;
-            if (result.detectedObjects.isNotEmpty) {
-              _hudDetail = result.detectedObjects;
+            if (!result.isPlantPresent) {
+              _hasNoPlantDetected = true;
+              _hudStatus = 'No plant in frame';
+              _hudDetail = 'Point camera at ${widget.plant.plantName} foliage or tap to capture';
+            } else {
+              _hasNoPlantDetected = false;
+              _hudStatus = result.statusMessage;
+              if (result.detectedObjects.isNotEmpty) {
+                _hudDetail = result.detectedObjects;
+              }
             }
           });
         }
 
         // Auto-capture condition: Both plant and water mug detected in frame
-        if (result.isWateringReady ||
-            (result.isPlantPresent && result.isWaterMugPresent)) {
+        if (result.isPlantPresent &&
+            (result.isWateringReady || result.isWaterMugPresent)) {
           _isLockedOn = true;
+          _hasNoPlantDetected = false;
           _analysisLoopTimer?.cancel();
 
           if (mounted) {
@@ -213,6 +222,13 @@ class _RealtimeWateringScannerScreenState
       }
     } catch (e) {
       debugPrint('Real-time watering frame recognition error: $e');
+      if (mounted) {
+        setState(() {
+          _hasNoPlantDetected = false;
+          _hudStatus = 'Aim camera at ${widget.plant.plantName}';
+          _hudDetail = 'Hold water mug near foliage';
+        });
+      }
     } finally {
       if (mounted) {
         _isAnalyzingFrame = false;
@@ -295,8 +311,8 @@ class _RealtimeWateringScannerScreenState
                         Expanded(
                           child: _buildDetectionPill(
                             icon: Icons.eco_rounded,
-                            label: widget.plant.plantName,
-                            isDetected: _isPlantInFrame,
+                            label: _hasNoPlantDetected ? 'No Plant Found' : widget.plant.plantName,
+                            isDetected: _isPlantInFrame && !_hasNoPlantDetected,
                             activeColor: const Color(0xFF2ECC71),
                           ),
                         ),
@@ -318,22 +334,26 @@ class _RealtimeWateringScannerScreenState
                   // Center Scanning Reticle Box
                   Center(
                     child: Container(
-                      width: 290,
-                      height: 310,
+                      width: 280,
+                      height: 260,
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: _isLockedOn
-                              ? const Color(0xFF00E676)
-                              : const Color(0xFF00B0FF).withValues(alpha: 0.6),
-                          width: _isLockedOn ? 3.0 : 2.0,
+                          color: _hasNoPlantDetected
+                              ? const Color(0xFFE53935)
+                              : _isLockedOn
+                                  ? const Color(0xFF00E676)
+                                  : const Color(0xFF00B0FF).withValues(alpha: 0.6),
+                          width: (_isLockedOn || _hasNoPlantDetected) ? 3.0 : 2.0,
                         ),
                         borderRadius: BorderRadius.circular(28),
                         boxShadow: [
                           BoxShadow(
-                            color: (_isLockedOn
-                                    ? const Color(0xFF00E676)
-                                    : const Color(0xFF00B0FF))
-                                .withValues(alpha: 0.25),
+                            color: (_hasNoPlantDetected
+                                    ? const Color(0xFFE53935)
+                                    : _isLockedOn
+                                        ? const Color(0xFF00E676)
+                                        : const Color(0xFF00B0FF))
+                                .withValues(alpha: 0.28),
                             blurRadius: 20,
                             spreadRadius: 4,
                           ),
@@ -348,6 +368,11 @@ class _RealtimeWateringScannerScreenState
                           AnimatedBuilder(
                             animation: _laserPosition,
                             builder: (context, _) {
+                              final laserColor = _hasNoPlantDetected
+                                  ? const Color(0xFFE53935)
+                                  : _isLockedOn
+                                      ? const Color(0xFF00E676)
+                                      : const Color(0xFF00B0FF);
                               return Align(
                                 alignment:
                                     Alignment(0, (_laserPosition.value * 2) - 1),
@@ -359,18 +384,13 @@ class _RealtimeWateringScannerScreenState
                                     gradient: LinearGradient(
                                       colors: [
                                         Colors.transparent,
-                                        _isLockedOn
-                                            ? const Color(0xFF00E676)
-                                            : const Color(0xFF00B0FF),
+                                        laserColor,
                                         Colors.transparent,
                                       ],
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: (_isLockedOn
-                                                ? const Color(0xFF00E676)
-                                                : const Color(0xFF00B0FF))
-                                            .withValues(alpha: 0.8),
+                                        color: laserColor.withValues(alpha: 0.8),
                                         blurRadius: 10,
                                         spreadRadius: 2,
                                       ),
@@ -384,12 +404,16 @@ class _RealtimeWateringScannerScreenState
                           // Target Center Reticle
                           Center(
                             child: Icon(
-                              Icons.filter_center_focus_rounded,
+                              _hasNoPlantDetected
+                                  ? Icons.error_outline_rounded
+                                  : Icons.filter_center_focus_rounded,
                               size: 44,
-                              color: (_isLockedOn
-                                      ? const Color(0xFF00E676)
-                                      : Colors.white)
-                                  .withValues(alpha: 0.6),
+                              color: (_hasNoPlantDetected
+                                      ? const Color(0xFFE53935)
+                                      : _isLockedOn
+                                          ? const Color(0xFF00E676)
+                                          : Colors.white)
+                                  .withValues(alpha: 0.7),
                             ),
                           ),
                         ],
@@ -402,21 +426,25 @@ class _RealtimeWateringScannerScreenState
                   // Bottom HUD Information Panel
                   Container(
                     margin:
-                        const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.78),
+                      color: Colors.black.withValues(alpha: 0.85),
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: _isLockedOn
-                            ? const Color(0xFF00E676)
-                            : const Color(0xFF00B0FF).withValues(alpha: 0.4),
+                        color: _hasNoPlantDetected
+                            ? const Color(0xFFE53935)
+                            : _isLockedOn
+                                ? const Color(0xFF00E676)
+                                : const Color(0xFF00B0FF).withValues(alpha: 0.4),
                         width: 1.5,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.5),
+                          color: _hasNoPlantDetected
+                              ? const Color(0xFFE53935).withValues(alpha: 0.25)
+                              : Colors.black.withValues(alpha: 0.5),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -430,19 +458,25 @@ class _RealtimeWateringScannerScreenState
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: (_isLockedOn
-                                        ? const Color(0xFF00E676)
-                                        : const Color(0xFF00B0FF))
+                                color: (_hasNoPlantDetected
+                                        ? const Color(0xFFE53935)
+                                        : _isLockedOn
+                                            ? const Color(0xFF00E676)
+                                            : const Color(0xFF00B0FF))
                                     .withValues(alpha: 0.2),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
-                                _isLockedOn
-                                    ? Icons.check_circle_rounded
-                                    : Icons.water_drop_rounded,
-                                color: _isLockedOn
-                                    ? const Color(0xFF00E676)
-                                    : const Color(0xFF00B0FF),
+                                _hasNoPlantDetected
+                                    ? Icons.cancel_rounded
+                                    : _isLockedOn
+                                        ? Icons.check_circle_rounded
+                                        : Icons.water_drop_rounded,
+                                color: _hasNoPlantDetected
+                                    ? const Color(0xFFFF5252)
+                                    : _isLockedOn
+                                        ? const Color(0xFF00E676)
+                                        : const Color(0xFF00B0FF),
                                 size: 24,
                               ),
                             ),
@@ -454,16 +488,20 @@ class _RealtimeWateringScannerScreenState
                                   Text(
                                     _hudStatus,
                                     style: GoogleFonts.fredoka(
-                                      color: Colors.white,
+                                      color: _hasNoPlantDetected
+                                          ? const Color(0xFFFF5252)
+                                          : Colors.white,
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     _hudDetail,
                                     style: GoogleFonts.nunito(
-                                      color: Colors.white70,
+                                      color: _hasNoPlantDetected
+                                          ? const Color(0xFFFFCDD2)
+                                          : Colors.white70,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -477,9 +515,11 @@ class _RealtimeWateringScannerScreenState
                         LinearProgressIndicator(
                           backgroundColor: Colors.white12,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            _isLockedOn
-                                ? const Color(0xFF00E676)
-                                : const Color(0xFF00B0FF),
+                            _hasNoPlantDetected
+                                ? const Color(0xFFE53935)
+                                : _isLockedOn
+                                    ? const Color(0xFF00E676)
+                                    : const Color(0xFF00B0FF),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -495,10 +535,14 @@ class _RealtimeWateringScannerScreenState
                               ),
                               elevation: 2,
                             ),
-                            onPressed: _isLockedOn
+                            onPressed: (_isLockedOn || _isAnalyzingFrame)
                                 ? null
                                 : () => _manualCaptureAndProceed(),
-                            icon: const Icon(Icons.water_drop_rounded, size: 20),
+                            icon: const Icon(
+                              Icons.water_drop_rounded,
+                              size: 20,
+                              color: Colors.white,
+                            ),
                             label: Text(
                               _isAnalyzingFrame
                                   ? 'Analyzing Live Feed...'
@@ -506,6 +550,7 @@ class _RealtimeWateringScannerScreenState
                               style: GoogleFonts.fredoka(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
+                                color: Colors.white,
                               ),
                             ),
                           ),
@@ -607,8 +652,11 @@ class _RealtimeWateringScannerScreenState
   Widget _buildReticleCorners() {
     const cornerSize = 22.0;
     const thickness = 4.0;
-    final color =
-        _isLockedOn ? const Color(0xFF00E676) : const Color(0xFF00B0FF);
+    final color = _hasNoPlantDetected
+        ? const Color(0xFFE53935)
+        : _isLockedOn
+            ? const Color(0xFF00E676)
+            : const Color(0xFF00B0FF);
 
     return Stack(
       children: [
@@ -676,7 +724,9 @@ class _RealtimeWateringScannerScreenState
     final progress = (_elapsedSeconds / 10.0).clamp(0.0, 1.0);
 
     String phaseText;
-    if (_isLockedOn) {
+    if (_hasNoPlantDetected) {
+      phaseText = '⚠️ No plant found in camera view';
+    } else if (_isLockedOn) {
       phaseText = '✨ Plant & Mug Confirmed • Hydration Ready!';
     } else if (!_isPlantInFrame && !_isWaterMugInFrame) {
       phaseText = '🌿 Aim at ${widget.plant.plantName} & water mug...';
@@ -718,9 +768,11 @@ class _RealtimeWateringScannerScreenState
                     color: Colors.black.withValues(alpha: 0.65),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: _isLockedOn
-                          ? const Color(0xFF00E676)
-                          : const Color(0xFF00B0FF).withValues(alpha: 0.5),
+                      color: _hasNoPlantDetected
+                          ? const Color(0xFFE53935)
+                          : _isLockedOn
+                              ? const Color(0xFF00E676)
+                              : const Color(0xFF00B0FF).withValues(alpha: 0.5),
                     ),
                   ),
                   child: Row(
@@ -729,15 +781,19 @@ class _RealtimeWateringScannerScreenState
                         width: 9,
                         height: 9,
                         decoration: BoxDecoration(
-                          color: _isLockedOn
-                              ? const Color(0xFF00E676)
-                              : const Color(0xFF00B0FF),
+                          color: _hasNoPlantDetected
+                              ? const Color(0xFFE53935)
+                              : _isLockedOn
+                                  ? const Color(0xFF00E676)
+                                  : const Color(0xFF00B0FF),
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: (_isLockedOn
-                                      ? const Color(0xFF00E676)
-                                      : const Color(0xFF00B0FF))
+                              color: (_hasNoPlantDetected
+                                      ? const Color(0xFFE53935)
+                                      : _isLockedOn
+                                          ? const Color(0xFF00E676)
+                                          : const Color(0xFF00B0FF))
                                   .withValues(alpha: 0.9),
                               blurRadius: 6,
                               spreadRadius: 2,
@@ -748,12 +804,14 @@ class _RealtimeWateringScannerScreenState
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          _isLockedOn
-                              ? '✨ HYDRATION LOCKED'
-                              : '💧 WATERING SCANNER: ${widget.plant.plantName.toUpperCase()}',
+                          _hasNoPlantDetected
+                              ? 'NO PLANT DETECTED'
+                              : _isLockedOn
+                                  ? '✨ HYDRATION LOCKED'
+                                  : '💧 WATERING SCANNER: ${widget.plant.plantName.toUpperCase()}',
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.fredoka(
-                            color: Colors.white,
+                            color: _hasNoPlantDetected ? const Color(0xFFFF5252) : Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.0,
@@ -771,20 +829,27 @@ class _RealtimeWateringScannerScreenState
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: _isLockedOn
-                        ? [const Color(0xFF00E676), const Color(0xFF1B5E20)]
-                        : [const Color(0xFF0288D1), const Color(0xFF01579B)],
+                    colors: _hasNoPlantDetected
+                        ? [const Color(0xFFD32F2F), const Color(0xFF5D1010)]
+                        : _isLockedOn
+                            ? [const Color(0xFF00E676), const Color(0xFF1B5E20)]
+                            : [const Color(0xFF0288D1), const Color(0xFF01579B)],
                   ),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                    color: _isLockedOn
-                        ? const Color(0xFF69F0AE)
-                        : const Color(0xFF40C4FF).withValues(alpha: 0.7),
+                    color: _hasNoPlantDetected
+                        ? const Color(0xFFFF5252)
+                        : _isLockedOn
+                            ? const Color(0xFF69F0AE)
+                            : const Color(0xFF40C4FF).withValues(alpha: 0.7),
                     width: 1.2,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF00B0FF).withValues(alpha: 0.4),
+                      color: (_hasNoPlantDetected
+                              ? const Color(0xFFE53935)
+                              : const Color(0xFF00B0FF))
+                          .withValues(alpha: 0.4),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -798,8 +863,8 @@ class _RealtimeWateringScannerScreenState
                       builder: (context, _) {
                         return Transform.rotate(
                           angle: _sparkleCtrl.value * 2 * 3.14159,
-                          child: const Icon(
-                            Icons.auto_awesome,
+                          child: Icon(
+                            _hasNoPlantDetected ? Icons.warning_amber_rounded : Icons.auto_awesome,
                             color: Colors.white,
                             size: 13,
                           ),
@@ -808,7 +873,9 @@ class _RealtimeWateringScannerScreenState
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      '${(10.0 - _elapsedSeconds).clamp(0.0, 10.0).toStringAsFixed(1)}s',
+                      _hasNoPlantDetected
+                          ? 'ALERT'
+                          : '${(10.0 - _elapsedSeconds).clamp(0.0, 10.0).toStringAsFixed(1)}s',
                       style: GoogleFonts.nunito(
                         color: Colors.white,
                         fontSize: 12,

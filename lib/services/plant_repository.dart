@@ -8,7 +8,7 @@ import 'notification_service.dart';
 import 'sync_service.dart';
 
 /// Local & Remote Plant Repository
-/// Manages persistent offline caching and remote synchronization for User Plants & Daily Check-ins with User Data Isolation
+/// Manages persistent offline caching and remote synchronization for User Plants & Daily Check-ins with Resilient Data Persistence
 class PlantRepository extends ChangeNotifier {
   static final PlantRepository _instance = PlantRepository._internal();
   factory PlantRepository() => _instance;
@@ -16,6 +16,8 @@ class PlantRepository extends ChangeNotifier {
 
   static const String _legacyPlantsStorageKey = 'spryflora_user_plants';
   static const String _legacyCheckinsStorageKey = 'spryflora_plant_checkins';
+  static const String _defaultUserPlantsKey = 'spryflora_user_plants_usr_default';
+  static const String _defaultUserCheckinsKey = 'spryflora_plant_checkins_usr_default';
 
   String? _currentUserId;
   List<PlantModel> _plants = [];
@@ -44,58 +46,108 @@ class PlantRepository extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Loads all plants and checkins for the active userId from persistent local storage
+  /// Loads all plants and checkins with multi-tier storage fallback to guarantee zero accidental deletions
   Future<void> loadLocalData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Load Plants
+      // 1. Load Plants with multi-key fallback & merger
       String? plantsJsonStr = prefs.getString(_plantsStorageKey);
-      // Fallback for default/guest account migration from legacy global key
-      if ((plantsJsonStr == null || plantsJsonStr.isEmpty) && activeUserId == 'usr_default') {
+      if (plantsJsonStr == null || plantsJsonStr.isEmpty) {
         plantsJsonStr = prefs.getString(_legacyPlantsStorageKey);
+      }
+      if (plantsJsonStr == null || plantsJsonStr.isEmpty) {
+        plantsJsonStr = prefs.getString(_defaultUserPlantsKey);
+      }
+
+      final Map<String, PlantModel> plantMap = {};
+
+      // Keep existing in-memory plants first
+      for (final p in _plants) {
+        plantMap[p.id] = p;
       }
 
       if (plantsJsonStr != null && plantsJsonStr.isNotEmpty) {
-        final List<dynamic> decoded = jsonDecode(plantsJsonStr) as List<dynamic>;
-        _plants = decoded
-            .map((item) => PlantModel.fromJson(item as Map<String, dynamic>))
-            .where((p) => p.userId == activeUserId || activeUserId == 'usr_default' || p.userId.isEmpty)
-            .toList();
-      } else {
-        _plants = [];
+        try {
+          final List<dynamic> decoded = jsonDecode(plantsJsonStr) as List<dynamic>;
+          for (final item in decoded) {
+            if (item is Map<String, dynamic>) {
+              final plant = PlantModel.fromJson(item);
+              plantMap[plant.id] = plant;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error parsing stored plants JSON: $e');
+        }
       }
 
-      // Load Check-ins
+      // Also check legacy storage key to rescue any orphaned plants
+      final legacyStr = prefs.getString(_legacyPlantsStorageKey);
+      if (legacyStr != null && legacyStr.isNotEmpty && legacyStr != plantsJsonStr) {
+        try {
+          final List<dynamic> decoded = jsonDecode(legacyStr) as List<dynamic>;
+          for (final item in decoded) {
+            if (item is Map<String, dynamic>) {
+              final plant = PlantModel.fromJson(item);
+              if (!plantMap.containsKey(plant.id)) {
+                plantMap[plant.id] = plant;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      _plants = plantMap.values.toList();
+
+      // 2. Load Check-ins with multi-key fallback
       String? checkinsJsonStr = prefs.getString(_checkinsStorageKey);
-      if ((checkinsJsonStr == null || checkinsJsonStr.isEmpty) && activeUserId == 'usr_default') {
+      if (checkinsJsonStr == null || checkinsJsonStr.isEmpty) {
         checkinsJsonStr = prefs.getString(_legacyCheckinsStorageKey);
+      }
+      if (checkinsJsonStr == null || checkinsJsonStr.isEmpty) {
+        checkinsJsonStr = prefs.getString(_defaultUserCheckinsKey);
+      }
+
+      final Map<String, DailyCheckinModel> checkinMap = {};
+      for (final c in _checkins) {
+        checkinMap[c.id] = c;
       }
 
       if (checkinsJsonStr != null && checkinsJsonStr.isNotEmpty) {
-        final List<dynamic> decodedCheckins = jsonDecode(checkinsJsonStr) as List<dynamic>;
-        _checkins = decodedCheckins
-            .map((item) => DailyCheckinModel.fromJson(item as Map<String, dynamic>))
-            .where((c) => c.userId == activeUserId || activeUserId == 'usr_default' || c.userId.isEmpty)
-            .toList();
-      } else {
-        _checkins = [];
+        try {
+          final List<dynamic> decodedCheckins = jsonDecode(checkinsJsonStr) as List<dynamic>;
+          for (final item in decodedCheckins) {
+            if (item is Map<String, dynamic>) {
+              final checkin = DailyCheckinModel.fromJson(item);
+              checkinMap[checkin.id] = checkin;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error parsing stored checkins JSON: $e');
+        }
       }
 
+      _checkins = checkinMap.values.toList();
       _isLoaded = true;
       notifyListeners();
+
+      // Ensure local state is saved back redundantly
+      await _savePlantsToStorage();
+      await _saveCheckinsToStorage();
 
       // Trigger background sync if remote backend is configured
       final remotePlants = await SyncService().syncPlants(_plants);
       if (remotePlants != null && remotePlants.isNotEmpty) {
-        _plants = remotePlants.where((p) => p.userId == activeUserId || activeUserId == 'usr_default').toList();
+        for (final rp in remotePlants) {
+          plantMap[rp.id] = rp;
+        }
+        _plants = plantMap.values.toList();
         await _savePlantsToStorage();
         notifyListeners();
       }
       await SyncService().syncCheckins(_checkins);
-    } catch (_) {
-      _plants = [];
-      _checkins = [];
+    } catch (e) {
+      debugPrint('Exception in loadLocalData (preserving existing in-memory plants): $e');
       _isLoaded = true;
       notifyListeners();
     }
@@ -107,7 +159,13 @@ class PlantRepository extends ChangeNotifier {
         ? plant
         : plant.copyWith(userId: activeUserId);
 
-    _plants.insert(0, taggedPlant);
+    final existingIdx = _plants.indexWhere((p) => p.id == taggedPlant.id);
+    if (existingIdx != -1) {
+      _plants[existingIdx] = taggedPlant;
+    } else {
+      _plants.insert(0, taggedPlant);
+    }
+
     await _savePlantsToStorage();
     notifyListeners();
     NotificationService().notifyPlantAdded(taggedPlant);
@@ -120,10 +178,12 @@ class PlantRepository extends ChangeNotifier {
     final index = _plants.indexWhere((p) => p.id == updatedPlant.id);
     if (index != -1) {
       _plants[index] = updatedPlant;
-      await _savePlantsToStorage();
-      notifyListeners();
-      SyncService().syncPlants(_plants);
+    } else {
+      _plants.add(updatedPlant);
     }
+    await _savePlantsToStorage();
+    notifyListeners();
+    SyncService().syncPlants(_plants);
   }
 
   /// Marks a plant as fully completed
@@ -140,7 +200,7 @@ class PlantRepository extends ChangeNotifier {
     }
   }
 
-  /// Deletes a plant by ID
+  /// Deletes a plant by ID (only when explicitly requested by user in plant details delete dialog)
   Future<void> deletePlant(String id) async {
     _plants.removeWhere((p) => p.id == id);
     _checkins.removeWhere((c) => c.plantId == id);
@@ -177,7 +237,13 @@ class PlantRepository extends ChangeNotifier {
             createdAt: checkin.createdAt,
           );
 
-    _checkins.insert(0, taggedCheckin);
+    final existingIdx = _checkins.indexWhere((c) => c.id == taggedCheckin.id);
+    if (existingIdx != -1) {
+      _checkins[existingIdx] = taggedCheckin;
+    } else {
+      _checkins.insert(0, taggedCheckin);
+    }
+
     await _saveCheckinsToStorage();
     notifyListeners();
     SyncService().syncCheckins(_checkins);
@@ -204,7 +270,10 @@ class PlantRepository extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final plantsListJson = _plants.map((p) => p.toJson()).toList();
-      await prefs.setString(_plantsStorageKey, jsonEncode(plantsListJson));
+      final encoded = jsonEncode(plantsListJson);
+      await prefs.setString(_plantsStorageKey, encoded);
+      await prefs.setString(_legacyPlantsStorageKey, encoded);
+      await prefs.setString(_defaultUserPlantsKey, encoded);
     } catch (_) {}
   }
 
@@ -212,7 +281,10 @@ class PlantRepository extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final checkinsListJson = _checkins.map((c) => c.toJson()).toList();
-      await prefs.setString(_checkinsStorageKey, jsonEncode(checkinsListJson));
+      final encoded = jsonEncode(checkinsListJson);
+      await prefs.setString(_checkinsStorageKey, encoded);
+      await prefs.setString(_legacyCheckinsStorageKey, encoded);
+      await prefs.setString(_defaultUserCheckinsKey, encoded);
     } catch (_) {}
   }
 }

@@ -84,26 +84,154 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Prompts & Style Consistency Anchors
+# Prompts & Style Consistency Anchors (Upgraded Ultra-HD Botanical Engine)
 # ─────────────────────────────────────────────────────────────────────────────
 
 STYLE_ANCHOR = (
-    "2.5D isometric game asset, skeuomorphic clay style, smooth matte finish, "
-    "cute round terracotta pot base with warm orange-brown hex #D97443, soil level fixed at 60% pot height, "
-    "centered composition, high key soft studio lighting, vibrant colors, pure solid bright green #00FF00 chroma background, "
-    "strictly no ground shadows, strictly no camera tilt change."
+    "Masterpiece 3D isometric botanical game asset, Unreal Engine 5 octane render style, "
+    "ultra-high detail 8k textures, smooth velvety claymorphism and botanical realism, "
+    "centered camera perspective at a gentle 15-degree isometric top-down angle, "
+    "consistent round warm terracotta ceramic pot (#D97443) filled with rich dark organic loam potting soil at 60% pot height, "
+    "cinematic soft studio three-point lighting with translucent leaf subsurface scattering and vibrant colors, "
+    "pure solid bright green #00FF00 chroma key background, strictly zero background clutter, strictly zero ground drop-shadows, perfectly isolated subject."
 )
 
-STAGE_PROMPTS = [
-    # Stage 0 (Seed)
-    "{species_name}, freshly planted seed cracked open in dark potting soil inside the terracotta pot, miniature bright green root tip poking upward.",
-    # Stage 1 (Sprout)
-    "{species_name}, young seedling sprout with exactly two tender baby cotyledon leaves standing upright from the soil inside the identical terracotta pot.",
-    # Stage 2 (Growing)
-    "{species_name}, juvenile half-mature plant with 6 to 8 signature leaves branching out, showing distinct species foliage patterns inside the identical terracotta pot.",
-    # Stage 3 (Mature)
-    "{species_name}, fully grown mature adult plant in lush prime condition, complete with adult foliage and signature species blooms/herbs filling out the identical terracotta pot."
-]
+BOTANICAL_SPECIES_KNOWLEDGE = {
+    "tulsi": {
+        "foliage": "aromatic ovate serrated green leaves with subtle purple veining and velvety texture",
+        "flower": "delicate upright purple-tinged blossom racemes with tiny fragrant florets",
+        "stem": "slender purplish-green square branching stems",
+    },
+    "holy basil": {
+        "foliage": "aromatic ovate serrated green leaves with subtle purple veining and velvety texture",
+        "flower": "delicate upright purple-tinged blossom racemes with tiny fragrant florets",
+        "stem": "slender purplish-green square branching stems",
+    },
+    "rose": {
+        "foliage": "glossy dark green pinnate compound leaves with fine serrated edges",
+        "flower": "luxurious velvety layered rose petals in radiant vibrant crimson and soft blush",
+        "stem": "sturdy woody green canes with characteristic miniature botanical thorns",
+    },
+    "sunflower": {
+        "foliage": "broad heart-shaped textured rough green leaves with deep prominent veins",
+        "flower": "magnificent golden-yellow ray petals surrounding a dense spiraling dark amber seed disk",
+        "stem": "thick robust fibrous hairy green stem standing upright",
+    },
+    "monstera": {
+        "foliage": "iconic glossy deep forest green swiss-cheese split leaves with distinct fenestrations",
+        "flower": "rare tropical pale cream spathe and spadix bloom",
+        "stem": "chunky tropical climbing aerial roots and thick emerald petioles",
+    },
+    "aloe vera": {
+        "foliage": "plump succulent rosette of thick fleshy lance-shaped leaves with soft white serrated teeth and translucent gel core",
+        "flower": "tall central flower spike with tubular coral-orange blossoms",
+        "stem": "stemless compact succulent rosette base",
+    },
+    "snake plant": {
+        "foliage": "tall architectural sword-like upright leaves with yellow-gold margins and dark green horizontal tiger stripes",
+        "flower": "slender spike of tiny greenish-white fragrant tubular flowers",
+        "stem": "dense cluster of rigid upright foliage emerging directly from soil",
+    },
+    "lavender": {
+        "foliage": "slender linear silvery-green needle-like aromatic foliage",
+        "flower": "vibrant fragrant violet-purple flower spikes waving gracefully",
+        "stem": "semi-woody compact branching base with slender flowering stalks",
+    },
+    "money plant": {
+        "foliage": "glossy heart-shaped cascading leaves with golden-yellow marble variegation splashes",
+        "flower": "rare tropical foliage vine",
+        "stem": "graceful trailing climbing vine with aerial root nodes",
+    },
+    "pothos": {
+        "foliage": "glossy heart-shaped cascading leaves with golden-yellow marble variegation splashes",
+        "flower": "rare tropical foliage vine",
+        "stem": "graceful trailing climbing vine with aerial root nodes",
+    },
+    "peace lily": {
+        "foliage": "lush arching dark green glossy lanceolate leaves with deep parallel venation",
+        "flower": "elegant pristine white petal-like spathe curving around a textured creamy spadix",
+        "stem": "slender arching petioles arising in a clumping habit",
+    },
+    "marigold": {
+        "foliage": "feathery deeply divided aromatic fern-like dark green leaflets",
+        "flower": "dense ruffled spherical pom-pom blossoms in dazzling golden amber and tangerine orange",
+        "stem": "bushy branching herbaceous green stems",
+    },
+    "jade plant": {
+        "foliage": "plump oval jade-green succulent leaves with subtle ruby-red sun-kissed margins",
+        "flower": "clusters of starry soft pink-white miniature blossoms",
+        "stem": "thick miniature bonsai-like tree trunk with smooth fleshy branches",
+    },
+    "orchid": {
+        "foliage": "thick leathery dark green oblong leaves arranged alternating at the base",
+        "flower": "exquisite cascading butterfly-shaped moth orchid blooms with striking magenta lip and pristine petals",
+        "stem": "gracefully arching slender flower spike with silvery aerial roots",
+    },
+    "jasmine": {
+        "foliage": "lustrous bright green ovate leaflets arranged in neat pairs",
+        "flower": "star-shaped intensely fragrant pure white blossoms with velvety petals",
+        "stem": "twining woody green vine with graceful sprawling branches",
+    },
+    "tomato": {
+        "foliage": "pungent aromatic deeply lobed serrated green leaves with fine glandular hairs",
+        "flower": "bright yellow star-shaped flowers and miniature glossy ripening cherry tomatoes",
+        "stem": "thick hairy green vine supported on a miniature garden stake",
+    },
+    "mint": {
+        "foliage": "bright emerald crinkled aromatic ovate leaves with serrated margins",
+        "flower": "tiny lilac-purple flower whorls on terminal spikes",
+        "stem": "square green branching stems forming a lush dense aromatic cluster",
+    },
+    "hibiscus": {
+        "foliage": "glossy dark green ovate leaves with coarsely serrated edges",
+        "flower": "giant dramatic tropical flared 5-petal flower with prominent long protruding red pistil and yellow pollen",
+        "stem": "woody upright branching shrub stem",
+    },
+}
+
+def get_species_trait(species_name: str) -> dict:
+    clean = species_name.lower().strip()
+    for key, val in BOTANICAL_SPECIES_KNOWLEDGE.items():
+        if key in clean or clean in key:
+            return val
+    # Generic intelligent fallback based on species name
+    return {
+        "foliage": f"healthy vibrant leaves with species-accurate shape, intricate venation, and natural green color gradient for {species_name}",
+        "flower": f"characteristic authentic blossoms and flower buds specific to {species_name}",
+        "stem": f"sturdy natural stem and branch structure for {species_name}",
+    }
+
+def build_upgraded_stage_prompt(species_name: str, stage_idx: int) -> str:
+    trait = get_species_trait(species_name)
+    foliage = trait["foliage"]
+    flower = trait["flower"]
+    stem = trait["stem"]
+
+    if stage_idx == 0:
+        stage_desc = (
+            f"Stage 0 (Germination & Seed): Micro-detail close-up of a fertile {species_name} seed bursting open "
+            f"in moist dark organic potting soil inside the round terracotta pot. A tiny translucent emerald-green radicle "
+            f"root anchors into the soil while the first tender sprout shoot tip ({stem}) arches upward with glistening morning micro-dewdrops."
+        )
+    elif stage_idx == 1:
+        stage_desc = (
+            f"Stage 1 (Baby Sprout & Cotyledon): Adorable healthy young {species_name} seedling sprout rising 3cm above the soil "
+            f"in the identical round terracotta pot. Two tender baby cotyledon leaves unfurl with delicate translucent cellular glow, "
+            f"and the very first miniature true leaf bud ({foliage}) emerges from the apical center on a tender lime-green stem."
+        )
+    elif stage_idx == 2:
+        stage_desc = (
+            f"Stage 2 (Vegetative Juvenile): Thriving energetic juvenile {species_name} plant at 50% maturity in the identical round terracotta pot. "
+            f"Lush vigorous branching ({stem}) with 6 to 10 distinct, fully formed signature species leaves ({foliage}) showing authentic venation, "
+            f"healthy chlorophyll gradients, strong central stalk, and developing early flower buds."
+        )
+    else: # stage_idx == 3
+        stage_desc = (
+            f"Stage 3 (Full Maturity & Blooming): Glorious fully grown adult {species_name} in magnificent peak bloom and supreme vitality "
+            f"in the identical round terracotta pot. Dense flourishing canopy of mature signature foliage ({foliage}), "
+            f"crowned with pristine authentic species flowers ({flower}), rich botanical textures, and award-winning showcase brilliance."
+        )
+    return f"{STYLE_ANCHOR} {stage_desc}"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Request / Response Schemas
@@ -271,8 +399,8 @@ async def generate_stage_image_with_client(client, species_name: str, stage_idx:
     """
     Generates a single stage image using Google GenAI SDK or fallback generator.
     """
-    full_prompt = f"{STYLE_ANCHOR} {STAGE_PROMPTS[stage_idx].format(species_name=species_name)}"
-    logger.info(f"Generating Stage {stage_idx} for '{species_name}'...")
+    full_prompt = build_upgraded_stage_prompt(species_name, stage_idx)
+    logger.info(f"Generating Stage {stage_idx} for '{species_name}' with upgraded prompt...")
 
     if client is not None:
         try:

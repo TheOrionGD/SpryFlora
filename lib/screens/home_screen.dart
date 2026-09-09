@@ -12,7 +12,6 @@ import '../theme/skeuo_theme.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_photo_view.dart';
 import '../widgets/bottom_nav_bar.dart';
-import '../widgets/fun_animated_plant.dart';
 import '../widgets/fun_bouncy_button.dart';
 import '../widgets/fun_confetti_overlay.dart';
 import 'my_plants_screen.dart';
@@ -24,7 +23,6 @@ import 'mascot_journey_screen.dart';
 import 'notification_center_screen.dart';
 import 'realtime_plant_scanner_screen.dart';
 import 'realtime_watering_scanner_screen.dart';
-
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -38,10 +36,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late UserService _userService;
   late PlantRepository _plantRepo;
   UserProfile? _userProfile;
-  VirtualPlant? _virtualPlant;
   bool _isLoading = true;
-  bool _showWaterConfetti = false;
-  bool _showWaterDroplets = false;
+  final bool _showWaterConfetti = false;
 
   late AnimationController _headerCtrl;
   late AnimationController _staggerCtrl;
@@ -69,7 +65,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (mounted) {
       setState(() {
         _userProfile = _userService.currentUser;
-        _virtualPlant = _userService.virtualPlant;
       });
     }
   }
@@ -89,7 +84,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (mounted) {
       setState(() {
         _userProfile = _userService.currentUser;
-        _virtualPlant = _userService.virtualPlant;
         _isLoading = false;
       });
       _headerCtrl.forward();
@@ -114,23 +108,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } catch (_) {}
   }
 
-  Future<void> _waterVirtualPlant() async {
-    setState(() {
-      _showWaterDroplets = true;
-      _showWaterConfetti = false;
-    });
-    await _userService.waterVirtualPlant();
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (mounted) {
-      setState(() {
-        _virtualPlant = _userService.virtualPlant;
-        _showWaterDroplets = false;
-        _showWaterConfetti = true;
-      });
-      await Future.delayed(const Duration(milliseconds: 2000));
-      if (mounted) setState(() => _showWaterConfetti = false);
-    }
-  }
+
 
   String get _greeting {
     final hour = DateTime.now().hour;
@@ -238,11 +216,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               const SizedBox(height: 18),
             ],
 
-            // ── Interactive Virtual Companion Card ───────────────────────
-            if (_plantRepo.plants.isNotEmpty) ...[
-              _buildVirtualCompanion(),
-              const SizedBox(height: 18),
-            ],
 
             // ── Today's Checklist Tasks ─────────────────────────────────
             _buildTodaysChecklist(),
@@ -739,83 +712,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── Virtual Companion ────────────────────────────────────────────────────────
-  Widget _buildVirtualCompanion() {
-    if (_plantRepo.plants.isEmpty) return const SizedBox.shrink();
-
-    final activePlant = _plantRepo.plants.first;
-    final health = activePlant.health.toDouble();
-    final level = (activePlant.growthProgress * 5).toInt() + 1;
-    final waterings = _virtualPlant?.wateringsCount ?? _plantRepo.plants.length;
-
-    return _AnimatedCard(
-      delay: 200,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: SkeuoTheme.yellowGreenGradient,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: SkeuoTheme.highRaisedShadows(),
-        ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Text(
-                  '🌟 My Buddy Plant',
-                  style: SkeuoTheme.funHeading(size: 16, color: Colors.white),
-                ),
-                const Spacer(),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'Lv.$level ⭐',
-                    style: SkeuoTheme.funLabel(size: 12, color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Animated plant with droplets on watering
-            FunAnimatedPlant(
-              health: health,
-              size: 160,
-              isWatered: _virtualPlant?.wateringsCount != null &&
-                  _virtualPlant!.wateringsCount > 0,
-              showDroplets: _showWaterDroplets,
-            ),
-
-            const SizedBox(height: 16),
-
-            Text(
-              'Watered $waterings times',
-              style: SkeuoTheme.funLabel(
-                  size: 11, color: Colors.white.withValues(alpha: 0.8)),
-            ),
-            const SizedBox(height: 16),
-
-            SizedBox(
-              width: double.infinity,
-              child: FunBouncyButton(
-                text: '💧 Water My Buddy!',
-                onPressed: _waterVirtualPlant,
-                color: Colors.white,
-                textColor: SkeuoTheme.primaryGreenDark,
-                height: 50,
-                fontSize: 15,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   // ── Section Header ───────────────────────────────────────────────────────────
   Widget _buildSectionHeader(String title, {VoidCallback? onSeeAll}) {

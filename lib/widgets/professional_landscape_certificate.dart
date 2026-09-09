@@ -129,10 +129,10 @@ class _ProfessionalLandscapeCertificateState
 
                 // ── 2. Auto-Detected Username (Recipient Name) Overlay ────────
                 Positioned(
-                  top: 450,
+                  top: 492,
                   left: 200,
                   right: 200,
-                  height: 80,
+                  height: 68,
                   child: Center(
                     child: Text(
                       resolvedUserName,
@@ -140,7 +140,7 @@ class _ProfessionalLandscapeCertificateState
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.kalam(
-                        fontSize: 54,
+                        fontSize: 48,
                         fontWeight: FontWeight.w700,
                         color: const Color(0xFF1B5E20),
                         letterSpacing: 1.2,
@@ -158,15 +158,15 @@ class _ProfessionalLandscapeCertificateState
 
                 // ── 3. Auto-Detected Plan / Program Overlay ───────────────────
                 Positioned(
-                  top: 604,
+                  top: 588,
                   left: 360,
                   right: 360,
-                  height: 56,
+                  height: 84,
                   child: Center(
                     child: Text(
                       resolvedProgram,
                       textAlign: TextAlign.center,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.fredoka(
                         fontSize: 26,
@@ -180,7 +180,7 @@ class _ProfessionalLandscapeCertificateState
 
                 // ── 4. Approved Stamp Overlay from 258.jpg (Bottom Center) ─────
                 Positioned(
-                  bottom: 74,
+                  top: 785.5,
                   left: (baseWidth - 215) / 2,
                   width: 215,
                   height: 185,
@@ -204,30 +204,38 @@ class _ProfessionalLandscapeCertificateState
 
                 // ── 5. Auto-Generated Certificate ID Overlay ─────────────────
                 Positioned(
-                  left: 410,
-                  bottom: 58,
-                  child: Text(
-                    certCode,
-                    style: GoogleFonts.nunito(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF2E7D32),
-                      letterSpacing: 0.8,
+                  left: 405,
+                  top: 916,
+                  width: 135,
+                  height: 26,
+                  child: Center(
+                    child: Text(
+                      certCode,
+                      style: GoogleFonts.nunito(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF2E7D32),
+                        letterSpacing: 0.8,
+                      ),
                     ),
                   ),
                 ),
 
                 // ── 6. Auto-Generated Date Overlay ───────────────────────────
                 Positioned(
-                  left: 1045,
-                  bottom: 58,
-                  child: Text(
-                    issueDate,
-                    style: GoogleFonts.nunito(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF2E7D32),
-                      letterSpacing: 0.8,
+                  left: 1005,
+                  top: 916,
+                  width: 140,
+                  height: 26,
+                  child: Center(
+                    child: Text(
+                      issueDate,
+                      style: GoogleFonts.nunito(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF2E7D32),
+                        letterSpacing: 0.8,
+                      ),
                     ),
                   ),
                 ),

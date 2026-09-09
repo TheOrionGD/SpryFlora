@@ -276,7 +276,7 @@ class ExcelService {
       }
     }
 
-    // 5. If the AI identified a non-generic botanical plant (e.g. Hibiscus, Bougainvillea, Marigold, Coleus, etc.)
+    // 5. If the AI identified a non-generic botanical plant
     final bool isGeneric = cleanLabel.isEmpty ||
         lowerLabel == 'botanical plant' ||
         lowerLabel == 'plant' ||
@@ -285,7 +285,10 @@ class ExcelService {
         lowerLabel == 'indoor plant' ||
         lowerLabel == 'flowering plant' ||
         lowerLabel == 'unknown species' ||
-        lowerLabel == 'not a plant';
+        lowerLabel == 'not a plant' ||
+        lowerLabel == 'no plant found' ||
+        lowerLabel == 'no plant detected' ||
+        lowerLabel == 'non-botanical object';
 
     if (!isGeneric) {
       final newSpecies = PlantSpecies(
@@ -304,17 +307,13 @@ class ExcelService {
       return newSpecies;
     }
 
-    // 6. Generic label fallback
-    if (_cachedSpecies.isNotEmpty) {
-      return _cachedSpecies.first;
-    }
-
+    // 6. Generic fallback (neutral botanical plant, never hardcode to Hibiscus)
     return PlantSpecies(
       commonName: 'Botanical Plant',
       lifespanDays: 365,
       wateringIntervalDays: 3,
       sunlightRequirements: 'Bright Indirect Light',
-      description: 'Healthy plant analyzed by SpryFlora AI.',
+      description: 'Botanical plant analyzed by SpryFlora AI.',
       idealTemp: '18°C - 28°C',
     );
   }

@@ -27,13 +27,15 @@ export class AIService {
     const defaultPrompt = `
 You are an expert AI computer vision botanist. Analyze this plant photo carefully.
 Verify if this image contains a real plant, leaf, flower, seedling, or sprout.
-Identify the specific botanical species (e.g. Hibiscus, Rose, Sunflower, Marigold, Tulsi, Money Plant, Aloe Vera, Snake Plant, Peace Lily, Tomato, etc.).
+If a real botanical plant is present, identify the specific botanical species (e.g. Rose, Sunflower, Marigold, Tulsi, Money Plant, Aloe Vera, Snake Plant, Peace Lily, Tomato, Hibiscus, etc.).
+If NO plant, flower, leaf, or seedling is present, set "isPlantDetected" to false, "identifiedSpecies" to "No Plant Found", "confidencePercent" to 0, and describe the non-plant object in "detectedObjectType".
+
 Return a JSON object in this exact format:
 {
   "isPlantDetected": true,
   "detectedObjectType": "Plant / Leaf",
   "rejectionReason": null,
-  "identifiedSpecies": "${hfResult ? hfResult.label : '<Exact species name>'}",
+  "identifiedSpecies": "${hfResult ? hfResult.label : '<Exact species name or No Plant Found>'}",
   "confidencePercent": ${hfResult ? hfResult.confidence : 95},
   "healthPercent": 95,
   "diseaseStatus": "Healthy",
@@ -187,10 +189,10 @@ Reply in 2-4 encouraging, educational sentences with emojis.
     }
 
     if (!responseText) {
-      return {
-        result: '🌿 Keep giving your plant bright light and gentle watering every few days! You are doing great! 🌱',
-        text: '🌿 Keep giving your plant bright light and gentle watering every few days! You are doing great! 🌱',
-      };
+      const err = new Error('AI assistant service is currently unavailable.');
+      err.statusCode = 503;
+      err.code = ERROR_CODES.AI_ANALYSIS_FAILED;
+      throw err;
     }
 
     return {
