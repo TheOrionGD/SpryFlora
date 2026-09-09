@@ -16,12 +16,13 @@ import 'profile_settings_screen.dart';
 import 'ai_eco_buddy_screen.dart';
 import 'notification_center_screen.dart';
 import 'realtime_plant_scanner_screen.dart';
+import 'realtime_watering_scanner_screen.dart';
 import 'virtual_garden_screen.dart';
 import '../models/garden_season.dart';
 
 /// Kid-Friendly Magical Garden Screen
 /// Lists user plants in their current state (growth stage, health, hydration, age),
-/// includes quick-watering actions, daily quest progression, and a portal button
+/// includes real-time AI camera watering actions, daily quest progression, and a portal button
 /// to open the full 3D Botanical Sanctuary (Virtual View).
 class GardenScreen extends StatefulWidget {
   const GardenScreen({super.key});
@@ -67,25 +68,13 @@ class _GardenScreenState extends State<GardenScreen>
   }
 
   Future<void> _quickWaterPlant(PlantModel plant) async {
-    final now = DateTime.now();
-    final updated = plant.copyWith(
-      health: (plant.health + 15).clamp(0, 100),
-      hydrationScore: (plant.hydrationScore + 20).clamp(0, 100),
-      lastWateredDate: now,
-      nextWateringDate: now.add(Duration(days: plant.wateringIntervalDays)),
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RealtimeWateringScannerScreen(plant: plant),
+      ),
     );
-    await _plantRepo.updatePlant(updated);
-    await _userService.addXp(25);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('💧 Watered ${plant.plantName}! +25 XP 🌱'),
-          backgroundColor: SkeuoTheme.primaryGreen,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
+    await _plantRepo.loadLocalData();
+    if (mounted) setState(() {});
   }
 
   Future<void> _waterAllDuePlants() async {
@@ -93,19 +82,13 @@ class _GardenScreenState extends State<GardenScreen>
     final duePlants = plants.where((p) => p.isWateringDue).toList();
     if (duePlants.isEmpty) return;
 
-    for (final plant in duePlants) {
-      await _quickWaterPlant(plant);
-    }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('🎉 All ${duePlants.length} due plants watered! Garden Thriving! 🌟'),
-          backgroundColor: const Color(0xFF2E7D32),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RealtimeWateringScannerScreen(plant: duePlants.first),
+      ),
+    );
+    await _plantRepo.loadLocalData();
+    if (mounted) setState(() {});
   }
 
   List<PlantModel> _getFilteredPlants(List<PlantModel> allPlants) {

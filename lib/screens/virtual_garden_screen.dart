@@ -12,6 +12,7 @@ import '../widgets/isometric_garden_island.dart';
 import '../widgets/leaves_particle_overlay.dart';
 import 'plant_details_screen.dart';
 import 'realtime_plant_scanner_screen.dart';
+import 'realtime_watering_scanner_screen.dart';
 import 'virtual_plant_growth_screen.dart';
 
 /// Interactive Virtual Garden Screen — Botanical Sanctuary
@@ -69,25 +70,13 @@ class _VirtualGardenScreenState extends State<VirtualGardenScreen>
   }
 
   Future<void> _quickWaterPlant(PlantModel plant) async {
-    final now = DateTime.now();
-    final updated = plant.copyWith(
-      health: (plant.health + 15).clamp(0, 100),
-      hydrationScore: (plant.hydrationScore + 20).clamp(0, 100),
-      lastWateredDate: now,
-      nextWateringDate: now.add(Duration(days: plant.wateringIntervalDays)),
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RealtimeWateringScannerScreen(plant: plant),
+      ),
     );
-    await _plantRepo.updatePlant(updated);
-    await _userService.addXp(25);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('💧 Watered ${plant.plantName}! +25 XP 🌱'),
-          backgroundColor: SkeuoTheme.primaryGreen,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
+    await _plantRepo.loadLocalData();
+    if (mounted) setState(() {});
   }
 
   @override

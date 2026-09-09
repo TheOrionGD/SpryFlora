@@ -152,126 +152,182 @@ class ExcelService {
     }
   }
 
-  /// Smart botanical cross-matching algorithm against local dataset
-  PlantSpecies matchSpeciesFromAIPrediction(String rawAiLabel, {String? detectedObjectType}) {
-    final query = ('$rawAiLabel ${detectedObjectType ?? ''}').toLowerCase().trim();
+  /// Smart botanical cross-matching algorithm against local dataset or dynamic creation
+  PlantSpecies matchSpeciesFromAIPrediction(
+    String rawAiLabel, {
+    String? detectedObjectType,
+    String? botanicalName,
+    int? wateringIntervalDays,
+    int? lifespanDays,
+    String? sunlightRequirements,
+    int? targetSunlightHours,
+    String? careInstructions,
+    String? description,
+    String? idealTemp,
+  }) {
+    final cleanLabel = rawAiLabel.trim();
+    final lowerLabel = cleanLabel.toLowerCase();
+    final query = ('$cleanLabel ${detectedObjectType ?? ''}').toLowerCase().trim();
 
-    // 1. Direct exact match check
-    final exact = getSpeciesByName(rawAiLabel);
-    if (exact != null) return exact;
-
-    // 2. Tree & Forest keyword heuristic cross-checks
-    if (query.contains('tree') ||
-        query.contains('forest') ||
-        query.contains('wood') ||
-        query.contains('conifer') ||
-        query.contains('evergreen') ||
-        query.contains('branch') ||
-        query.contains('canopy') ||
-        query.contains('pine') ||
-        query.contains('neem') ||
-        query.contains('banyan') ||
-        query.contains('ficus') ||
-        query.contains('oak') ||
-        query.contains('woodland')) {
-      if (query.contains('banyan')) return getSpeciesByName('Banyan Tree') ?? _cachedSpecies.first;
-      if (query.contains('pine')) return getSpeciesByName('Pine Tree') ?? _cachedSpecies.first;
-      if (query.contains('ficus')) return getSpeciesByName('Ficus Tree') ?? _cachedSpecies.first;
-      if (query.contains('mango')) return getSpeciesByName('Mango Tree') ?? _cachedSpecies.first;
-      if (query.contains('gulmohar')) return getSpeciesByName('Gulmohar Tree') ?? _cachedSpecies.first;
-      return getSpeciesByName('Neem Tree') ?? (_cachedSpecies.isNotEmpty ? _cachedSpecies.first : PlantSpecies(commonName: 'Neem Tree', lifespanDays: 3650, wateringIntervalDays: 4));
+    // 1. Direct exact or case-insensitive match check
+    if (cleanLabel.isNotEmpty) {
+      final exact = getSpeciesByName(cleanLabel);
+      if (exact != null) return exact;
     }
 
-    // 3. Specific species keyword matching
-    if (query.contains('tulsi') || query.contains('basil') || query.contains('ocimum')) {
-      return getSpeciesByName('Tulsi') ?? _cachedSpecies.first;
-    }
-    if (query.contains('money') || query.contains('pothos') || query.contains('epipremnum') || query.contains('vine')) {
-      return getSpeciesByName('Money Plant') ?? _cachedSpecies.first;
-    }
-    if (query.contains('aloe') || query.contains('succulent')) {
-      return getSpeciesByName('Aloe Vera') ?? _cachedSpecies.first;
-    }
-    if (query.contains('snake') || query.contains('sansevieria')) {
-      return getSpeciesByName('Snake Plant') ?? _cachedSpecies.first;
-    }
-    if (query.contains('peace') || query.contains('lily') || query.contains('spathiphyllum')) {
-      return getSpeciesByName('Peace Lily') ?? _cachedSpecies.first;
-    }
-    if (query.contains('spider') || query.contains('chlorophytum')) {
-      return getSpeciesByName('Spider Plant') ?? _cachedSpecies.first;
-    }
-    if (query.contains('jade') || query.contains('crassula')) {
-      return getSpeciesByName('Jade Plant') ?? _cachedSpecies.first;
+    // 2. Specific species keyword matching in database
+    if (query.contains('hibiscus') || query.contains('shoe flower')) {
+      final match = getSpeciesByName('Hibiscus');
+      if (match != null) return match;
     }
     if (query.contains('rose') || query.contains('rosa')) {
-      return getSpeciesByName('Rose') ?? _cachedSpecies.first;
+      final match = getSpeciesByName('Rose');
+      if (match != null) return match;
     }
-    if (query.contains('zz') || query.contains('zamioculcas')) {
-      return getSpeciesByName('ZZ Plant') ?? PlantSpecies(
-        commonName: 'ZZ Plant',
-        lifespanDays: 1000,
-        wateringIntervalDays: 14,
-        sunlight: 'Low to Bright Indirect',
-        description: 'Hardy drought-tolerant foliage with shiny waxy leaflets and underground water-storing rhizomes.',
-        idealTemp: '18°C - 26°C',
-      );
+    if (query.contains('sunflower') || query.contains('helianthus')) {
+      final match = getSpeciesByName('Sunflower');
+      if (match != null) return match;
+    }
+    if (query.contains('marigold') || query.contains('tagetes')) {
+      final match = getSpeciesByName('Marigold');
+      if (match != null) return match;
+    }
+    if (query.contains('jasmine') || query.contains('jasminum')) {
+      final match = getSpeciesByName('Jasmine');
+      if (match != null) return match;
+    }
+    if (query.contains('bougainvillea')) {
+      final match = getSpeciesByName('Bougainvillea');
+      if (match != null) return match;
+    }
+    if (query.contains('tulsi') || query.contains('basil') || query.contains('ocimum')) {
+      final match = getSpeciesByName('Tulsi');
+      if (match != null) return match;
+    }
+    if (query.contains('money plant') || query.contains('pothos') || query.contains('epipremnum') || query.contains('devil\'s ivy')) {
+      final match = getSpeciesByName('Money Plant');
+      if (match != null) return match;
+    }
+    if (query.contains('aloe') || query.contains('succulent')) {
+      final match = getSpeciesByName('Aloe Vera');
+      if (match != null) return match;
+    }
+    if (query.contains('snake plant') || query.contains('sansevieria')) {
+      final match = getSpeciesByName('Snake Plant');
+      if (match != null) return match;
+    }
+    if (query.contains('peace lily') || query.contains('spathiphyllum')) {
+      final match = getSpeciesByName('Peace Lily');
+      if (match != null) return match;
+    }
+    if (query.contains('spider plant') || query.contains('chlorophytum')) {
+      final match = getSpeciesByName('Spider Plant');
+      if (match != null) return match;
+    }
+    if (query.contains('jade plant') || query.contains('crassula')) {
+      final match = getSpeciesByName('Jade Plant');
+      if (match != null) return match;
+    }
+    if (query.contains('zz plant') || query.contains('zamioculcas')) {
+      final match = getSpeciesByName('ZZ Plant');
+      if (match != null) return match;
     }
     if (query.contains('monstera') || query.contains('deliciosa') || query.contains('swiss cheese')) {
-      return getSpeciesByName('Monstera') ?? PlantSpecies(
-        commonName: 'Monstera Deliciosa',
-        lifespanDays: 1000,
-        wateringIntervalDays: 7,
-        sunlight: 'Bright Indirect Light',
-        description: 'Iconic split-leaf tropical climbing plant.',
-        idealTemp: '18°C - 30°C',
-      );
+      final match = getSpeciesByName('Monstera');
+      if (match != null) return match;
     }
-    if (query.contains('hibiscus') || query.contains('shoe flower')) {
-      return getSpeciesByName('Hibiscus') ?? _cachedSpecies.first;
+    if (query.contains('orchid') || query.contains('phalaenopsis')) {
+      final match = getSpeciesByName('Orchid');
+      if (match != null) return match;
     }
-    if (query.contains('orchid')) {
-      return getSpeciesByName('Orchid') ?? _cachedSpecies.first;
+    if (query.contains('fern') || query.contains('nephrolepis')) {
+      final match = getSpeciesByName('Fern');
+      if (match != null) return match;
     }
-    if (query.contains('fern')) {
-      return getSpeciesByName('Fern') ?? _cachedSpecies.first;
+    if (query.contains('bamboo palm') || query.contains('chamaedorea')) {
+      final match = getSpeciesByName('Bamboo Palm');
+      if (match != null) return match;
     }
-    if (query.contains('bamboo')) {
-      return getSpeciesByName('Bamboo Palm') ?? _cachedSpecies.first;
+    if (query.contains('tomato')) {
+      final match = getSpeciesByName('Tomato');
+      if (match != null) return match;
     }
+    if (query.contains('mint') || query.contains('mentha')) {
+      final match = getSpeciesByName('Mint');
+      if (match != null) return match;
+    }
+    if (query.contains('lavender')) {
+      final match = getSpeciesByName('Lavender');
+      if (match != null) return match;
+    }
+
+    // 3. Tree & Forest keyword heuristic cross-checks
+    if (query.contains('banyan')) return getSpeciesByName('Banyan Tree') ?? _fallbackTree('Banyan Tree');
+    if (query.contains('pine')) return getSpeciesByName('Pine Tree') ?? _fallbackTree('Pine Tree');
+    if (query.contains('ficus')) return getSpeciesByName('Ficus Tree') ?? _fallbackTree('Ficus Tree');
+    if (query.contains('mango')) return getSpeciesByName('Mango Tree') ?? _fallbackTree('Mango Tree');
+    if (query.contains('gulmohar')) return getSpeciesByName('Gulmohar Tree') ?? _fallbackTree('Gulmohar Tree');
+    if (query.contains('neem')) return getSpeciesByName('Neem Tree') ?? _fallbackTree('Neem Tree');
 
     // 4. Substring matching against cached species
     for (final s in _cachedSpecies) {
-      if (query.contains(s.name.toLowerCase()) || s.name.toLowerCase().contains(query)) {
+      if (s.name.toLowerCase().contains(lowerLabel) || (lowerLabel.isNotEmpty && lowerLabel.contains(s.name.toLowerCase()))) {
         return s;
       }
     }
 
-    // 5. Clean AI labels — avoid generic placeholders like "Botanical Plant" or "Plant"
-    final cleanLabel = rawAiLabel.trim();
-    final lower = cleanLabel.toLowerCase();
-    if (lower == 'botanical plant' ||
-        lower == 'plant' ||
-        lower == 'unknown' ||
-        lower == 'green plant' ||
-        lower == 'indoor plant' ||
-        lower == 'unknown species' ||
-        cleanLabel.isEmpty) {
-      // Pick common favorite indoor species
-      return getSpeciesByName('Money Plant') ??
-          (getSpeciesByName('Tulsi') ??
-              (_cachedSpecies.isNotEmpty
-                  ? _cachedSpecies.first
-                  : PlantSpecies(commonName: 'Money Plant', lifespanDays: 365, wateringIntervalDays: 4)));
+    // 5. If the AI identified a non-generic botanical plant (e.g. Hibiscus, Bougainvillea, Marigold, Coleus, etc.)
+    final bool isGeneric = cleanLabel.isEmpty ||
+        lowerLabel == 'botanical plant' ||
+        lowerLabel == 'plant' ||
+        lowerLabel == 'unknown' ||
+        lowerLabel == 'green plant' ||
+        lowerLabel == 'indoor plant' ||
+        lowerLabel == 'flowering plant' ||
+        lowerLabel == 'unknown species' ||
+        lowerLabel == 'not a plant';
+
+    if (!isGeneric) {
+      final newSpecies = PlantSpecies(
+        commonName: cleanLabel,
+        botanicalName: botanicalName ?? cleanLabel,
+        lifespanDays: lifespanDays ?? 365,
+        wateringIntervalDays: wateringIntervalDays ?? 3,
+        sunlightRequirements: sunlightRequirements ?? 'Bright Indirect Light',
+        targetSunlightHours: targetSunlightHours ?? 4,
+        careInstructions: careInstructions ?? 'Water when topsoil feels dry and provide appropriate natural sunlight.',
+        description: description ?? 'Discovered and identified by SpryFlora AI Vision.',
+        idealTemp: idealTemp ?? '18°C - 30°C',
+      );
+      // Auto-register discovered species into database cache
+      addNewSpecies(newSpecies);
+      return newSpecies;
+    }
+
+    // 6. Generic label fallback
+    if (_cachedSpecies.isNotEmpty) {
+      return _cachedSpecies.first;
     }
 
     return PlantSpecies(
-      commonName: cleanLabel,
+      commonName: 'Botanical Plant',
       lifespanDays: 365,
-      wateringIntervalDays: 4,
-      sunlight: 'Bright Indirect Light',
-      description: 'Identified by SpryFlora Botanical AI Vision.',
+      wateringIntervalDays: 3,
+      sunlightRequirements: 'Bright Indirect Light',
+      description: 'Healthy plant analyzed by SpryFlora AI.',
       idealTemp: '18°C - 28°C',
     );
+  }
+
+  PlantSpecies _fallbackTree(String treeName) {
+    return getSpeciesByName(treeName) ??
+        PlantSpecies(
+          commonName: treeName,
+          lifespanDays: 36500,
+          wateringIntervalDays: 4,
+          sunlightRequirements: 'Full Direct Sun',
+          description: 'Majestic perennial shade tree.',
+          idealTemp: '20°C - 38°C',
+        );
   }
 }

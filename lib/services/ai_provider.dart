@@ -580,15 +580,18 @@ class HuggingFaceProvider implements AIProvider {
 }
 
 class GroqProvider implements AIProvider {
-  final String apiKey;
-  GroqProvider({this.apiKey = ''});
+  final String? _explicitKey;
+  GroqProvider({String? apiKey}) : _explicitKey = apiKey;
+
+  String get apiKey => _explicitKey ?? ApiConfig.groqApiKey;
+  String get effectiveKey => _explicitKey != null ? _explicitKey! : ApiConfig.groqApiKey;
 
   @override
   Future<PlantIdentificationResult> identifyPlant({
     required String base64Image,
     List<int>? rawBytes,
   }) async {
-    final effectiveKey = apiKey.isNotEmpty ? apiKey : ApiConfig.groqApiKey;
+    final effectiveKey = this.effectiveKey;
     if (effectiveKey.isEmpty) {
       return const PlantIdentificationResult(
         status: AIResultStatus.authenticationError,
@@ -611,66 +614,89 @@ Return a JSON object in this exact format:
 Return JSON only without markdown formatting.
 ''';
 
-      final imageUrl = base64Image.startsWith('data:image')
-          ? base64Image
-          : 'data:image/jpeg;base64,$base64Image';
-
-      final response = await http.post(
-        Uri.parse(ApiConfig.groqApiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $effectiveKey',
-        },
-        body: jsonEncode({
-          'model': ApiConfig.groqVisionModel,
-          'messages': [
-            {
-              'role': 'user',
-              'content': [
-                {'type': 'text', 'text': prompt},
-                {
-                  'type': 'image_url',
-                  'image_url': {'url': imageUrl}
-                }
-              ]
-            }
-          ],
-          'temperature': 0.2,
-        }),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['choices']?[0]?['message']?['content']?.toString();
-        if (content != null) {
-          final cleaned = content.replaceAll('```json', '').replaceAll('```', '').trim();
-          final map = jsonDecode(cleaned);
-          final isPlant = map['isPlantDetected'] == true;
-          final objectType = map['detectedObjectType']?.toString() ?? 'Object';
-          final rejection = map['rejectionReason']?.toString();
-          final species = map['identifiedSpecies']?.toString() ?? 'Unknown Species';
-          final confidence = (map['confidencePercent'] as num?)?.toInt() ?? 85;
-
-          if (!isPlant) {
-            return PlantIdentificationResult(
-              status: AIResultStatus.rejected,
-              isPlantDetected: false,
-              detectedObjectType: objectType,
-              rejectionReason: rejection ?? 'No plant detected in photo.',
-              identifiedSpecies: 'Not a Plant',
-              confidencePercent: 0,
-            );
-          }
-
-          return PlantIdentificationResult(
-            status: AIResultStatus.success,
-            isPlantDetected: true,
-            detectedObjectType: 'Plant / Leaf',
-            identifiedSpecies: species,
-            confidencePercent: confidence,
-          );
+      String cleanBase64 = base64Image.trim();
+      if (cleanBase64.contains(',')) {
+        final parts = cleanBase64.split(',');
+        if (parts.length > 1) {
+          cleanBase64 = parts[1].trim();
         }
       }
+      final imageUrl = 'data:image/jpeg;base64,$cleanBase64';
+
+      final modelsToTry = [
+        ApiConfig.groqVisionModel,
+        'llama-3.2-11b-vision-preview',
+        'llama-3.2-90b-vision-preview',
+      ];
+
+      for (final model in modelsToTry) {
+        try {
+          final response = await http.post(
+            Uri.parse(ApiConfig.groqApiUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $effectiveKey',
+            },
+            body: jsonEncode({
+              'model': model,
+              'messages': [
+                {
+                  'role': 'user',
+                  'content': [
+                    {'type': 'text', 'text': prompt},
+                    {
+                      'type': 'image_url',
+                      'image_url': {'url': imageUrl}
+                    }
+                  ]
+                }
+              ],
+              'temperature': 0.2,
+            }),
+          ).timeout(const Duration(seconds: 10));
+
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            final content = data['choices']?[0]?['message']?['content']?.toString();
+            if (content != null) {
+              final cleaned = content.replaceAll('```json', '').replaceAll('```', '').trim();
+              final startIdx = cleaned.indexOf('{');
+              final endIdx = cleaned.lastIndexOf('}');
+              final jsonStr = (startIdx != -1 && endIdx != -1 && endIdx > startIdx)
+                  ? cleaned.substring(startIdx, endIdx + 1)
+                  : cleaned;
+              final map = jsonDecode(jsonStr);
+              final isPlant = map['isPlantDetected'] == true;
+              final objectType = map['detectedObjectType']?.toString() ?? 'Object';
+              final rejection = map['rejectionReason']?.toString();
+              final species = map['identifiedSpecies']?.toString() ?? 'Unknown Species';
+              final confidence = (map['confidencePercent'] as num?)?.toInt() ?? 85;
+
+              if (!isPlant) {
+                return PlantIdentificationResult(
+                  status: AIResultStatus.rejected,
+                  isPlantDetected: false,
+                  detectedObjectType: objectType,
+                  rejectionReason: rejection ?? 'No plant detected in photo.',
+                  identifiedSpecies: 'Not a Plant',
+                  confidencePercent: 0,
+                );
+              }
+
+              return PlantIdentificationResult(
+                status: AIResultStatus.success,
+                isPlantDetected: true,
+                detectedObjectType: 'Plant / Leaf',
+                identifiedSpecies: species,
+                confidencePercent: confidence,
+              );
+            }
+          }
+        } catch (e) {
+          // Try next model
+        }
+      }
+
       return const PlantIdentificationResult(
         status: AIResultStatus.providerError,
         errorMessage: 'Groq vision API returned unexpected status.',
@@ -690,57 +716,166 @@ Return JSON only without markdown formatting.
     required String base64Image,
     List<int>? rawBytes,
   }) async {
-    return const WateringVerificationResult(
-      status: AIResultStatus.providerError,
-      isVerified: false,
-      errorMessage: 'Groq vision is unconfigured.',
-    );
+    final effectiveKey = this.effectiveKey;
+    if (effectiveKey.isEmpty) {
+      return const WateringVerificationResult(
+        status: AIResultStatus.authenticationError,
+        isVerified: false,
+        errorMessage: 'Groq API key is missing.',
+      );
+    }
+
+    try {
+      final prompt = '''
+Analyze this image as proof of watering plant "$plantName" ($speciesName).
+Verify if this photo shows a real plant and evidence of hydration/care (water cup, watering can, moisture, or watering action).
+
+Return pure JSON only in this exact format:
+{
+  "isWateringVerified": true,
+  "confidencePercent": 92,
+  "userFeedback": "Watering verified for $plantName!"
+}
+''';
+
+      String cleanBase64 = base64Image.trim();
+      if (cleanBase64.contains(',')) {
+        final parts = cleanBase64.split(',');
+        if (parts.length > 1) {
+          cleanBase64 = parts[1].trim();
+        }
+      }
+      final imageUrl = 'data:image/jpeg;base64,$cleanBase64';
+
+      final modelsToTry = [
+        ApiConfig.groqVisionModel,
+        'llama-3.2-11b-vision-preview',
+        'llama-3.2-90b-vision-preview',
+      ];
+
+      for (final model in modelsToTry) {
+        try {
+          final response = await http.post(
+            Uri.parse(ApiConfig.groqApiUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $effectiveKey',
+            },
+            body: jsonEncode({
+              'model': model,
+              'messages': [
+                {
+                  'role': 'user',
+                  'content': [
+                    {'type': 'text', 'text': prompt},
+                    {
+                      'type': 'image_url',
+                      'image_url': {'url': imageUrl}
+                    }
+                  ]
+                }
+              ],
+              'temperature': 0.2,
+            }),
+          ).timeout(const Duration(seconds: 10));
+
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            final content = data['choices']?[0]?['message']?['content']?.toString();
+            if (content != null) {
+              final cleaned = content.replaceAll('```json', '').replaceAll('```', '').trim();
+              final startIdx = cleaned.indexOf('{');
+              final endIdx = cleaned.lastIndexOf('}');
+              final jsonStr = (startIdx != -1 && endIdx != -1 && endIdx > startIdx)
+                  ? cleaned.substring(startIdx, endIdx + 1)
+                  : cleaned;
+              final map = jsonDecode(jsonStr);
+              final isVerified = map['isWateringVerified'] == true;
+              final confidence = (map['confidencePercent'] as num?)?.toInt() ?? (isVerified ? 90 : 20);
+              final feedback = map['userFeedback']?.toString() ?? 'Watering check complete.';
+
+              return WateringVerificationResult(
+                status: isVerified ? AIResultStatus.success : AIResultStatus.rejected,
+                isVerified: isVerified,
+                confidencePercent: confidence,
+                userFeedback: feedback,
+                rejectionReason: isVerified ? null : feedback,
+              );
+            }
+          }
+        } catch (e) {
+          // Try next model
+        }
+      }
+
+      return const WateringVerificationResult(
+        status: AIResultStatus.providerError,
+        isVerified: false,
+        errorMessage: 'Groq vision models returned unexpected response.',
+      );
+    } catch (e) {
+      return WateringVerificationResult(
+        status: AIResultStatus.networkError,
+        isVerified: false,
+        errorMessage: e.toString(),
+      );
+    }
   }
 
   @override
   Future<BuddyResponse> askBuddy({required String prompt}) async {
-    if (apiKey.isEmpty) {
+    final effectiveKey = this.effectiveKey;
+    if (effectiveKey.isEmpty) {
       return const BuddyResponse(
         status: AIResultStatus.authenticationError,
         answerText: 'Groq API key is missing.',
       );
     }
 
-    try {
-      final response = await http.post(
-        Uri.parse(ApiConfig.groqApiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': ApiConfig.groqModel,
-          'messages': [
-            {'role': 'user', 'content': prompt}
-          ],
-          'temperature': 0.7,
-        }),
-      ).timeout(const Duration(seconds: 8));
+    final modelsToTry = [
+      ApiConfig.groqModel,
+      'llama-3.3-70b-versatile',
+      'llama-3.1-8b-instant',
+      'llama-3.3-70b-specdec',
+      'openai/gpt-oss-120b',
+    ];
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['choices']?[0]?['message']?['content']?.toString();
-        if (content != null) {
-          return BuddyResponse(
-            status: AIResultStatus.success,
-            answerText: content.trim(),
-          );
+    for (final model in modelsToTry) {
+      try {
+        final response = await http.post(
+          Uri.parse(ApiConfig.groqApiUrl),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $effectiveKey',
+          },
+          body: jsonEncode({
+            'model': model,
+            'messages': [
+              {'role': 'user', 'content': prompt}
+            ],
+            'temperature': 0.7,
+            'max_tokens': 1024,
+          }),
+        ).timeout(const Duration(seconds: 8));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final content = data['choices']?[0]?['message']?['content']?.toString();
+          if (content != null && content.trim().isNotEmpty) {
+            return BuddyResponse(
+              status: AIResultStatus.success,
+              answerText: content.trim(),
+            );
+          }
         }
+      } catch (e) {
+        // Try next model
       }
-      return const BuddyResponse(
-        status: AIResultStatus.providerError,
-        answerText: 'Groq returned error response.',
-      );
-    } catch (e) {
-      return BuddyResponse(
-        status: AIResultStatus.networkError,
-        answerText: e.toString(),
-      );
     }
+
+    return const BuddyResponse(
+      status: AIResultStatus.providerError,
+      answerText: 'Groq returned error response.',
+    );
   }
 }

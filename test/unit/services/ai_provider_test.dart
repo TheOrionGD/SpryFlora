@@ -38,5 +38,25 @@ void main() {
       expect(result.status, AIResultStatus.authenticationError);
       expect(result.answerText.contains('missing') || result.answerText.contains('unavailable'), isTrue);
     });
+
+    test('GroqProvider identifyPlant returns authenticationError when API key is missing', () async {
+      final provider = GroqProvider(apiKey: '');
+      final result = await provider.identifyPlant(base64Image: 'dummy_image');
+
+      expect(result.status, AIResultStatus.authenticationError);
+      expect(result.isPlantDetected, isFalse);
+    });
+
+    test('GroqProvider verifyWatering returns authenticationError when API key is missing', () async {
+      final provider = GroqProvider(apiKey: '');
+      final result = await provider.verifyWatering(
+        plantName: 'Tulsi',
+        speciesName: 'Ocimum tenuiflorum',
+        base64Image: 'dummy_image',
+      );
+
+      expect(result.status, AIResultStatus.authenticationError);
+      expect(result.isVerified, isFalse);
+    });
   });
 }

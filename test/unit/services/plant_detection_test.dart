@@ -43,7 +43,13 @@ void main() {
     print('====================================================\n');
 
     expect(result.isPlantDetected, isTrue, reason: 'Real plant in photo must be detected');
-    expect(result.detectedObjectType.toLowerCase(), contains('plant'));
+    expect(
+      result.detectedObjectType.toLowerCase().contains('plant') ||
+          result.detectedObjectType.toLowerCase().contains('flower') ||
+          result.detectedObjectType.toLowerCase().contains('leaf') ||
+          result.detectedObjectType.toLowerCase().contains('blossom'),
+      isTrue,
+    );
     expect(result.identifiedSpecies.isNotEmpty, isTrue);
     expect(result.confidencePercent, greaterThanOrEqualTo(80));
     expect(result.healthPercent, greaterThanOrEqualTo(70));

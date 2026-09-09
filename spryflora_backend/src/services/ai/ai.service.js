@@ -26,24 +26,29 @@ export class AIService {
 
     const defaultPrompt = `
 You are an expert AI computer vision botanist. Analyze this plant photo carefully.
-Verify if this image contains a real plant, leaf, seedling, or sprout.
+Verify if this image contains a real plant, leaf, flower, seedling, or sprout.
+Identify the specific botanical species (e.g. Hibiscus, Rose, Sunflower, Marigold, Tulsi, Money Plant, Aloe Vera, Snake Plant, Peace Lily, Tomato, etc.).
 Return a JSON object in this exact format:
 {
   "isPlantDetected": true,
   "detectedObjectType": "Plant / Leaf",
   "rejectionReason": null,
-  "identifiedSpecies": "${hfResult ? hfResult.label : 'Tulsi'}",
-  "confidencePercent": ${hfResult ? hfResult.confidence : 92},
+  "identifiedSpecies": "${hfResult ? hfResult.label : '<Exact species name>'}",
+  "confidencePercent": ${hfResult ? hfResult.confidence : 95},
   "healthPercent": 95,
   "diseaseStatus": "Healthy",
-  "recommendations": ["Ensure 4 hours of bright light", "Water regularly"],
+  "recommendations": ["Ensure 4-6 hours of bright light", "Water regularly according to species needs"],
   "detailedAdvice": "Plant foliage appears vibrant and healthy."
 }
 Do not wrap in markdown. Return pure JSON only.
 `;
 
     const aiPrompt = prompt || defaultPrompt;
-    let responseText = await GeminiService.generateContent(aiPrompt, image);
+    let responseText = await GroqService.generateVisionContent(aiPrompt, image);
+
+    if (!responseText) {
+      responseText = await GeminiService.generateContent(aiPrompt, image);
+    }
 
     if (!responseText) {
       responseText = await GroqService.generateContent(aiPrompt);
@@ -82,10 +87,18 @@ Return JSON:
 `;
 
     const aiPrompt = prompt || defaultPrompt;
-    let responseText = await GeminiService.generateContent(aiPrompt, image);
+    let responseText = null;
 
-    if (!responseText && !image) {
+    if (image) {
+      responseText = await GroqService.generateVisionContent(aiPrompt, image);
+      if (!responseText) {
+        responseText = await GeminiService.generateContent(aiPrompt, image);
+      }
+    } else {
       responseText = await GroqService.generateContent(aiPrompt);
+      if (!responseText) {
+        responseText = await GeminiService.generateContent(aiPrompt);
+      }
     }
 
     if (!responseText) {
@@ -127,7 +140,11 @@ Return pure JSON only:
 }
 `;
 
-    let responseText = await GeminiService.generateContent(prompt, image);
+    let responseText = await GroqService.generateVisionContent(prompt, image);
+    if (!responseText) {
+      responseText = await GeminiService.generateContent(prompt, image);
+    }
+
     if (!responseText) {
       // Rule: NO fake success when AI provider fails
       return {
@@ -164,9 +181,9 @@ Context: Caring for plant "${plant ? plant.plantName : 'Companion'}".
 Reply in 2-4 encouraging, educational sentences with emojis.
 `;
 
-    let responseText = await GeminiService.generateContent(fullPrompt);
+    let responseText = await GroqService.generateContent(fullPrompt);
     if (!responseText) {
-      responseText = await GroqService.generateContent(fullPrompt);
+      responseText = await GeminiService.generateContent(fullPrompt);
     }
 
     if (!responseText) {

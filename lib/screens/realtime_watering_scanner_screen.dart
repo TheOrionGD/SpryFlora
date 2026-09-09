@@ -30,12 +30,14 @@ class RealtimeWateringScannerScreen extends StatefulWidget {
 
 class _RealtimeWateringScannerScreenState
     extends State<RealtimeWateringScannerScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   CameraController? _cameraController;
   final CameraWebBridge _webBridge = CameraWebBridge();
 
   late AnimationController _scannerAnimCtrl;
   late Animation<double> _laserPosition;
+  late AnimationController _sparkleCtrl;
+  late AnimationController _tenSecondCtrl;
 
   bool _isCameraReady = false;
   bool _isAnalyzingFrame = false;
@@ -48,6 +50,8 @@ class _RealtimeWateringScannerScreenState
   String _hudDetail = 'AI real-time hydration scanning active';
   int _scanTicks = 0;
   Timer? _analysisLoopTimer;
+  double _elapsedSeconds = 0.0;
+  Timer? _stopwatchTicker;
 
   @override
   void initState() {
@@ -60,6 +64,24 @@ class _RealtimeWateringScannerScreenState
     _laserPosition = Tween<double>(begin: 0.08, end: 0.92).animate(
       CurvedAnimation(parent: _scannerAnimCtrl, curve: Curves.easeInOut),
     );
+
+    _sparkleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+
+    _tenSecondCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    )..repeat();
+
+    _stopwatchTicker = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (!mounted || _isLockedOn) return;
+      setState(() {
+        _elapsedSeconds = (_elapsedSeconds + 0.1);
+        if (_elapsedSeconds > 10.0) _elapsedSeconds = 0.0;
+      });
+    });
 
     _initScanner();
   }
@@ -237,7 +259,10 @@ class _RealtimeWateringScannerScreenState
   @override
   void dispose() {
     _analysisLoopTimer?.cancel();
+    _stopwatchTicker?.cancel();
     _scannerAnimCtrl.dispose();
+    _sparkleCtrl.dispose();
+    _tenSecondCtrl.dispose();
     _cameraController?.dispose();
     _webBridge.dispose();
     super.dispose();
@@ -259,84 +284,8 @@ class _RealtimeWateringScannerScreenState
             child: SafeArea(
               child: Column(
                 children: [
-                  // Top HUD Bar
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    child: Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () => Navigator.of(context).pop(),
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.5),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white24),
-                            ),
-                            child: const Icon(Icons.close_rounded,
-                                color: Colors.white, size: 22),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.65),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: _isLockedOn
-                                    ? const Color(0xFF00E676)
-                                    : const Color(0xFF00B0FF)
-                                        .withValues(alpha: 0.4),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                    color: _isLockedOn
-                                        ? const Color(0xFF00E676)
-                                        : const Color(0xFF00B0FF),
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: (_isLockedOn
-                                                ? const Color(0xFF00E676)
-                                                : const Color(0xFF00B0FF))
-                                            .withValues(alpha: 0.8),
-                                        blurRadius: 8,
-                                        spreadRadius: 2,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _isLockedOn
-                                        ? '✨ HYDRATION LOCKED'
-                                        : '💧 WATERING SCANNER: ${widget.plant.plantName.toUpperCase()}',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.fredoka(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 1.0,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // Top Sparkling 10-Second Loader & HUD Bar
+                  _buildTopSparklingLoader(),
 
                   // Dual Detection Badges (Plant & Water Mug)
                   Padding(
@@ -720,6 +669,222 @@ class _RealtimeWateringScannerScreenState
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTopSparklingLoader() {
+    final progress = (_elapsedSeconds / 10.0).clamp(0.0, 1.0);
+
+    String phaseText;
+    if (_isLockedOn) {
+      phaseText = '✨ Plant & Mug Confirmed • Hydration Ready!';
+    } else if (!_isPlantInFrame && !_isWaterMugInFrame) {
+      phaseText = '🌿 Aim at ${widget.plant.plantName} & water mug...';
+    } else if (_isPlantInFrame && !_isWaterMugInFrame) {
+      phaseText = '💧 Plant detected! Bring water mug in view...';
+    } else if (!_isPlantInFrame && _isWaterMugInFrame) {
+      phaseText = '🌿 Water mug detected! Aim at plant leaves...';
+    } else {
+      phaseText = '✨ Verifying hydration frame alignment...';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Row 1: Close Button + Scanner Title + Live Stopwatch Badge
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: const Icon(Icons.close_rounded,
+                      color: Colors.white, size: 20),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _isLockedOn
+                          ? const Color(0xFF00E676)
+                          : const Color(0xFF00B0FF).withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: _isLockedOn
+                              ? const Color(0xFF00E676)
+                              : const Color(0xFF00B0FF),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: (_isLockedOn
+                                      ? const Color(0xFF00E676)
+                                      : const Color(0xFF00B0FF))
+                                  .withValues(alpha: 0.9),
+                              blurRadius: 6,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _isLockedOn
+                              ? '✨ HYDRATION LOCKED'
+                              : '💧 WATERING SCANNER: ${widget.plant.plantName.toUpperCase()}',
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.fredoka(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Live Stopwatch / Countdown Badge
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: _isLockedOn
+                        ? [const Color(0xFF00E676), const Color(0xFF1B5E20)]
+                        : [const Color(0xFF0288D1), const Color(0xFF01579B)],
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: _isLockedOn
+                        ? const Color(0xFF69F0AE)
+                        : const Color(0xFF40C4FF).withValues(alpha: 0.7),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00B0FF).withValues(alpha: 0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedBuilder(
+                      animation: _sparkleCtrl,
+                      builder: (context, _) {
+                        return Transform.rotate(
+                          angle: _sparkleCtrl.value * 2 * 3.14159,
+                          child: const Icon(
+                            Icons.auto_awesome,
+                            color: Colors.white,
+                            size: 13,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      '${(10.0 - _elapsedSeconds).clamp(0.0, 10.0).toStringAsFixed(1)}s',
+                      style: GoogleFonts.nunito(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          // Row 2: 10-Second Sparkling Gradient Progress Bar
+          Container(
+            height: 7,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Stack(
+              children: [
+                FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: progress,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: _isLockedOn
+                            ? [
+                                const Color(0xFF00E676),
+                                const Color(0xFF69F0AE),
+                              ]
+                            : [
+                                const Color(0xFF00B0FF),
+                                const Color(0xFF00E5FF),
+                                const Color(0xFF76FF03),
+                              ],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (_isLockedOn
+                                  ? const Color(0xFF00E676)
+                                  : const Color(0xFF00B0FF))
+                              .withValues(alpha: 0.6),
+                          blurRadius: 6,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          // Row 3: Micro Phase Status
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              phaseText,
+              style: GoogleFonts.nunito(
+                color: Colors.white70,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

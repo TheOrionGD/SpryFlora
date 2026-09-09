@@ -1003,38 +1003,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _quickWaterSinglePlant(PlantModel plant) async {
-    setState(() {
-      _showWaterDroplets = true;
-      _showWaterConfetti = false;
-    });
-
-    final now = DateTime.now();
-    final updated = plant.copyWith(
-      health: (plant.health + 15).clamp(0, 100),
-      hydrationScore: (plant.hydrationScore + 25).clamp(0, 100),
-      lastWateredDate: now,
-      nextWateringDate: now.add(Duration(days: plant.wateringIntervalDays)),
-    );
-    await _plantRepo.updatePlant(updated);
-    await _userService.addXp(25);
-
-    if (mounted) {
-      setState(() {
-        _showWaterDroplets = false;
-        _showWaterConfetti = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('💧 Watered ${plant.plantName}! +25 XP 🌱'),
-          backgroundColor: SkeuoTheme.primaryGreen,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-      await Future.delayed(const Duration(milliseconds: 2000));
-      if (mounted) setState(() => _showWaterConfetti = false);
-    }
-  }
 
   // ── Watering Plant Section (Container below Plants list) ────────────────────
   Widget _buildWateringPlantSection() {
@@ -1236,71 +1204,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                 const SizedBox(height: 14),
 
-                // Action Buttons Row: AI Camera Scan & Quick Water
-                Row(
-                  children: [
-                    // AI Camera Watering Scanner Button
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => RealtimeWateringScannerScreen(
-                                plant: targetPlant,
-                              ),
-                            ),
-                          ).then((_) => _loadData());
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: const Color(0xFF00B0FF),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF00B0FF)
-                                    .withValues(alpha: 0.15),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.camera_alt_rounded,
-                                  color: Color(0xFF0288D1), size: 18),
-                              const SizedBox(width: 6),
-                              Text(
-                                'AI Water Scan',
-                                style: GoogleFonts.nunito(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: const Color(0xFF0288D1),
-                                ),
-                              ),
-                            ],
+                // Action Button: Real-Time AI Camera Watering Scanner
+                SizedBox(
+                  width: double.infinity,
+                  child: FunBouncyButton(
+                    text: '💧 Scan Plant & Mug to Water',
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => RealtimeWateringScannerScreen(
+                            plant: targetPlant,
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    // Quick Water Button
-                    Expanded(
-                      child: FunBouncyButton(
-                        text: 'Quick Water 💧',
-                        onPressed: () => _quickWaterSinglePlant(targetPlant),
-                        color: SkeuoTheme.primaryGreen,
-                        textColor: Colors.white,
-                        height: 46,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
+                      ).then((_) => _loadData());
+                    },
+                    color: isDue ? const Color(0xFF0288D1) : SkeuoTheme.primaryGreen,
+                    textColor: Colors.white,
+                    height: 50,
+                    fontSize: 14,
+                  ),
                 ),
               ],
             ),
