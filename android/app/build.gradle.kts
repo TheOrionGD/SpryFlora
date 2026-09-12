@@ -84,3 +84,10 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+tasks.configureEach {
+    if (name.startsWith("strip") && name.contains("DebugSymbols")) {
+        enabled = false
+    }
+}
+
