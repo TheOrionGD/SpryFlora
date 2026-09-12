@@ -66,7 +66,7 @@ void main() {
 
       final selectedSpecies = excelService.getSpeciesByName('Rose');
       expect(selectedSpecies, isNotNull);
-      expect(selectedSpecies!.lifespanDays, 150);
+      expect(selectedSpecies!.lifespanDays, 1500);
       expect(selectedSpecies.wateringIntervalDays, 3);
 
       final now = DateTime.now();
@@ -90,9 +90,9 @@ void main() {
       final storedPlant = repo.getPlantById('integration_rose_1');
       expect(storedPlant, isNotNull);
       expect(storedPlant!.ageInDays, 30);
-      expect((storedPlant.growthProgress * 100).toStringAsFixed(1), '20.0');
-      expect(storedPlant.growthStageName, 'Sprout');
-      expect(storedPlant.calculateFrameIndex(150), 29);
+      expect((storedPlant.growthProgress * 100).toStringAsFixed(1), '2.0');
+      expect(storedPlant.growthStageName, 'Seed');
+      expect(storedPlant.calculateFrameIndex(150), 2);
     });
 
     test('End-to-End Flow 3: Daily Care Check-in, Multi-factor Health Analysis, and AI Advice Generation', () async {

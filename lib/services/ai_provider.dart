@@ -189,73 +189,76 @@ Return JSON only:
           ? 'image/png'
           : 'image/jpeg';
 
-      final uri = Uri.parse('${ApiConfig.geminiBaseUrl}/${ApiConfig.primaryModel}:generateContent');
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': _effectiveKey,
-        },
-        body: jsonEncode({
-          'contents': [
-            {
-              'parts': [
-                {'text': prompt},
-                {
-                  'inlineData': {
-                    'mimeType': mimeType,
-                    'data': base64Image,
-                  }
-                }
-              ]
-            }
-          ],
-          'generationConfig': {
-            'temperature': 0.2,
-            'maxOutputTokens': 2048,
-            'thinkingConfig': {
-              'thinkingBudget': 0,
+      for (final model in ApiConfig.geminiFallbackModels) {
+        try {
+          final uri = Uri.parse('${ApiConfig.geminiBaseUrl}/$model:generateContent');
+          final response = await http.post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': _effectiveKey,
             },
+            body: jsonEncode({
+              'contents': [
+                {
+                  'parts': [
+                    {'text': prompt},
+                    {
+                      'inlineData': {
+                        'mimeType': mimeType,
+                        'data': base64Image,
+                      }
+                    }
+                  ]
+                }
+              ],
+              'generationConfig': {
+                'temperature': 0.2,
+                'maxOutputTokens': 2048,
+              }
+            }),
+          ).timeout(const Duration(seconds: 10));
+
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
+            if (text != null) {
+              String cleaned = text.replaceAll('```json', '').replaceAll('```', '').trim();
+              final startIdx = cleaned.indexOf('{');
+              final endIdx = cleaned.lastIndexOf('}');
+              if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
+                cleaned = cleaned.substring(startIdx, endIdx + 1);
+              }
+              final map = jsonDecode(cleaned);
+
+              final isPlant = map['isPlantDetected'] == true;
+              final objectType = map['detectedObjectType']?.toString() ?? 'Object';
+              final rejection = map['rejectionReason']?.toString();
+              final species = map['identifiedSpecies']?.toString() ?? 'Unknown Species';
+              final confidence = (map['confidencePercent'] as num?)?.toInt() ?? 0;
+
+              if (!isPlant) {
+                return PlantIdentificationResult(
+                  status: AIResultStatus.rejected,
+                  isPlantDetected: false,
+                  detectedObjectType: objectType,
+                  rejectionReason: rejection ?? 'No plant detected. Photo showed $objectType.',
+                  identifiedSpecies: 'Not a Plant',
+                  confidencePercent: 0,
+                );
+              }
+
+              return PlantIdentificationResult(
+                status: AIResultStatus.success,
+                isPlantDetected: true,
+                detectedObjectType: 'Plant / Leaf',
+                identifiedSpecies: species,
+                confidencePercent: confidence,
+              );
+            }
           }
-        }),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
-        if (text != null) {
-          String cleaned = text.replaceAll('```json', '').replaceAll('```', '').trim();
-          final startIdx = cleaned.indexOf('{');
-          final endIdx = cleaned.lastIndexOf('}');
-          if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
-            cleaned = cleaned.substring(startIdx, endIdx + 1);
-          }
-          final map = jsonDecode(cleaned);
-
-          final isPlant = map['isPlantDetected'] == true;
-          final objectType = map['detectedObjectType']?.toString() ?? 'Object';
-          final rejection = map['rejectionReason']?.toString();
-          final species = map['identifiedSpecies']?.toString() ?? 'Unknown Species';
-          final confidence = (map['confidencePercent'] as num?)?.toInt() ?? 0;
-
-          if (!isPlant) {
-            return PlantIdentificationResult(
-              status: AIResultStatus.rejected,
-              isPlantDetected: false,
-              detectedObjectType: objectType,
-              rejectionReason: rejection ?? 'No plant detected. Photo showed $objectType.',
-              identifiedSpecies: 'Not a Plant',
-              confidencePercent: 0,
-            );
-          }
-
-          return PlantIdentificationResult(
-            status: AIResultStatus.success,
-            isPlantDetected: true,
-            detectedObjectType: 'Plant / Leaf',
-            identifiedSpecies: species,
-            confidencePercent: confidence,
-          );
+        } catch (e) {
+          // Try next model
         }
       }
       return const PlantIdentificationResult(
@@ -349,59 +352,62 @@ Return JSON only:
 }
 ''';
 
-      final uri = Uri.parse('${ApiConfig.geminiBaseUrl}/${ApiConfig.primaryModel}:generateContent');
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': _effectiveKey,
-        },
-        body: jsonEncode({
-          'contents': [
-            {
-              'parts': [
-                {'text': prompt},
-                {
-                  'inlineData': {
-                    'mimeType': 'image/jpeg',
-                    'data': base64Image,
-                  }
-                }
-              ]
-            }
-          ],
-          'generationConfig': {
-            'temperature': 0.2,
-            'maxOutputTokens': 1024,
-            'thinkingConfig': {
-              'thinkingBudget': 0,
+      for (final model in ApiConfig.geminiFallbackModels) {
+        try {
+          final uri = Uri.parse('${ApiConfig.geminiBaseUrl}/$model:generateContent');
+          final response = await http.post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': _effectiveKey,
             },
-          }
-        }),
-      ).timeout(const Duration(seconds: 10));
+            body: jsonEncode({
+              'contents': [
+                {
+                  'parts': [
+                    {'text': prompt},
+                    {
+                      'inlineData': {
+                        'mimeType': 'image/jpeg',
+                        'data': base64Image,
+                      }
+                    }
+                  ]
+                }
+              ],
+              'generationConfig': {
+                'temperature': 0.2,
+                'maxOutputTokens': 1024,
+              }
+            }),
+          ).timeout(const Duration(seconds: 10));
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
-        if (text != null) {
-          String cleaned = text.replaceAll('```json', '').replaceAll('```', '').trim();
-          final startIdx = cleaned.indexOf('{');
-          final endIdx = cleaned.lastIndexOf('}');
-          if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
-            cleaned = cleaned.substring(startIdx, endIdx + 1);
-          }
-          final map = jsonDecode(cleaned);
-          final isVerified = map['isWateringVerified'] == true;
-          final confidence = (map['confidencePercent'] as num?)?.toInt() ?? 0;
-          final feedback = map['userFeedback']?.toString() ?? 'Watering check complete.';
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
+            if (text != null) {
+              String cleaned = text.replaceAll('```json', '').replaceAll('```', '').trim();
+              final startIdx = cleaned.indexOf('{');
+              final endIdx = cleaned.lastIndexOf('}');
+              if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
+                cleaned = cleaned.substring(startIdx, endIdx + 1);
+              }
+              final map = jsonDecode(cleaned);
+              final isVerified = map['isWateringVerified'] == true;
+              final confidence = (map['confidencePercent'] as num?)?.toInt() ?? 0;
+              final feedback = map['userFeedback']?.toString() ?? 'Watering check complete.';
 
-          return WateringVerificationResult(
-            status: isVerified ? AIResultStatus.success : AIResultStatus.rejected,
-            isVerified: isVerified,
-            confidencePercent: confidence,
-            userFeedback: feedback,
-            rejectionReason: isVerified ? null : feedback,
-          );
+              return WateringVerificationResult(
+                status: isVerified ? AIResultStatus.success : AIResultStatus.rejected,
+                isVerified: isVerified,
+                confidencePercent: confidence,
+                userFeedback: feedback,
+                rejectionReason: isVerified ? null : feedback,
+              );
+            }
+          }
+        } catch (e) {
+          // Try next model
         }
       }
       return const WateringVerificationResult(
@@ -455,39 +461,42 @@ Return JSON only:
     }
 
     try {
-      final uri = Uri.parse('${ApiConfig.geminiBaseUrl}/${ApiConfig.primaryModel}:generateContent');
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': _effectiveKey,
-        },
-        body: jsonEncode({
-          'contents': [
-            {
-              'parts': [
-                {'text': prompt}
-              ]
-            }
-          ],
-          'generationConfig': {
-            'temperature': 0.7,
-            'maxOutputTokens': 1024,
-            'thinkingConfig': {
-              'thinkingBudget': 0,
+      for (final model in ApiConfig.geminiFallbackModels) {
+        try {
+          final uri = Uri.parse('${ApiConfig.geminiBaseUrl}/$model:generateContent');
+          final response = await http.post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': _effectiveKey,
             },
-          }
-        }),
-      ).timeout(const Duration(seconds: 8));
+            body: jsonEncode({
+              'contents': [
+                {
+                  'parts': [
+                    {'text': prompt}
+                  ]
+                }
+              ],
+              'generationConfig': {
+                'temperature': 0.7,
+                'maxOutputTokens': 1024,
+              }
+            }),
+          ).timeout(const Duration(seconds: 8));
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
-        if (text != null && text.isNotEmpty) {
-          return BuddyResponse(
-            status: AIResultStatus.success,
-            answerText: text.trim(),
-          );
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
+            if (text != null && text.isNotEmpty) {
+              return BuddyResponse(
+                status: AIResultStatus.success,
+                answerText: text.trim(),
+              );
+            }
+          }
+        } catch (e) {
+          // Try next model
         }
       }
       return const BuddyResponse(

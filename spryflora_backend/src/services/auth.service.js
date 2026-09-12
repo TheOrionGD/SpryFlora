@@ -50,7 +50,7 @@ export class AuthService {
       childName: childName || name || cleanEmail.split('@')[0],
       username: cleanUsername,
       dob: dob || '',
-      favoritePlant: favoritePlant || 'Tulsi',
+      favoritePlant: favoritePlant || '',
     });
 
     const token = signToken({ userId: user._id.toString(), email: user.email });

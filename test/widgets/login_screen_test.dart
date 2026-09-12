@@ -22,7 +22,7 @@ void main() {
       expect(find.text('LOGIN'), findsOneWidget);
       expect(find.text('Login to continue your plant adventure!'), findsOneWidget);
       expect(find.text('Forgot password?'), findsOneWidget);
-      expect(find.text('SIGN IN 🌿'), findsOneWidget);
+      expect(find.text('Sign In'), findsOneWidget);
     });
 
     testWidgets('Shows validation errors when email or password is cleared and login is tapped', (tester) async {
@@ -40,7 +40,7 @@ void main() {
       await tester.pump();
 
       // Tap Login button
-      await tester.tap(find.text('SIGN IN 🌿'));
+      await tester.tap(find.text('Sign In'));
       await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.text('Enter your email or username'), findsOneWidget);

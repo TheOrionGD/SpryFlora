@@ -171,7 +171,7 @@ void main() {
       expect(restoredService.currentUser?.name, 'Auto Login Hero');
     });
 
-    test('Auto-login recovers existing user profile when session key was empty', () async {
+    test('Clearing session key ensures user is cleanly logged out without cross-user leakage', () async {
       final authService = AuthService();
       await authService.logout();
 
@@ -182,16 +182,15 @@ void main() {
         name: 'Recovered Explorer',
       );
 
-      // Simulate session string cleared but user data preserved in SharedPreferences
+      // Simulate session string cleared
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('spryflora_auth_session');
-      await prefs.setBool('spryflora_explicit_logout', false);
 
       final freshService = AuthService();
       await freshService.restoreSession();
 
-      expect(freshService.isAuthenticated, isTrue);
-      expect(freshService.currentUser?.name, 'Recovered Explorer');
+      expect(freshService.isAuthenticated, isFalse);
+      expect(freshService.currentUser, isNull);
     });
   });
 }

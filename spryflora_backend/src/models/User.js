@@ -34,16 +34,16 @@ const userSchema = new mongoose.Schema(
     },
     age: {
       type: Number,
-      default: 8,
+      default: null,
     },
     school: {
       type: String,
-      default: 'Spry Academy',
+      default: '',
       trim: true,
     },
     favoritePlant: {
       type: String,
-      default: 'Tulsi',
+      default: '',
       trim: true,
     },
     profilePhotoUrl: {
@@ -52,12 +52,12 @@ const userSchema = new mongoose.Schema(
     },
     xp: {
       type: Number,
-      default: 120,
+      default: 0,
       min: 0,
     },
     careStreakDays: {
       type: Number,
-      default: 1,
+      default: 0,
       min: 0,
     },
     completedPlantsCount: {

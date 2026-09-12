@@ -35,6 +35,9 @@ class PlantRepository extends ChangeNotifier {
   /// Sets the active user context and reloads user-isolated plants & checkins
   Future<void> setCurrentUser(String? userId) async {
     _currentUserId = userId;
+    _plants = [];
+    _checkins = [];
+    _isLoaded = false;
     await loadLocalData();
   }
 
@@ -46,26 +49,15 @@ class PlantRepository extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Loads all plants and checkins with multi-tier storage fallback to guarantee zero accidental deletions
+  /// Loads all plants and checkins from the current user's isolated storage key only.
   Future<void> loadLocalData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // 1. Load Plants with multi-key fallback & merger
-      String? plantsJsonStr = prefs.getString(_plantsStorageKey);
-      if (plantsJsonStr == null || plantsJsonStr.isEmpty) {
-        plantsJsonStr = prefs.getString(_legacyPlantsStorageKey);
-      }
-      if (plantsJsonStr == null || plantsJsonStr.isEmpty) {
-        plantsJsonStr = prefs.getString(_defaultUserPlantsKey);
-      }
+      // 1. Load Plants — user-scoped key only (no cross-user legacy fallbacks or in-memory leaks)
+      final plantsJsonStr = prefs.getString(_plantsStorageKey);
 
       final Map<String, PlantModel> plantMap = {};
-
-      // Keep existing in-memory plants first
-      for (final p in _plants) {
-        plantMap[p.id] = p;
-      }
 
       if (plantsJsonStr != null && plantsJsonStr.isNotEmpty) {
         try {
@@ -81,37 +73,12 @@ class PlantRepository extends ChangeNotifier {
         }
       }
 
-      // Also check legacy storage key to rescue any orphaned plants
-      final legacyStr = prefs.getString(_legacyPlantsStorageKey);
-      if (legacyStr != null && legacyStr.isNotEmpty && legacyStr != plantsJsonStr) {
-        try {
-          final List<dynamic> decoded = jsonDecode(legacyStr) as List<dynamic>;
-          for (final item in decoded) {
-            if (item is Map<String, dynamic>) {
-              final plant = PlantModel.fromJson(item);
-              if (!plantMap.containsKey(plant.id)) {
-                plantMap[plant.id] = plant;
-              }
-            }
-          }
-        } catch (_) {}
-      }
-
       _plants = plantMap.values.toList();
 
-      // 2. Load Check-ins with multi-key fallback
-      String? checkinsJsonStr = prefs.getString(_checkinsStorageKey);
-      if (checkinsJsonStr == null || checkinsJsonStr.isEmpty) {
-        checkinsJsonStr = prefs.getString(_legacyCheckinsStorageKey);
-      }
-      if (checkinsJsonStr == null || checkinsJsonStr.isEmpty) {
-        checkinsJsonStr = prefs.getString(_defaultUserCheckinsKey);
-      }
+      // 2. Load Check-ins — user-scoped key only
+      final checkinsJsonStr = prefs.getString(_checkinsStorageKey);
 
       final Map<String, DailyCheckinModel> checkinMap = {};
-      for (final c in _checkins) {
-        checkinMap[c.id] = c;
-      }
 
       if (checkinsJsonStr != null && checkinsJsonStr.isNotEmpty) {
         try {
@@ -131,7 +98,7 @@ class PlantRepository extends ChangeNotifier {
       _isLoaded = true;
       notifyListeners();
 
-      // Ensure local state is saved back redundantly
+      // Persist loaded state back to user-scoped storage
       await _savePlantsToStorage();
       await _saveCheckinsToStorage();
 
@@ -271,9 +238,8 @@ class PlantRepository extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final plantsListJson = _plants.map((p) => p.toJson()).toList();
       final encoded = jsonEncode(plantsListJson);
+      // Write only to the user-scoped key — never to shared/legacy keys
       await prefs.setString(_plantsStorageKey, encoded);
-      await prefs.setString(_legacyPlantsStorageKey, encoded);
-      await prefs.setString(_defaultUserPlantsKey, encoded);
     } catch (_) {}
   }
 
@@ -282,9 +248,8 @@ class PlantRepository extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final checkinsListJson = _checkins.map((c) => c.toJson()).toList();
       final encoded = jsonEncode(checkinsListJson);
+      // Write only to the user-scoped key — never to shared/legacy keys
       await prefs.setString(_checkinsStorageKey, encoded);
-      await prefs.setString(_legacyCheckinsStorageKey, encoded);
-      await prefs.setString(_defaultUserCheckinsKey, encoded);
     } catch (_) {}
   }
 }

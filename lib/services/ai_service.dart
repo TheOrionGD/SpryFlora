@@ -229,21 +229,24 @@ Do not wrap in markdown quotes. Return pure JSON only.
                 isPlantDetected = map['isPlantDetected'] == true;
               }
               if (map['detectedObjectType'] != null) {
-                detectedObjectType = map['detectedObjectType'].toString().trim();
+                detectedObjectType =
+                    map['detectedObjectType'].toString().trim();
               }
               if (map['rejectionReason'] != null) {
                 rejectionReason = map['rejectionReason'].toString().trim();
               }
 
-              final speciesStr = map['identifiedSpecies']?.toString().trim() ?? '';
+              final speciesStr =
+                  map['identifiedSpecies']?.toString().trim() ?? '';
               final lowerSpecies = speciesStr.toLowerCase();
               // Check if the AI confirmed a plant is present
-              final isDefinitelyNotPlant =
-                  lowerSpecies == 'no plant found' ||
+              final isDefinitelyNotPlant = lowerSpecies == 'no plant found' ||
                   lowerSpecies == 'not a plant' ||
                   lowerSpecies == 'no plant detected';
 
-              if (isPlantDetected && speciesStr.isNotEmpty && !isDefinitelyNotPlant) {
+              if (isPlantDetected &&
+                  speciesStr.isNotEmpty &&
+                  !isDefinitelyNotPlant) {
                 // Accept any non-empty species name when AI says it's a plant
                 // (including generic names like "Plant", "Green Plant", "Botanical Plant")
                 detectedSpeciesName = speciesStr;
@@ -255,10 +258,12 @@ Do not wrap in markdown quotes. Return pure JSON only.
               }
 
               detectedBotanicalName = map['botanicalName']?.toString();
-              aiWateringInterval = (map['wateringIntervalDays'] as num?)?.toInt();
+              aiWateringInterval =
+                  (map['wateringIntervalDays'] as num?)?.toInt();
               aiLifespan = (map['lifespanDays'] as num?)?.toInt();
               aiSunlight = map['sunlightRequirements']?.toString();
-              aiTargetSunlightHours = (map['targetSunlightHours'] as num?)?.toInt();
+              aiTargetSunlightHours =
+                  (map['targetSunlightHours'] as num?)?.toInt();
               aiIdealTemp = map['idealTemp']?.toString();
               aiCareInstructions = map['careInstructions']?.toString();
               aiDescription = map['description']?.toString();
@@ -298,7 +303,8 @@ Do not wrap in markdown quotes. Return pure JSON only.
         debugPrint('Multimodal vision analysis exception: $e');
         isPlantDetected = false;
         detectedObjectType = 'Non-Botanical Object';
-        rejectionReason = 'Unable to recognize plant. Please ensure good lighting and aim directly at the plant leaves.';
+        rejectionReason =
+            'Unable to recognize plant. Please ensure good lighting and aim directly at the plant leaves.';
         detectedSpeciesName = 'No Plant Found';
         confidence = 0;
       }
@@ -369,9 +375,10 @@ Do not wrap in markdown quotes. Return pure JSON only.
     final bool isKnownBase = _excelService.speciesList.any(
       (s) => s.name.toLowerCase() == detectedSpeciesName.toLowerCase(),
     );
-    final bool isGeneric = detectedSpeciesName.toLowerCase() == 'botanical plant' ||
-        detectedSpeciesName.toLowerCase() == 'plant' ||
-        detectedSpeciesName.toLowerCase() == 'flowering plant';
+    final bool isGeneric =
+        detectedSpeciesName.toLowerCase() == 'botanical plant' ||
+            detectedSpeciesName.toLowerCase() == 'plant' ||
+            detectedSpeciesName.toLowerCase() == 'flowering plant';
     final bool isNewDiscovery = !isKnownBase && isPlantDetected && !isGeneric;
     final String? discoveryBadge = isNewDiscovery ? 'Botanical Pioneer' : null;
     final String? discoveryReward = isNewDiscovery
@@ -416,7 +423,8 @@ Give 2 brief, friendly care sentences for a $species in its $stage stage (Age: $
 
     if (apiKey.isNotEmpty || ApiConfig.usesBackendProxy) {
       try {
-        final res = await _callGeminiApi(prompt: prompt, preferredApiKey: ApiConfig.geminiApiKey1);
+        final res = await _callGeminiApi(
+            prompt: prompt, preferredApiKey: ApiConfig.geminiApiKey1);
         if (res != null && res.isNotEmpty) return res.trim();
       } catch (_) {}
     }
@@ -454,7 +462,8 @@ Give 2 brief, friendly care sentences for a $species in its $stage stage (Age: $
       return {
         'isVerified': false,
         'confidence': 0,
-        'rejectionReason': 'Photo file not found or invalid. Please take a new photo.',
+        'rejectionReason':
+            'Photo file not found or invalid. Please take a new photo.',
       };
     }
 
@@ -486,10 +495,14 @@ Return JSON only:
   "userFeedback": "Great job watering your ${plant.plantName}!"
 }
 """;
-        final visionRes = await _callVisionApi(prompt: prompt, base64Image: base64Image, rawBytes: rawBytes);
+        final visionRes = await _callVisionApi(
+            prompt: prompt, base64Image: base64Image, rawBytes: rawBytes);
         if (visionRes != null && visionRes.isNotEmpty) {
           try {
-            String cleaned = visionRes.replaceAll('```json', '').replaceAll('```', '').trim();
+            String cleaned = visionRes
+                .replaceAll('```json', '')
+                .replaceAll('```', '')
+                .trim();
             final startIdx = cleaned.indexOf('{');
             final endIdx = cleaned.lastIndexOf('}');
             if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
@@ -499,8 +512,12 @@ Return JSON only:
             final verified = map['isWateringVerified'] == true;
             return {
               'isVerified': verified,
-              'confidence': (map['confidencePercent'] as num?)?.toInt() ?? (verified ? 90 : 20),
-              'rejectionReason': verified ? null : (map['rejectionReason']?.toString() ?? 'Could not clearly verify watering action.'),
+              'confidence': (map['confidencePercent'] as num?)?.toInt() ??
+                  (verified ? 90 : 20),
+              'rejectionReason': verified
+                  ? null
+                  : (map['rejectionReason']?.toString() ??
+                      'Could not clearly verify watering action.'),
             };
           } catch (_) {}
         }
@@ -599,8 +616,10 @@ Do not wrap in markdown. Return pure JSON only.
             final map = jsonDecode(cleaned);
             final isPlant = map['isPlantPresent'] == true;
             final isMug = map['isWaterMugPresent'] == true;
-            final isReady = map['isWateringReady'] == true || (isPlant && isMug);
-            final conf = (map['confidencePercent'] as num?)?.toInt() ?? (isReady ? 92 : (isPlant ? 75 : 0));
+            final isReady =
+                map['isWateringReady'] == true || (isPlant && isMug);
+            final conf = (map['confidencePercent'] as num?)?.toInt() ??
+                (isReady ? 92 : (isPlant ? 75 : 0));
             final msg = !isPlant
                 ? 'No plant found'
                 : (map['statusMessage']?.toString() ??
@@ -652,22 +671,22 @@ Do not wrap in markdown. Return pure JSON only.
     required String base64Image,
     List<int>? rawBytes,
   }) async {
-    // 1. Primary: Groq Multimodal Vision (llama-3.2-11b-vision-preview / llama-3.2-90b-vision-preview)
-    final groqRes = await _callGroqVisionApi(
-      prompt: prompt,
-      base64Image: base64Image,
-    );
-    if (groqRes != null && groqRes.isNotEmpty) {
-      return groqRes;
-    }
-
-    // 2. Secondary: Google Gemini Vision API
+    // 1. Primary: Google Gemini Vision API (fastest direct multimodal vision)
     final geminiRes = await _callGeminiVisionApi(
       prompt: prompt,
       base64Image: base64Image,
     );
     if (geminiRes != null && geminiRes.isNotEmpty) {
       return geminiRes;
+    }
+
+    // 2. Secondary: Groq Multimodal Vision
+    final groqRes = await _callGroqVisionApi(
+      prompt: prompt,
+      base64Image: base64Image,
+    );
+    if (groqRes != null && groqRes.isNotEmpty) {
+      return groqRes;
     }
 
     // 3. Tertiary: Backend AI Proxy
@@ -766,7 +785,8 @@ Do not wrap in markdown. Return pure JSON only.
     required String base64Image,
   }) async {
     try {
-      final uri = Uri.parse('${ApiConfig.aiBackendUrl}${ApiConfig.backendIdentifyEndpoint}');
+      final uri = Uri.parse(
+          '${ApiConfig.aiBackendUrl}${ApiConfig.backendIdentifyEndpoint}');
       final headers = {
         'Content-Type': 'application/json',
       };
@@ -789,7 +809,8 @@ Do not wrap in markdown. Return pure JSON only.
   }
 
   /// Hugging Face plant classification model call
-  Future<String?> _callHuggingFaceVisionApi({required List<int> rawBytes}) async {
+  Future<String?> _callHuggingFaceVisionApi(
+      {required List<int> rawBytes}) async {
     try {
       final uri = Uri.parse(ApiConfig.huggingFaceVisionModel);
       final headers = {
@@ -839,7 +860,8 @@ Do not wrap in markdown. Return pure JSON only.
   }) async {
     final allUserPlants = PlantRepository().plants;
     final userProfile = UserService().currentUser;
-    final activePlant = plant ?? (allUserPlants.isNotEmpty ? allUserPlants.first : null);
+    final activePlant =
+        plant ?? (allUserPlants.isNotEmpty ? allUserPlants.first : null);
     final healthReport = activePlant != null
         ? PlantHealthEngine.evaluate(plant: activePlant, checkins: history)
         : null;
@@ -944,7 +966,8 @@ Reply in 2-4 friendly, encouraging sentences with emojis.
       }
     }
 
-    return _generateOfflineQnAResponse(activePlant, userQuestion, healthReport, hasNoPlants: hasNoPlants);
+    return _generateOfflineQnAResponse(activePlant, userQuestion, healthReport,
+        hasNoPlants: hasNoPlants);
   }
 
   /// High-speed Groq Chat REST call using verified active models
@@ -985,7 +1008,8 @@ Reply in 2-4 friendly, encouraging sentences with emojis.
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          final content = data['choices']?[0]?['message']?['content']?.toString();
+          final content =
+              data['choices']?[0]?['message']?['content']?.toString();
           if (content != null && content.trim().isNotEmpty) {
             return content.trim();
           }
@@ -996,6 +1020,40 @@ Reply in 2-4 friendly, encouraging sentences with emojis.
     }
 
     return null;
+  }
+
+  /// Fetches available Gemini models for the specified API key from Google Generative Language API
+  Future<List<String>> fetchAvailableGeminiModels({String? apiKey}) async {
+    final keyToUse = apiKey ?? (this.apiKey.isNotEmpty ? this.apiKey : ApiConfig.geminiApiKey1);
+    if (keyToUse.isEmpty) return ApiConfig.geminiFallbackModels;
+
+    try {
+      final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?key=$keyToUse');
+      final response = await http.get(uri).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['models'] is List) {
+          final List<String> available = [];
+          for (final item in data['models']) {
+            if (item is Map && item['name'] != null) {
+              final rawName = item['name'].toString();
+              final modelId = rawName.startsWith('models/') ? rawName.substring(7) : rawName;
+              final methods = item['supportedGenerationMethods'];
+              if (methods is List && methods.contains('generateContent')) {
+                available.add(modelId);
+              }
+            }
+          }
+          if (available.isNotEmpty) {
+            return available;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching available Gemini models for API key: $e');
+    }
+    return ApiConfig.geminiFallbackModels;
   }
 
   /// REST call to Gemini Generative Language API
@@ -1013,20 +1071,14 @@ Reply in 2-4 friendly, encouraging sentences with emojis.
       if (fallbackKey.isNotEmpty && fallbackKey != primaryKey) fallbackKey,
     ];
 
-    final modelsToTry = [
-      'gemini-2.5-flash',
-      'gemini-2.5-flash-lite',
-      'gemini-3.7-flash',
-      'gemini-3.5-flash',
-      'gemini-flash-latest',
-      'gemini-1.5-flash',
-    ];
+    final modelsToTry = ApiConfig.geminiFallbackModels;
 
     for (final currentKey in keysToTry) {
       if (currentKey.isEmpty) continue;
       for (final model in modelsToTry) {
         try {
-          final uri = Uri.parse('${ApiConfig.geminiBaseUrl}/$model:generateContent');
+          final uri =
+              Uri.parse('${ApiConfig.geminiBaseUrl}/$model:generateContent');
           final headers = {
             'Content-Type': 'application/json',
             'x-goog-api-key': currentKey,
@@ -1047,11 +1099,12 @@ Reply in 2-4 friendly, encouraging sentences with emojis.
 
           final response = await http
               .post(uri, headers: headers, body: body)
-              .timeout(const Duration(seconds: 6));
+              .timeout(const Duration(seconds: 4));
 
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
-            final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
+            final text = data['candidates']?[0]?['content']?['parts']?[0]
+                ?['text'] as String?;
             if (text != null && text.isNotEmpty) {
               return text;
             }
@@ -1081,18 +1134,12 @@ Reply in 2-4 friendly, encouraging sentences with emojis.
       if (fallbackKey.isNotEmpty && fallbackKey != primaryKey) fallbackKey,
     ];
 
-    final modelsToTry = [
-      'gemini-2.5-flash',
-      'gemini-2.5-flash-lite',
-      'gemini-3.7-flash',
-      'gemini-3.5-flash',
-      'gemini-flash-latest',
-      'gemini-1.5-flash',
-    ];
+    final modelsToTry = ApiConfig.geminiFallbackModels;
 
     String cleanBase64 = base64Image.trim();
     String mimeType = 'image/jpeg';
-    if (cleanBase64.startsWith('data:image/png') || cleanBase64.startsWith('iVBOR')) {
+    if (cleanBase64.startsWith('data:image/png') ||
+        cleanBase64.startsWith('iVBOR')) {
       mimeType = 'image/png';
     }
     if (cleanBase64.contains(',')) {
@@ -1106,7 +1153,8 @@ Reply in 2-4 friendly, encouraging sentences with emojis.
       if (currentKey.isEmpty) continue;
       for (final model in modelsToTry) {
         try {
-          final uri = Uri.parse('${ApiConfig.geminiBaseUrl}/$model:generateContent');
+          final uri =
+              Uri.parse('${ApiConfig.geminiBaseUrl}/$model:generateContent');
           final headers = {
             'Content-Type': 'application/json',
             'x-goog-api-key': currentKey,
@@ -1133,11 +1181,12 @@ Reply in 2-4 friendly, encouraging sentences with emojis.
 
           final response = await http
               .post(uri, headers: headers, body: body)
-              .timeout(const Duration(seconds: 6));
+              .timeout(const Duration(seconds: 4));
 
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
-            final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
+            final text = data['candidates']?[0]?['content']?['parts']?[0]
+                ?['text'] as String?;
             if (text != null && text.isNotEmpty) {
               return text;
             }
@@ -1163,11 +1212,14 @@ Reply in 2-4 friendly, encouraging sentences with emojis.
     }
 
     final q = question.toLowerCase();
-    final species = plant.speciesName.isNotEmpty ? plant.speciesName : plant.plantName;
+    final species =
+        plant.speciesName.isNotEmpty ? plant.speciesName : plant.plantName;
 
     if (q.contains('water') || q.contains('drink') || q.contains('dry')) {
       final days = plant.daysUntilWatering;
-      final status = plant.isWateringDue ? "needs water today! 💧" : "is hydrated and needs water in $days day${days > 1 ? 's' : ''}.";
+      final status = plant.isWateringDue
+          ? "needs water today! 💧"
+          : "is hydrated and needs water in $days day${days > 1 ? 's' : ''}.";
       return '💧 Your ${plant.plantName} ($species) $status Make sure to water with room-temperature water.';
     } else if (q.contains('sun') || q.contains('light')) {
       return '☀️ ${plant.plantName} ($species) thrives with ${plant.targetSunlightHours} hours of bright, indirect sunlight daily!';
@@ -1192,93 +1244,125 @@ Reply in 2-4 friendly, encouraging sentences with emojis.
 
   static const Map<String, Map<String, String>> botanicalSpeciesDictionary = {
     'tulsi': {
-      'foliage': 'aromatic ovate serrated green leaves with subtle purple veining and velvety texture',
-      'flower': 'delicate upright purple-tinged blossom racemes with tiny fragrant florets',
+      'foliage':
+          'aromatic ovate serrated green leaves with subtle purple veining and velvety texture',
+      'flower':
+          'delicate upright purple-tinged blossom racemes with tiny fragrant florets',
       'stem': 'slender purplish-green square branching stems',
     },
     'holy basil': {
-      'foliage': 'aromatic ovate serrated green leaves with subtle purple veining and velvety texture',
-      'flower': 'delicate upright purple-tinged blossom racemes with tiny fragrant florets',
+      'foliage':
+          'aromatic ovate serrated green leaves with subtle purple veining and velvety texture',
+      'flower':
+          'delicate upright purple-tinged blossom racemes with tiny fragrant florets',
       'stem': 'slender purplish-green square branching stems',
     },
     'rose': {
-      'foliage': 'glossy dark green pinnate compound leaves with fine serrated edges',
-      'flower': 'luxurious velvety layered rose petals in radiant vibrant crimson and soft blush',
-      'stem': 'sturdy woody green canes with characteristic miniature botanical thorns',
+      'foliage':
+          'glossy dark green pinnate compound leaves with fine serrated edges',
+      'flower':
+          'luxurious velvety layered rose petals in radiant vibrant crimson and soft blush',
+      'stem':
+          'sturdy woody green canes with characteristic miniature botanical thorns',
     },
     'sunflower': {
-      'foliage': 'broad heart-shaped textured rough green leaves with deep prominent veins',
-      'flower': 'magnificent golden-yellow ray petals surrounding a dense spiraling dark amber seed disk',
+      'foliage':
+          'broad heart-shaped textured rough green leaves with deep prominent veins',
+      'flower':
+          'magnificent golden-yellow ray petals surrounding a dense spiraling dark amber seed disk',
       'stem': 'thick robust fibrous hairy green stem standing upright',
     },
     'monstera': {
-      'foliage': 'iconic glossy deep forest green swiss-cheese split leaves with distinct fenestrations',
+      'foliage':
+          'iconic glossy deep forest green swiss-cheese split leaves with distinct fenestrations',
       'flower': 'rare tropical pale cream spathe and spadix bloom',
-      'stem': 'chunky tropical climbing aerial roots and thick emerald petioles',
+      'stem':
+          'chunky tropical climbing aerial roots and thick emerald petioles',
     },
     'aloe vera': {
-      'foliage': 'plump succulent rosette of thick fleshy lance-shaped leaves with soft white serrated teeth and translucent gel core',
+      'foliage':
+          'plump succulent rosette of thick fleshy lance-shaped leaves with soft white serrated teeth and translucent gel core',
       'flower': 'tall central flower spike with tubular coral-orange blossoms',
       'stem': 'stemless compact succulent rosette base',
     },
     'snake plant': {
-      'foliage': 'tall architectural sword-like upright leaves with yellow-gold margins and dark green horizontal tiger stripes',
+      'foliage':
+          'tall architectural sword-like upright leaves with yellow-gold margins and dark green horizontal tiger stripes',
       'flower': 'slender spike of tiny greenish-white fragrant tubular flowers',
-      'stem': 'dense cluster of rigid upright foliage emerging directly from soil',
+      'stem':
+          'dense cluster of rigid upright foliage emerging directly from soil',
     },
     'lavender': {
       'foliage': 'slender linear silvery-green needle-like aromatic foliage',
-      'flower': 'vibrant fragrant violet-purple flower spikes waving gracefully',
+      'flower':
+          'vibrant fragrant violet-purple flower spikes waving gracefully',
       'stem': 'semi-woody compact branching base with slender flowering stalks',
     },
     'money plant': {
-      'foliage': 'glossy heart-shaped cascading leaves with golden-yellow marble variegation splashes',
+      'foliage':
+          'glossy heart-shaped cascading leaves with golden-yellow marble variegation splashes',
       'flower': 'rare tropical foliage vine',
       'stem': 'graceful trailing climbing vine with aerial root nodes',
     },
     'pothos': {
-      'foliage': 'glossy heart-shaped cascading leaves with golden-yellow marble variegation splashes',
+      'foliage':
+          'glossy heart-shaped cascading leaves with golden-yellow marble variegation splashes',
       'flower': 'rare tropical foliage vine',
       'stem': 'graceful trailing climbing vine with aerial root nodes',
     },
     'peace lily': {
-      'foliage': 'lush arching dark green glossy lanceolate leaves with deep parallel venation',
-      'flower': 'elegant pristine white petal-like spathe curving around a textured creamy spadix',
+      'foliage':
+          'lush arching dark green glossy lanceolate leaves with deep parallel venation',
+      'flower':
+          'elegant pristine white petal-like spathe curving around a textured creamy spadix',
       'stem': 'slender arching petioles arising in a clumping habit',
     },
     'marigold': {
-      'foliage': 'feathery deeply divided aromatic fern-like dark green leaflets',
-      'flower': 'dense ruffled spherical pom-pom blossoms in dazzling golden amber and tangerine orange',
+      'foliage':
+          'feathery deeply divided aromatic fern-like dark green leaflets',
+      'flower':
+          'dense ruffled spherical pom-pom blossoms in dazzling golden amber and tangerine orange',
       'stem': 'bushy branching herbaceous green stems',
     },
     'jade plant': {
-      'foliage': 'plump oval jade-green succulent leaves with subtle ruby-red sun-kissed margins',
+      'foliage':
+          'plump oval jade-green succulent leaves with subtle ruby-red sun-kissed margins',
       'flower': 'clusters of starry soft pink-white miniature blossoms',
-      'stem': 'thick miniature bonsai-like tree trunk with smooth fleshy branches',
+      'stem':
+          'thick miniature bonsai-like tree trunk with smooth fleshy branches',
     },
     'orchid': {
-      'foliage': 'thick leathery dark green oblong leaves arranged alternating at the base',
-      'flower': 'exquisite cascading butterfly-shaped moth orchid blooms with striking magenta lip and pristine petals',
-      'stem': 'gracefully arching slender flower spike with silvery aerial roots',
+      'foliage':
+          'thick leathery dark green oblong leaves arranged alternating at the base',
+      'flower':
+          'exquisite cascading butterfly-shaped moth orchid blooms with striking magenta lip and pristine petals',
+      'stem':
+          'gracefully arching slender flower spike with silvery aerial roots',
     },
     'jasmine': {
       'foliage': 'lustrous bright green ovate leaflets arranged in neat pairs',
-      'flower': 'star-shaped intensely fragrant pure white blossoms with velvety petals',
+      'flower':
+          'star-shaped intensely fragrant pure white blossoms with velvety petals',
       'stem': 'twining woody green vine with graceful sprawling branches',
     },
     'tomato': {
-      'foliage': 'pungent aromatic deeply lobed serrated green leaves with fine glandular hairs',
-      'flower': 'bright yellow star-shaped flowers and miniature glossy ripening cherry tomatoes',
+      'foliage':
+          'pungent aromatic deeply lobed serrated green leaves with fine glandular hairs',
+      'flower':
+          'bright yellow star-shaped flowers and miniature glossy ripening cherry tomatoes',
       'stem': 'thick hairy green vine supported on a miniature garden stake',
     },
     'mint': {
-      'foliage': 'bright emerald crinkled aromatic ovate leaves with serrated margins',
+      'foliage':
+          'bright emerald crinkled aromatic ovate leaves with serrated margins',
       'flower': 'tiny lilac-purple flower whorls on terminal spikes',
-      'stem': 'square green branching stems forming a lush dense aromatic cluster',
+      'stem':
+          'square green branching stems forming a lush dense aromatic cluster',
     },
     'hibiscus': {
       'foliage': 'glossy dark green ovate leaves with coarsely serrated edges',
-      'flower': 'giant dramatic tropical flared 5-petal flower with prominent long protruding red pistil and yellow pollen',
+      'flower':
+          'giant dramatic tropical flared 5-petal flower with prominent long protruding red pistil and yellow pollen',
       'stem': 'woody upright branching shrub stem',
     },
   };
@@ -1292,8 +1376,10 @@ Reply in 2-4 friendly, encouraging sentences with emojis.
       }
     }
     return {
-      'foliage': 'healthy vibrant foliage with species-accurate shape, intricate venation, and vivid chlorophyll green tones for $speciesName',
-      'flower': 'characteristic authentic blossoms and flower buds specific to $speciesName',
+      'foliage':
+          'healthy vibrant foliage with species-accurate shape, intricate venation, and vivid chlorophyll green tones for $speciesName',
+      'flower':
+          'characteristic authentic blossoms and flower buds specific to $speciesName',
       'stem': 'sturdy natural stem and branch structure for $speciesName',
     };
   }
@@ -1308,7 +1394,9 @@ Reply in 2-4 friendly, encouraging sentences with emojis.
     final foliage = profile['foliage']!;
     final flower = profile['flower']!;
     final stem = profile['stem']!;
-    final plantLabel = speciesName.isNotEmpty ? speciesName : (plant?.plantName ?? 'Botanical Plant');
+    final plantLabel = speciesName.isNotEmpty
+        ? speciesName
+        : (plant?.plantName ?? 'Botanical Plant');
 
     String stageDescription;
     switch (stageIndex) {
@@ -1348,7 +1436,8 @@ Reply in 2-4 friendly, encouraging sentences with emojis.
     required int stageIndex,
     int? seed,
   }) {
-    final prompt = getEnhancedPlantStagePrompt(speciesName: speciesName, stageIndex: stageIndex);
+    final prompt = getEnhancedPlantStagePrompt(
+        speciesName: speciesName, stageIndex: stageIndex);
     final encodedPrompt = Uri.encodeComponent(prompt);
     final seedVal = seed ?? (speciesName.hashCode.abs() + (stageIndex * 1337));
     return "https://image.pollinations.ai/prompt/$encodedPrompt?width=512&height=512&seed=$seedVal&nologo=true";
