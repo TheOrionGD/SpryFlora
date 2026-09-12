@@ -17,6 +17,9 @@ import forgotPasswordRoutes from './routes/forgot_password.routes.js';
 
 const app = express();
 
+// Trust Render.com's reverse proxy (required for express-rate-limit to read X-Forwarded-For correctly)
+app.set('trust proxy', 1);
+
 // Security Middlewares
 app.use(
   helmet({

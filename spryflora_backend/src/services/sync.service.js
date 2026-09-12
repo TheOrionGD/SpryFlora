@@ -4,6 +4,9 @@ import { UserService } from './user.service.js';
 import { SyncOperation } from '../models/SyncOperation.js';
 import { generateClientOpId } from '../utils/ids.js';
 
+/** Returns true if a MongoDB error is a duplicate key (E11000) conflict. */
+const isDuplicateKeyError = (err) => err?.code === 11000;
+
 export class SyncService {
   static async syncPlants(userId, localPlants = []) {
     const processed = [];
@@ -29,15 +32,22 @@ export class SyncService {
           plant = await PlantService.updatePlant(userId, clientPlantId, localPlant);
         }
 
-        await SyncOperation.create({
-          clientOperationId: opId,
-          userId,
-          operationType: 'UPSERT',
-          entityType: 'PLANT',
-          entityId: clientPlantId,
-          payload: localPlant,
-          status: 'PROCESSED',
-        });
+        // Use upsert to avoid race-condition duplicate key errors
+        await SyncOperation.findOneAndUpdate(
+          { clientOperationId: opId },
+          {
+            $setOnInsert: {
+              clientOperationId: opId,
+              userId,
+              operationType: 'UPSERT',
+              entityType: 'PLANT',
+              entityId: clientPlantId,
+              payload: localPlant,
+              status: 'PROCESSED',
+            },
+          },
+          { upsert: true, new: false }
+        );
       } catch (err) {
         console.error(`[SyncService] Plant sync error for ${clientPlantId}:`, err.message);
       }
@@ -90,15 +100,22 @@ export class SyncService {
           });
         }
 
-        await SyncOperation.create({
-          clientOperationId: opId,
-          userId,
-          operationType: 'CREATE',
-          entityType: 'CHECKIN',
-          entityId: checkinId,
-          payload: checkin,
-          status: 'PROCESSED',
-        });
+        // Use upsert to avoid race-condition duplicate key errors
+        await SyncOperation.findOneAndUpdate(
+          { clientOperationId: opId },
+          {
+            $setOnInsert: {
+              clientOperationId: opId,
+              userId,
+              operationType: 'CREATE',
+              entityType: 'CHECKIN',
+              entityId: checkinId,
+              payload: checkin,
+              status: 'PROCESSED',
+            },
+          },
+          { upsert: true, new: false }
+        );
 
         syncedCount++;
       } catch (err) {
