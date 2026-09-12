@@ -14,7 +14,9 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.theoriongd.spryflora_app"
+    namespace = "com.spryflora.app"
+    // Use flutter.compileSdkVersion so plugins that require a higher SDK
+    // (camera, geolocator, notifications, etc.) compile without errors.
     compileSdk = 36
     ndkVersion = "28.2.13676358"
 
@@ -25,16 +27,9 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.theoriongd.spryflora_app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        applicationId = "com.spryflora.app"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
-        // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
-        // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
-        // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
-        // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -53,12 +48,25 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            
+
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
             }
+
+            // Fix: Disable NDK debug symbol stripping to avoid Gradle 8 crash
+            // where stripReleaseDebugSymbols fails to hash libflutter.so temp files.
+            ndk {
+                debugSymbolLevel = "NONE"
+            }
+        }
+    }
+
+    // Fix: useLegacyPackaging prevents .so temp-stream file packaging issues on Gradle 8
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 }

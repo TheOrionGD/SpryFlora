@@ -1,4 +1,4 @@
-package com.theoriongd.spryflora_app
+package com.spryflora.app
 
 import io.flutter.embedding.android.FlutterActivity
 

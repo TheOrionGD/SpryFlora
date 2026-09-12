@@ -237,18 +237,18 @@ Do not wrap in markdown quotes. Return pure JSON only.
 
               final speciesStr = map['identifiedSpecies']?.toString().trim() ?? '';
               final lowerSpecies = speciesStr.toLowerCase();
-              if (isPlantDetected &&
-                  speciesStr.isNotEmpty &&
-                  lowerSpecies != 'unknown' &&
-                  lowerSpecies != 'plant' &&
-                  lowerSpecies != 'botanical plant' &&
-                  lowerSpecies != 'green plant' &&
-                  lowerSpecies != 'not a plant' &&
-                  lowerSpecies != 'no plant found' &&
-                  lowerSpecies != 'no plant detected') {
+              // Check if the AI confirmed a plant is present
+              final isDefinitelyNotPlant =
+                  lowerSpecies == 'no plant found' ||
+                  lowerSpecies == 'not a plant' ||
+                  lowerSpecies == 'no plant detected';
+
+              if (isPlantDetected && speciesStr.isNotEmpty && !isDefinitelyNotPlant) {
+                // Accept any non-empty species name when AI says it's a plant
+                // (including generic names like "Plant", "Green Plant", "Botanical Plant")
                 detectedSpeciesName = speciesStr;
                 aiIdentified = true;
-              } else if (!isPlantDetected || lowerSpecies == 'no plant found' || lowerSpecies == 'not a plant') {
+              } else if (!isPlantDetected || isDefinitelyNotPlant) {
                 isPlantDetected = false;
                 detectedSpeciesName = 'No Plant Found';
                 confidence = 0;
@@ -284,8 +284,10 @@ Do not wrap in markdown quotes. Return pure JSON only.
             confidence = 0;
           }
 
-          if (!aiIdentified) {
-            isPlantDetected = false;
+          // Only override detection if the AI itself said no plant was found.
+          // Do NOT override a positive AI result (isPlantDetected=true) just
+          // because the species name looked generic — that was causing false negatives.
+          if (!aiIdentified && !isPlantDetected) {
             detectedObjectType = 'Non-Botanical Object';
             rejectionReason = 'No plant detected in photo.';
             detectedSpeciesName = 'No Plant Found';

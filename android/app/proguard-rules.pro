@@ -7,7 +7,7 @@
 -keep class io.flutter.plugins.**  { *; }
 
 # SpryFlora App Components
--keep class com.theoriongd.spryflora_app.** { *; }
+-keep class com.spryflora.app.** { *; }
 
 # Notifications
 -keep class com.dexterous.flutterlocalnotifications.** { *; }
