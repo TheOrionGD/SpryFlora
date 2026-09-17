@@ -14,11 +14,6 @@ class PlantRepository extends ChangeNotifier {
   factory PlantRepository() => _instance;
   PlantRepository._internal();
 
-  static const String _legacyPlantsStorageKey = 'spryflora_user_plants';
-  static const String _legacyCheckinsStorageKey = 'spryflora_plant_checkins';
-  static const String _defaultUserPlantsKey = 'spryflora_user_plants_usr_default';
-  static const String _defaultUserCheckinsKey = 'spryflora_plant_checkins_usr_default';
-
   String? _currentUserId;
   List<PlantModel> _plants = [];
   List<DailyCheckinModel> _checkins = [];

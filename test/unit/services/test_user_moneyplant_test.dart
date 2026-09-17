@@ -1,7 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:spryflora_app/models/plant_model.dart';
-import 'package:spryflora_app/models/user_model.dart';
 import 'package:spryflora_app/services/test_data_service.dart';
 import 'package:spryflora_app/services/plant_repository.dart';
 import 'package:spryflora_app/services/user_service.dart';
@@ -14,7 +12,9 @@ void main() {
   });
 
   group('Money Plant Completed Test User Suite', () {
-    test('Should seed completed test user with 100% grown Money Plant and all tasks complete', () async {
+    test(
+        'Should seed completed test user with 100% grown Money Plant and all tasks complete',
+        () async {
       await TestDataService.seedCompletedMoneyPlantLocalUser();
 
       final user = UserService().currentUser;
